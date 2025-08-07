@@ -1,3 +1,4 @@
+import { CategoryId } from '@/type';
 export const mockCategories = [
   {
     id: "haircut",
@@ -5,9 +6,10 @@ export const mockCategories = [
     description: "Cuts, styling & treatments",
     icon: "✂️",
     image:"/images/barber.jpg",
-    services: 15,
-    avgWait: "12 min",
-    popular: true,
+    services: 0, 
+    gradient: "from-pink-500 to-rose-500",
+    avgWait: "12 min", // 👈 ADD THIS
+    popular: true,    // 👈 ADD THIS
   },
   {
      id: 'spa-wellness',
@@ -15,9 +17,10 @@ export const mockCategories = [
     description: "Massage & relaxation",
     icon: "🧘‍♀️",
     image:"/images/spa.jpg",
-    services: 8,
-    avgWait: "25 min",
-    trending: true,
+    services: 0,
+    gradient: "from-teal-400 to-cyan-500",
+    avgWait: "25 min", // 👈 ADD THIS
+    trending: true,   // 👈 ADD THIS
   },
   {
      id: 'health',
@@ -25,8 +28,9 @@ export const mockCategories = [
     description: "Medical appointments",
     icon: "🏥",
     image: "/images/health.jpg",
-    services: 12,
-    avgWait: "18 min",
+    services: 0,
+    gradient: "from-blue-500 to-indigo-500",
+    avgWait: "18 min", // 👈 ADD THIS
   },
   {
    id: 'fitness',
@@ -34,8 +38,9 @@ export const mockCategories = [
     description: "Training & classes",
     icon: "💪",
     image:"/images/fintnees.jpeg",
-    services: 6,
-    avgWait: "8 min",
+    services: 0,
+    gradient: "from-orange-500 to-amber-500",
+    avgWait: "8 min",  // 👈 ADD THIS
   },
   {
     id: "automotive",
@@ -43,8 +48,9 @@ export const mockCategories = [
     description: "Car care & repair",
     icon: "🚗",
     image:"/images/auto.png",
-    services: 10,
-    avgWait: "35 min",
+    services: 0,
+    gradient: "from-slate-600 to-gray-700",
+    avgWait: "35 min", // 👈 ADD THIS
   },
   {
     id: "food",
@@ -52,18 +58,20 @@ export const mockCategories = [
     description: "Dining & takeout",
     icon: "🍽️",
     image:"/images/food.jpg",
-    services: 20,
-    avgWait: "15 min",
+    services: 0,
+    gradient: "from-red-500 to-red-600",
+    avgWait: "15 min", // 👈 ADD THIS
   },
    {
     id: 'pet-services',
     name: 'Pet Services',
-    description: "Dining & takeout",
+    description: "Grooming & care",
     icon: "🐶",
-    image:"/images/food.jpg",
-    services: 20,
-    avgWait: "15 min",
+    image:"/images/pet.jpg",
+    services: 0,
+    gradient: "from-lime-500 to-green-500",
+    avgWait: "15 min", // 👈 ADD THIS
   },
-]
+];
 
-
+// ... rest of your firebase-utils.ts file ...

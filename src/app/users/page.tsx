@@ -1,83 +1,65 @@
 "use client";
+import { useState, useEffect } from 'react';
+// Or your router of choice
+import Link from 'next/link';
+import { Category } from '@/type';
 
-import { useState, useMemo } from "react";
-import MainDashboard from "@/components/maindashbord"; // Correct path if needed
-import CategoryView from "@/components/category";     // Correct path if needed
+import { useRouter } from 'next/navigation';
 
-// Import mock data
-import { mockServices } from "@/components/data/services";
-import { mockCompanies } from "@/components/data/company";
-import { mockQueueItems } from "@/components/data/queueItem";
+import { getGlobalCategoriesWithServiceCounts } from '@/lib/firebase-utils';
+// Example: Get your companyId from auth context or session
 
-// Import your central types
 
-import { mockCategories } from "@/components/data/categories";
-import { ServiceWithDetails, Category } from "@/type";
-export default function HomePage() {
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  // ✨ 1. ADD STATE FOR THE SEARCH QUERY IN THE PARENT COMPONENT
-  const [searchQuery, setSearchQuery] = useState("");
+const ServiceCategoriesPage = () => {
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const router = useRouter();
 
-  // Create the detailed data set (this logic is correct from previous steps)
-  const servicesWithDetails: ServiceWithDetails[] = useMemo(() => {
-    return mockServices.map((service) => {
-      const company = mockCompanies.find((c) => c.id === service.companyId);
-      const queueCount = mockQueueItems.filter(
-        (q) => q.serviceId === service.id && q.status === "waiting"
-      ).length;
-      return { ...service, company, queueCount };
-    });
+   useEffect(() => {
+    const fetchCategories = async () => {
+      setIsLoading(true);
+      // 👇 Use the new function. No companyId needed!
+      const data = await getGlobalCategoriesWithServiceCounts(); 
+      setCategories(data);
+      setIsLoading(false);
+    };
+
+    fetchCategories();
   }, []);
 
-  const featuredServicesWithDetails = useMemo(() => {
-    return servicesWithDetails.filter((service) => service.featureEnabled === true);
-  }, [servicesWithDetails]);
-  
-  // ✨ 2. CREATE A FILTERED LIST FOR THE CATEGORY VIEW
-  // This list depends on both the selected category and the search query
-  const filteredCategoryServices = useMemo(() => {
-    if (!selectedCategory) return [];
-
-    // Find the actual category object to get its type (e.g., 'Beauty')
-    const categoryDetails = mockCategories.find(c => c.id === selectedCategory);
-    if (!categoryDetails) return [];
-
-    let filtered = servicesWithDetails.filter(s => s.type === categoryDetails.name);
-
-    if (searchQuery) {
-      const searchLower = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        s => 
-          s.name.toLowerCase().includes(searchLower) ||
-          s.company?.name.toLowerCase().includes(searchLower) ||
-          s.code.toLowerCase().includes(searchLower)
-      );
-    }
-    
-    return filtered;
-  }, [selectedCategory, searchQuery, servicesWithDetails]);
-
-
-  if (selectedCategory) {
-    // ✨ 3. PASS THE MISSING PROPS TO CATEGORYVIEW
-    return (
-      <CategoryView
-        categoryId={selectedCategory}
-        services={filteredCategoryServices} // Pass the newly filtered list
-        searchQuery={searchQuery}            // Pass the state
-        onSearchChange={setSearchQuery}      // Pass the state setter
-        onClearCategory={() => {
-          setSelectedCategory(null);
-          setSearchQuery(""); // Also clear search when leaving the category
-        }}
-      />
-    );
+  if (isLoading) {
+    return <div>Loading categories...</div>;
   }
 
   return (
-    <MainDashboard
-      onSelectCategory={setSelectedCategory}
-      featuredServices={featuredServicesWithDetails}
-    />
+    <div className="container mx-auto p-8">
+      <h1 className="text-3xl font-bold mb-6">Service Categories</h1>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {categories.map((category) => (
+          // Use Link to make the whole card clickable
+          <Link key={category.id} href={`/usercategory/${category.id}`} passHref>
+            <div className="block p-6 bg-white rounded-lg border border-gray-200 shadow-md hover:bg-gray-100 transition-colors duration-200 cursor-pointer">
+              <div className="flex items-center mb-4">
+                <span className="text-4xl mr-4">{category.icon}</span>
+                <div>
+                  <h5 className="text-2xl font-bold tracking-tight text-gray-900">
+                    {category.name}
+                  </h5>
+                  <p className="font-normal text-gray-700">
+                    {category.description}
+                  </p>
+                </div>
+              </div>
+               {/* Display the dynamic service count */}
+              <p className="text-blue-600 font-semibold">
+                {category.services} {category.services === 1 ? 'service' : 'services'} available
+              </p>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </div>
   );
-}
+};
+
+export default ServiceCategoriesPage;
