@@ -3,8 +3,8 @@
 import { useState, useEffect } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { Icon } from "@iconify/react";
-import { JoinQueueDialog } from "@/components/JoinQueueDialog";
-import BookServiceDialog from "@/components/BookServiceDialog";
+import { JoinQueueDialog } from "@/app/services/[servicesId]/book/_componet/JoinQueueDialog";
+import BookServiceDialog from "@/app/services/[servicesId]/book/_componet/BookServiceDialog";
 import { getServiceWithProviders } from "@/lib/firebase-utils";
 
 // --- KEY IMPORTS ---

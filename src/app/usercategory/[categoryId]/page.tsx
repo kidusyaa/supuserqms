@@ -8,10 +8,12 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 
 import { Service } from '@/type';
-import { getAllServicesByCategory } from '@/lib/firebase-utils';
+import { getAllServicesByCategory, getCategoryById } from '@/lib/firebase-utils';
 import Link from 'next/link';
 const ServicesListPage = () => {
   const [services, setServices] = useState<Service[]>([]);
+  const [categoryName, setCategoryName] = useState<string>("");
+  const [categoryIcon, setCategoryIcon] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
 
   const router = useRouter(); // This hook is for navigation (e.g., router.back())
@@ -23,14 +25,19 @@ const ServicesListPage = () => {
   useEffect(() => {
     // We already have the categoryId, so no need for 'typeof' check here
     if (categoryId) {
-      const fetchServices = async () => {
+      const fetchData = async () => {
         setIsLoading(true);
-        const data = await getAllServicesByCategory(categoryId);
+        const [data, category] = await Promise.all([
+          getAllServicesByCategory(categoryId),
+          getCategoryById(categoryId),
+        ]);
         setServices(data);
+        setCategoryName(category?.name || categoryId);
+        setCategoryIcon(category?.icon || categoryId);
         setIsLoading(false);
       };
 
-      fetchServices();
+      fetchData();
     }
   }, [categoryId]); // The dependency array is correct
 
@@ -43,7 +50,8 @@ const ServicesListPage = () => {
       <button onClick={() => router.back()} className="mb-6 text-blue-600 hover:underline">
         ← Back to Categories
       </button>
-      <h1 className="text-3xl font-bold mb-6">Services for {categoryId}</h1>
+      <p className="mb-4 ">Services for <span className='text-2xl font-bold '>{categoryName}{categoryIcon}</span></p>
+      
       
       {services.length === 0 ? (
         <p>No services found...</p>

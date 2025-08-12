@@ -53,7 +53,7 @@ function ServiceDetailContent() {
             setSelectedProvider(ANY_PROVIDER_OPTION);
           }
         } else {
-          setError(`Service with ID "${serviceId}" not found.`);
+          setError(`This service is inactive or not available.`);
         }
 
         if (companyData) {

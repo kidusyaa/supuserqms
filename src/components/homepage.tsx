@@ -2,22 +2,21 @@ import React from 'react'
 import Link from 'next/link'
 import DivCenter from './divCenter'
 import { Button } from './ui/button'
+
+import ServiceCategoriesPage from './ServiceCategoriesPage'
+import NavSection from './navsection'
+import { StatsFs } from 'node:fs'
+import StatsSection from './StatsSection'
+import FeaturedServices from './Featuredservice'
+
 export default function Homepage() {
+  const SERVICES_SECTION_ID = "services-list";
   return (
     <div>
-        <DivCenter>
-          <div className='my-auto'>
-             <Link href={'/users'}>
-            <Button >Users Queue</Button>
-            </Link>
-            <Link href={'/company'}>
-            <Button className='ml-4'>Company Dashbord</Button>
-            </Link>
-            <Link href={'/registration'}>
-            <Button className='ml-4'>Company Regstration</Button>
-            </Link>
-          </div>
-        </DivCenter>
+      <NavSection servicesSectionId={SERVICES_SECTION_ID} />
+      <StatsSection/>
+      <FeaturedServices/>
+      <ServiceCategoriesPage/>
     </div>
   )
 }

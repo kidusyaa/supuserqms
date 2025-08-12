@@ -1,6 +1,5 @@
 // Firebase utilities with proper error handling
 import type { Company, Service, QueueItem, CreateQueueItem, User, Category, Provider, MessageTemplate, LocationOption } from '../type';
-import { mockCategories } from '@/components/data/categories'; // Assuming you have a mock data file
 // Import Firebase modules directly - this should work now with the updated config
 import { 
   collection, 
@@ -18,7 +17,8 @@ import {
   onSnapshot,
   serverTimestamp,
   collectionGroup,
-  writeBatch
+  writeBatch,
+  Timestamp
 } from 'firebase/firestore';
 import { db } from './firebase-simple';
 // ✅ correct
@@ -43,6 +43,17 @@ export const getAllCategories = async (): Promise<Category[]> => {
   const snapshot = await getDocs(q);
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Category[];
 };
+
+export const getCategoryById = async (id: string): Promise<Category | null> => {
+  try {
+    const docRef = doc(db, 'categories', id);
+    const docSnap = await getDoc(docRef);
+    return docSnap.exists() ? ({ id: docSnap.id, ...docSnap.data() } as Category) : null;
+  } catch (error) {
+    console.error('Error getting category by ID:', error);
+    return null;
+  }
+};
 // ✅ NEW FUNCTION: Get a single service with its providers
 export const getServiceWithProviders = async (
   companyId: string, 
@@ -61,6 +72,10 @@ export const getServiceWithProviders = async (
     console.log("[Firebase] Service document found successfully.");
 
     const serviceData = { id: serviceSnap.id, ...serviceSnap.data() } as Service;
+    // If service is inactive, block downstream use
+    if (serviceData.status !== 'active') {
+      return null;
+    }
 
     console.log("[Firebase] Now fetching providers subcollection...");
     // We wrap this in its own try/catch in case only this part fails (e.g., security rules)
@@ -86,8 +101,11 @@ export const getServiceWithProviders = async (
 // ✅ NEW FUNCTION 1: Get ALL services from ALL companies
 export const getAllServices = async (): Promise<Service[]> => {
   try {
-    // This query gets all documents from any subcollection named "services"
-    const servicesQuery = query(collectionGroup(db, 'services'));
+    // This query gets all ACTIVE documents from any subcollection named "services"
+    const servicesQuery = query(
+      collectionGroup(db, 'services'),
+      where('status', '==', 'active')
+    );
     const servicesSnapshot = await getDocs(servicesQuery);
     const services = servicesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service));
 
@@ -109,7 +127,27 @@ export const getAllServices = async (): Promise<Service[]> => {
     return services;
   } catch (error) {
     console.error("Error getting all services:", error);
-    return [];
+    // Fallback: iterate companies and read subcollections to avoid collection group index requirement
+    try {
+      const companiesSnapshot = await getDocs(collection(db, 'companies'));
+      const companiesMap = new Map(
+        companiesSnapshot.docs.map(doc => [doc.id, { id: doc.id, ...doc.data() } as Company])
+      );
+      const services: Service[] = [];
+      for (const companyDoc of companiesSnapshot.docs) {
+        const activeServicesSnap = await getDocs(
+          query(collection(db, 'companies', companyDoc.id, 'services'), where('status', '==', 'active'))
+        );
+        for (const svcDoc of activeServicesSnap.docs) {
+          const data = svcDoc.data() as any;
+          services.push({ id: svcDoc.id, ...data, company: companiesMap.get(data.companyId) } as Service);
+        }
+      }
+      return services;
+    } catch (fallbackError) {
+      console.error('Fallback getAllServices failed:', fallbackError);
+      return [];
+    }
   }
 };
 
@@ -117,7 +155,11 @@ export const getAllServices = async (): Promise<Service[]> => {
 export const getAllServicesByCategory = async (categoryId: string): Promise<Service[]> => {
   try {
     // Query the "services" collection group with a "where" clause
-    const servicesQuery = query(collectionGroup(db, 'services'), where("categoryId", "==", categoryId));
+    const servicesQuery = query(
+      collectionGroup(db, 'services'),
+      where("categoryId", "==", categoryId),
+      where('status', '==', 'active')
+    );
     const servicesSnapshot = await getDocs(servicesQuery);
     const services = servicesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service));
 
@@ -136,17 +178,41 @@ export const getAllServicesByCategory = async (categoryId: string): Promise<Serv
     return services;
   } catch (error) {
     console.error(`Error getting all services for category ${categoryId}:`, error);
-    return [];
+    // Fallback: read per-company services, filter to active, then filter category in memory (avoids composite index)
+    try {
+      const companiesSnapshot = await getDocs(collection(db, 'companies'));
+      const companiesMap = new Map(
+        companiesSnapshot.docs.map(doc => [doc.id, { id: doc.id, ...doc.data() } as Company])
+      );
+      const services: Service[] = [];
+      for (const companyDoc of companiesSnapshot.docs) {
+        const activeServicesSnap = await getDocs(
+          query(collection(db, 'companies', companyDoc.id, 'services'), where('status', '==', 'active'))
+        );
+        for (const svcDoc of activeServicesSnap.docs) {
+          const data = svcDoc.data() as any;
+          if (data.categoryId === categoryId) {
+            services.push({ id: svcDoc.id, ...data, company: companiesMap.get(data.companyId) } as Service);
+          }
+        }
+      }
+      return services;
+    } catch (fallbackError) {
+      console.error('Fallback getAllServicesByCategory failed:', fallbackError);
+      return [];
+    }
   }
 };
 
 // ✅ NEW FUNCTION 3: Get categories with service counts from ALL companies
 export const getGlobalCategoriesWithServiceCounts = async (): Promise<Category[]> => {
   try {
-    // 1. Use our new global function to get all services
-    const allServices = await getAllServices();
+    // 1) Fetch all categories from Firestore
+    const categoriesSnapshot = await getDocs(collection(db, 'categories'));
+    const categoriesRaw = categoriesSnapshot.docs.map((docSnap: any) => ({ id: docSnap.id, ...docSnap.data() }));
 
-    // 2. The rest of the logic is the same!
+    // 2) Fetch all services globally and count by categoryId
+    const allServices = await getAllServices();
     const serviceCounts = new Map<string, number>();
     for (const service of allServices) {
       if (service.categoryId) {
@@ -154,14 +220,25 @@ export const getGlobalCategoriesWithServiceCounts = async (): Promise<Category[]
         serviceCounts.set(service.categoryId, currentCount + 1);
       }
     }
-    const categoriesWithCounts = mockCategories.map(category => ({
-      ...category,
+
+    // 3) Return categories with a computed `services` count and safe fallbacks for optional fields
+    const categoriesWithCounts: Category[] = categoriesRaw.map((category: any) => ({
+      id: category.id,
+      name: category.name ?? 'Unnamed',
+      description: category.description ?? '',
+      icon: category.icon ?? '📦',
+      image: category.image ?? '/images/images.jpeg',
+      gradient: category.gradient ?? 'from-slate-600 to-gray-700',
       services: serviceCounts.get(category.id) || 0,
+      avgWait: category.avgWait ?? '0 min',
+      popular: category.popular ?? false,
+      trending: category.trending ?? false,
     }));
+
     return categoriesWithCounts;
   } catch (error) {
     console.error('Error getting global categories with service counts:', error);
-    return mockCategories; // Return mock data on error
+    return [];
   }
 };
 // export const getCategories = async (): Promise<Category[]> => {
@@ -479,36 +556,198 @@ export const subscribeToUserQueues = (
 // Search functions
 export const searchServices = async (searchTerm: string, categoryId?: string): Promise<Service[]> => {
   try {
-    const companiesRef = collection(db, 'companies');
-    let companiesQuery: any = companiesRef;
-    
+    // Use collection group search to get only active services first
+    const constraints: any[] = [where('status', '==', 'active')];
     if (categoryId) {
-      companiesQuery = query(companiesRef, where('categoryIds', 'array-contains', categoryId));
+      constraints.push(where('categoryId', '==', categoryId));
     }
-    
-    const snapshot = await getDocs(companiesQuery);
-    const services: Service[] = [];
-    
-    for (const companyDoc of snapshot.docs) {
-      const servicesSnapshot = await getDocs(collection(db, 'companies', companyDoc.id, 'services'));
-      const companyServices = servicesSnapshot.docs.map((serviceDoc: any) => {
-        const serviceData = serviceDoc.data() as any;
-        const companyData = companyDoc.data() as any;
-        return {
-          ...serviceData,
-          id: serviceDoc.id,
-          company: { id: companyDoc.id, ...companyData }
-        } as unknown as Service;
-      });
-      services.push(...companyServices);
-    }
-    
-    return services.filter(service => 
-      service.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      service.code.toLowerCase().includes(searchTerm.toLowerCase())
+    const servicesQuery = query(collectionGroup(db, 'services'), ...constraints);
+    const servicesSnapshot = await getDocs(servicesQuery);
+
+    const companiesSnapshot = await getDocs(collection(db, 'companies'));
+    const companiesMap = new Map(
+      companiesSnapshot.docs.map(doc => [doc.id, { id: doc.id, ...doc.data() } as Company])
+    );
+
+    const services: Service[] = servicesSnapshot.docs.map((serviceDoc: any) => {
+      const serviceData = serviceDoc.data() as any;
+      return {
+        ...serviceData,
+        id: serviceDoc.id,
+        company: companiesMap.get(serviceData.companyId)
+      } as unknown as Service;
+    });
+
+    const q = searchTerm.trim().toLowerCase();
+    const tokens = q.split(/\s+/).filter(Boolean);
+    if (tokens.length === 0) return [];
+
+    const matches = (text?: string) =>
+      text ? tokens.some(t => text.toLowerCase().includes(t)) : false;
+
+    return services.filter(service =>
+      matches(service.name) ||
+      matches(service.code) ||
+      matches(service.company?.name) ||
+      matches((service as any).description)
     );
   } catch (error) {
     console.error('Error searching services:', error);
-    return [];
+    // Fallback: use active services loader and filter in memory
+    try {
+      let services = await getAllServices();
+      if (categoryId) {
+        services = services.filter(s => s.categoryId === categoryId);
+      }
+      const q = searchTerm.trim().toLowerCase();
+      const tokens = q.split(/\s+/).filter(Boolean);
+      if (tokens.length === 0) return [];
+      const matches = (text?: string) =>
+        text ? tokens.some(t => text.toLowerCase().includes(t)) : false;
+      return services.filter(service =>
+        matches(service.name) ||
+        matches(service.code) ||
+        matches(service.company?.name) ||
+        matches((service as any).description)
+      );
+    } catch (fallbackError) {
+      console.error('Fallback searchServices failed:', fallbackError);
+      return [];
+    }
   }
 }; 
+
+// Featured services: status active AND featureEnabled true
+export const getFeaturedServices = async (): Promise<Service[]> => {
+  try {
+    const featuredQuery = query(
+      collectionGroup(db, 'services'),
+      where('status', '==', 'active'),
+      where('featureEnabled', '==', true)
+    );
+    const snapshot = await getDocs(featuredQuery);
+    const services = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service));
+
+    if (services.length > 0) {
+      const companiesSnapshot = await getDocs(collection(db, 'companies'));
+      const companiesMap = new Map(
+        companiesSnapshot.docs.map(doc => [doc.id, { id: doc.id, ...doc.data() } as Company])
+      );
+      return services.map(service => ({
+        ...service,
+        company: companiesMap.get(service.companyId),
+      }));
+    }
+    return services;
+  } catch (error) {
+    console.error('Error getting featured services:', error);
+    // Fallback without collection group indexes
+    try {
+      const companiesSnapshot = await getDocs(collection(db, 'companies'));
+      const companiesMap = new Map(
+        companiesSnapshot.docs.map(doc => [doc.id, { id: doc.id, ...doc.data() } as Company])
+      );
+      const featuredServices: Service[] = [];
+      for (const companyDoc of companiesSnapshot.docs) {
+        const servicesSnap = await getDocs(
+          query(
+            collection(db, 'companies', companyDoc.id, 'services'),
+            where('status', '==', 'active'),
+            where('featureEnabled', '==', true)
+          )
+        );
+        for (const svcDoc of servicesSnap.docs) {
+          const data = svcDoc.data() as any;
+          featuredServices.push({ id: svcDoc.id, ...data, company: companiesMap.get(data.companyId) } as Service);
+        }
+      }
+      return featuredServices;
+    } catch (fallbackError) {
+      console.error('Fallback getFeaturedServices failed:', fallbackError);
+      return [];
+    }
+  }
+};
+
+// Global stats for the landing page
+export const getGlobalStats = async (): Promise<{
+  companies: number;
+  activeServices: number;
+  users: number;
+  servedToday: number;
+}> => {
+  try {
+    let companies = 0;
+    let activeServices = 0;
+    let users = 0;
+    let servedToday = 0;
+
+    // Companies count (independent)
+    try {
+      const companiesSnap = await getDocs(collection(db, 'companies'));
+      companies = companiesSnap.size;
+    } catch (e) {
+      companies = 0;
+    }
+
+    // Active services count (try collection group first)
+    try {
+      const activeServicesSnap = await getDocs(
+        query(collectionGroup(db, 'services'), where('status', '==', 'active'))
+      );
+      activeServices = activeServicesSnap.size;
+    } catch (e) {
+      // Fallback: per-company scan if we could read companies
+      if (companies > 0) {
+        try {
+          const companiesSnap = await getDocs(collection(db, 'companies'));
+          let total = 0;
+          for (const companyDoc of companiesSnap.docs) {
+            try {
+              const svcSnap = await getDocs(
+                query(collection(db, 'companies', companyDoc.id, 'services'), where('status', '==', 'active'))
+              );
+              total += svcSnap.size;
+            } catch {
+              // skip company if forbidden
+            }
+          }
+          activeServices = total;
+        } catch {
+          activeServices = 0;
+        }
+      } else {
+        activeServices = 0;
+      }
+    }
+
+    // Users count (independent)
+    try {
+      const usersSnap = await getDocs(collection(db, 'users'));
+      users = usersSnap.size;
+    } catch (e) {
+      users = 0;
+    }
+
+    // Served today from all queues (optional)
+    try {
+      const now = new Date();
+      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const servedSnap = await getDocs(
+        query(
+          collectionGroup(db, 'queue'),
+          where('status', '==', 'served'),
+          where('joinedAt', '>=', Timestamp.fromDate(startOfToday))
+        )
+      );
+      servedToday = servedSnap.size;
+    } catch (e) {
+      servedToday = 0;
+    }
+
+    return { companies, activeServices, users, servedToday };
+  } catch (error) {
+    console.error('Error getting global stats:', error);
+    return { companies: 0, activeServices: 0, users: 0, servedToday: 0 };
+  }
+};

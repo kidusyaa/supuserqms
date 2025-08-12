@@ -5,8 +5,8 @@ import { getAllServices } from "@/lib/firebase-utils";
 import FilterNav from "@/components/FilterNav";
 import { Service, FilterState } from "@/type";
 import Link from "next/link";
-// LocationOption and useAuth are not directly related to the category fix, but keeping them.
-import { useAuth } from "@/lib/AuthContext"; 
+// LocationOption and useAuth are not directly related to the fix, but keeping them.
+import { useAuth } from "@/lib/AuthContext";
 import { LocationOption } from "@/type";
 
 const initialFilterState: FilterState = {
@@ -23,23 +23,25 @@ export default function ServicesListPage() {
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<FilterState>(initialFilterState);
 
-  // This useEffect correctly fetches all services. No changes needed here.
+  // Fetches active services from the database.
   useEffect(() => {
     const fetchServices = async () => {
       setLoading(true);
-      const allServices = await getAllServices(); // Make sure this function fetches the categoryId field!
+      const allServices = await getAllServices(); // returns only active
       setServices(allServices);
       setLoading(false);
     };
     fetchServices();
   }, []);
 
-  // --- THIS IS THE KEY FIX ---
-  // This useMemo hook will now work correctly because service.categoryId exists.
+  // useMemo hook now filters out inactive services first.
   const filteredServices = useMemo(() => {
-    // Start with all services
-    let filtered = services;
+    // --- THIS IS THE KEY CHANGE ---
+    // 1. Start by filtering for active services only.
+    let filtered = services.filter(service => service.status === 'active');
 
+    // 2. Then, apply all other user-driven filters to the already-active list.
+    
     // Apply search term filter
     if (filters.searchTerm) {
       filtered = filtered.filter(service =>
@@ -50,16 +52,12 @@ export default function ServicesListPage() {
 
     // Apply category filter
     if (filters.categoryId) {
-      // This line will now work!
       filtered = filtered.filter(service => service.categoryId === filters.categoryId);
     }
 
-    // Apply location filter (keeping your existing logic)
+    // Apply location filter
     if (filters.location?.value) {
-        // This is a more robust way to handle the location object
         if (filters.location.value === 'my_location') {
-            // Here you would implement distance-based filtering if you have coordinates
-            // For now, we'll skip it as it's a separate complex feature.
             console.log("Filtering by 'Near Me' is not yet implemented.");
         } else {
             // Filtering by a specific company location
@@ -71,7 +69,7 @@ export default function ServicesListPage() {
 
     return filtered;
 
-  }, [services, filters]);
+  }, [services, filters]); // Re-run when the full service list or filters change
 
   // The rest of your JSX is perfect and requires no changes.
   return (
