@@ -8,6 +8,7 @@ import NavSection from './navsection'
 import { StatsFs } from 'node:fs'
 import StatsSection from './StatsSection'
 import FeaturedServices from './Featuredservice'
+import Footer from './footer'
 
 export default function Homepage() {
   const SERVICES_SECTION_ID = "services-list";
@@ -17,6 +18,7 @@ export default function Homepage() {
       <StatsSection/>
       <FeaturedServices/>
       <ServiceCategoriesPage/>
+      <Footer/>
     </div>
   )
 }

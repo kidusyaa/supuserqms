@@ -30,7 +30,6 @@ export type Service = {
   price: string;
   company?: Company; 
   locationLink?: string;
- 
   allowWalkIns: boolean;
   walkInBuffer: number;
   maxWalkInsPerHour: number;
@@ -130,10 +129,9 @@ export interface LocationOption {
 
 export interface FilterState {
   searchTerm: string;
-  location: LocationOption | null;
-  categoryId: string | null; // null means 'All Categories'
-  showNoQueue: boolean;
-  isFavorite: boolean; // For a potential "My Favorites" filter
+  locations: LocationOption[]; // Changed from location: LocationOption | null
+  categoryId: string | null;
+  companyIds: string[];        // Changed from companyId: string | null
 }
 export type MessageTemplate = {
   id: string
@@ -145,12 +143,22 @@ export type MessageTemplate = {
 // This allows us to treat it uniformly in our UI.
 
 export interface LocationOption {
-  value: string; // e.g., companyId
-  label: string; // e.g., Company Name or City
-  coordinates?: {
-    lat: number;
-    lon: number;
-  };
+  value: string;
+  label: string;
+  // This can be optional if you don't always have coordinates
+  coordinates?: { lat: number; lon: number };
+}
+export interface CompanyFilterOption {
+  id: string;
+  name: string;
+}
+
+//stats section
+export interface GlobalStatsData {
+  companiesCount: number;
+  activeServicesCount: number;
+  servicesCompletedCount: number;
+  usersCount: number;
 }
 //category service 
 // ... your other types (Company, Service, etc.)

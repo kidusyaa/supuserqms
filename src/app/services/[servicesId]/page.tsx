@@ -1,24 +1,18 @@
+// --- Paste this entire updated component into your file ---
+
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Icon } from "@iconify/react";
 import { getServiceWithProviders, getCompanyById } from "@/lib/firebase-utils";
-
-// --- KEY CHANGE: CLEANER IMPORTS ---
-// We import Provider and our shared ANY_PROVIDER_OPTION constant from the same type definition file.
 import { Service, Provider, Company, ANY_PROVIDER_OPTION } from "@/type";
-
-// The local 'SelectionOption' type is no longer needed.
 
 function ServiceDetailContent() {
   const [service, setService] = useState<Service | null>(null);
   const [company, setCompany] = useState<Company | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
-
-  // --- The state is now simpler, using the Provider type directly ---
-  // This works because ANY_PROVIDER_OPTION now conforms to the Provider shape.
   const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
 
   const router = useRouter();
@@ -27,8 +21,6 @@ function ServiceDetailContent() {
 
   const serviceId = params.servicesId as string;
   const companyId = searchParams.get("companyId");
-
-  // The local definition of ANY_PROVIDER_OPTION has been removed, as it's now imported.
 
   useEffect(() => {
     const loadData = async () => {
@@ -45,11 +37,9 @@ function ServiceDetailContent() {
 
         if (serviceData) {
           setService(serviceData);
-          // Default selection logic remains the same and now works perfectly.
           if (serviceData.providers && serviceData.providers.length === 1) {
             setSelectedProvider(serviceData.providers[0]);
           } else {
-            // Use the globally defined, imported constant.
             setSelectedProvider(ANY_PROVIDER_OPTION);
           }
         } else {
@@ -72,7 +62,6 @@ function ServiceDetailContent() {
   }, [companyId, serviceId]);
 
   const handleBooking = () => {
-    // This logic is now simpler, as a selection is always present after loading.
     if (!selectedProvider) {
       alert("An error occurred. Please refresh and try again.");
       return;
@@ -80,7 +69,6 @@ function ServiceDetailContent() {
     router.push(`/services/${serviceId}/book?companyId=${companyId}&providerId=${selectedProvider.id}`);
   };
 
-  // --- Render States ---
   if (isLoading) {
     return <div className="flex justify-center items-center h-screen bg-slate-50 text-slate-500">Loading Service Details...</div>;
   }
@@ -105,32 +93,81 @@ function ServiceDetailContent() {
           Back to Services
         </button>
 
-        {/* --- Main Information Card (Unchanged) --- */}
         <div className="bg-white p-6 md:p-8 rounded-xl shadow-lg border border-slate-200">
+          {/* --- Main Service Info --- */}
           <div>
             <span className="text-sm font-semibold text-blue-900 uppercase tracking-wider">{company.name}</span>
-            <h1 className="text-4xl md:text-5xl font-bold text-slate-800 mt-1 mb-4">{service.name}</h1>
+            <div className="flex items-center justify-between mt-2 mb-4">
+                <h1 className="text-4xl md:text-5xl font-bold text-slate-800 mt-1 mb-4">{service.name}</h1>
+                <p className="text-sm ">Scode:<span className="font-semibold   bg-gray-100 rounded-md p-1">{service.code}</span></p>
+            </div>
             <p className="text-slate-600 text-lg mb-6">{service.description}</p>
             <div className="flex flex-col sm:flex-row gap-6 mb-6">
                 <div className="flex items-center gap-3"><Icon icon="lucide:dollar-sign" width="20" height="20" /><span className="text-2xl font-bold text-green-600">${service.price}</span></div>
                 <div className="flex items-center gap-3 text-slate-700"><Icon icon="lucide:clock" width="20" height="20" /><span className="text-lg">~{service.estimatedWaitTime} min duration</span></div>
             </div>
           </div>
+
           <hr className="my-6 border-slate-200" />
+
+          {/* --- NEW: Revamped Company Details Section --- */}
           <div>
-            <h2 className="text-xl font-bold text-slate-700 mb-3">About {company.name}</h2>
-            <p className="text-slate-600 mb-2">{company.address}</p>
-            <p className="text-slate-600">Phone: <a href={`tel:${company.phone}`} className="text-blue-900 hover:underline">{company.phone}</a></p>
+            <h2 className="text-xl font-bold text-slate-700 mb-4">About {company.name}</h2>
+            <div className="space-y-3">
+              {/* Address */}
+              <div className="flex items-start gap-3 text-slate-600">
+                <Icon icon="lucide:map-pin" className="mt-1 flex-shrink-0" width="18" height="18" />
+                <span>{company.address}</span>
+              </div>
+              {/* Phone */}
+              <div className="flex items-start gap-3 text-slate-600">
+                <Icon icon="lucide:phone" className="mt-1 flex-shrink-0" width="18" height="18" />
+                <a href={`tel:${company.phone}`} className="text-blue-900 hover:underline">{company.phone}</a>
+              </div>
+              {/* Working Hours - Added from your data */}
+              {company.workingHours && (
+                <div className="flex items-start gap-3 text-slate-600">
+                  <Icon icon="lucide:calendar-clock" className="mt-1 flex-shrink-0" width="18" height="18" />
+                  <span>{company.workingHours}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Social Media Links - Dynamically rendered */}
+            {company.socials && (
+              <div className="mt-5 pt-4 border-t border-slate-100 flex items-center gap-4">
+                {company.socials.website && (
+                  <a href={company.socials.website} target="_blank" rel="noopener noreferrer" aria-label="Website" className="text-slate-500 hover:text-blue-900 transition-colors">
+                    <Icon icon="lucide:globe" width="24" height="24" />
+                  </a>
+                )}
+                {company.socials.facebook && (
+                  <a href={company.socials.facebook} target="_blank" rel="noopener noreferrer" aria-label="Facebook" className="text-slate-500 hover:text-blue-900 transition-colors">
+                    <Icon icon="lucide:facebook" width="24" height="24" />
+                  </a>
+                )}
+                {company.socials.instagram && (
+                  <a href={company.socials.instagram} target="_blank" rel="noopener noreferrer" aria-label="Instagram" className="text-slate-500 hover:text-blue-900 transition-colors">
+                    <Icon icon="lucide:instagram" width="24" height="24" />
+                  </a>
+                )}
+                {company.socials.twitter && (
+                  <a href={company.socials.twitter} target="_blank" rel="noopener noreferrer" aria-label="Twitter or X" className="text-slate-500 hover:text-blue-900 transition-colors">
+                    <Icon icon="ri:tiktok-line" width="24" height="24" />
+                  </a>
+                )}
+              </div>
+            )}
           </div>
+          {/* --- END: Revamped Company Details Section --- */}
+
         </div>
 
-        {/* --- Providers Section --- */}
+        {/* --- Providers Section (Unchanged) --- */}
         {service.providers && service.providers.length > 0 && (
           <div className="mt-10">
             <h2 className="text-2xl font-bold text-slate-800 mb-4">Choose Your Specialist</h2>
-            <p className="text-slate-600 mb-4 -mt-2">
-                "{ANY_PROVIDER_OPTION.name}" is selected by default. Click a specialist to choose them instead.
-            </p>
+           
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               <button
                 key={ANY_PROVIDER_OPTION.id}
@@ -166,10 +203,13 @@ function ServiceDetailContent() {
                 </button>
               ))}
             </div>
+             <p className="text-slate-600 mb-4 mt-2">
+                "{ANY_PROVIDER_OPTION.name}" is selected by default. Click a specialist to choose them instead.
+            </p>
           </div>
         )}
 
-        {/* --- Call to Action (CTA) Button --- */}
+        {/* --- Call to Action (CTA) Button (Unchanged) --- */}
         <div className="mt-10 pt-6 border-t border-slate-200">
           <button
             onClick={handleBooking}
@@ -178,8 +218,6 @@ function ServiceDetailContent() {
                        hover:bg-blue-800 transition-all
                        disabled:bg-slate-300 disabled:cursor-not-allowed disabled:text-slate-500"
           >
-            {/* --- CLEAN & TYPE-SAFE LOGIC --- */}
-            {/* We check for the `isAny` flag on the selectedProvider object. */}
             {selectedProvider?.isAny
               ? 'Join Queue for Any Specialist'
               : `Continue with ${selectedProvider?.name}`}
@@ -190,7 +228,7 @@ function ServiceDetailContent() {
   );
 }
 
-// This wrapper component remains the same
+// Your wrapper component remains the same
 const ServiceDetailPage = () => {
   return (
     <Suspense fallback={<div className="w-full h-screen flex items-center justify-center text-slate-500">Loading Page...</div>}>

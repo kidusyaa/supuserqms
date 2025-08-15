@@ -1,5 +1,5 @@
 // Firebase utilities with proper error handling
-import type { Company, Service, QueueItem, CreateQueueItem, User, Category, Provider, MessageTemplate, LocationOption } from '../type';
+import type { Company, Service, QueueItem, CreateQueueItem, User, Category, Provider, MessageTemplate, LocationOption,GlobalStatsData } from '../type';
 // Import Firebase modules directly - this should work now with the updated config
 import { 
   collection, 
@@ -17,6 +17,7 @@ import {
   onSnapshot,
   serverTimestamp,
   collectionGroup,
+  getCountFromServer,
   writeBatch,
   Timestamp
 } from 'firebase/firestore';
@@ -670,84 +671,54 @@ export const getFeaturedServices = async (): Promise<Service[]> => {
 };
 
 // Global stats for the landing page
-export const getGlobalStats = async (): Promise<{
-  companies: number;
-  activeServices: number;
-  users: number;
-  servedToday: number;
-}> => {
+export const getGlobalStats = async (): Promise<GlobalStatsData> => {
   try {
-    let companies = 0;
-    let activeServices = 0;
-    let users = 0;
-    let servedToday = 0;
+    // Define references to the collections we need to count
+    const companiesRef = collection(db, 'companies');
+    const usersRef = collection(db, 'users');
+    
+    // Define queries for collections that need filtering
+    // Query for all active services across all companies
+    const activeServicesQuery = query(
+      collectionGroup(db, 'services'), 
+      where('status', '==', 'active')
+    );
+    
+    // Query for all completed ("served") queue items across all services
+    const servicesCompletedQuery = query(
+      collectionGroup(db, 'queue'), 
+      where('status', '==', 'served')
+    );
 
-    // Companies count (independent)
-    try {
-      const companiesSnap = await getDocs(collection(db, 'companies'));
-      companies = companiesSnap.size;
-    } catch (e) {
-      companies = 0;
-    }
+    // Run all count queries in parallel for maximum speed
+    const [
+      companiesSnap, 
+      activeServicesSnap, 
+      servicesCompletedSnap, 
+      usersSnap
+    ] = await Promise.all([
+      getCountFromServer(companiesRef),
+      getCountFromServer(activeServicesQuery),
+      getCountFromServer(servicesCompletedQuery),
+      getCountFromServer(usersRef)
+    ]);
 
-    // Active services count (try collection group first)
-    try {
-      const activeServicesSnap = await getDocs(
-        query(collectionGroup(db, 'services'), where('status', '==', 'active'))
-      );
-      activeServices = activeServicesSnap.size;
-    } catch (e) {
-      // Fallback: per-company scan if we could read companies
-      if (companies > 0) {
-        try {
-          const companiesSnap = await getDocs(collection(db, 'companies'));
-          let total = 0;
-          for (const companyDoc of companiesSnap.docs) {
-            try {
-              const svcSnap = await getDocs(
-                query(collection(db, 'companies', companyDoc.id, 'services'), where('status', '==', 'active'))
-              );
-              total += svcSnap.size;
-            } catch {
-              // skip company if forbidden
-            }
-          }
-          activeServices = total;
-        } catch {
-          activeServices = 0;
-        }
-      } else {
-        activeServices = 0;
-      }
-    }
-
-    // Users count (independent)
-    try {
-      const usersSnap = await getDocs(collection(db, 'users'));
-      users = usersSnap.size;
-    } catch (e) {
-      users = 0;
-    }
-
-    // Served today from all queues (optional)
-    try {
-      const now = new Date();
-      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const servedSnap = await getDocs(
-        query(
-          collectionGroup(db, 'queue'),
-          where('status', '==', 'served'),
-          where('joinedAt', '>=', Timestamp.fromDate(startOfToday))
-        )
-      );
-      servedToday = servedSnap.size;
-    } catch (e) {
-      servedToday = 0;
-    }
-
-    return { companies, activeServices, users, servedToday };
+    // Return the data from the snapshots
+    return {
+      companiesCount: companiesSnap.data().count,
+      activeServicesCount: activeServicesSnap.data().count,
+      servicesCompletedCount: servicesCompletedSnap.data().count,
+      usersCount: usersSnap.data().count,
+    };
   } catch (error) {
     console.error('Error getting global stats:', error);
-    return { companies: 0, activeServices: 0, users: 0, servedToday: 0 };
+    // If any part of the process fails, return a default object with zeros
+    // This prevents the entire stats section from crashing on the frontend
+    return { 
+      companiesCount: 0, 
+      activeServicesCount: 0, 
+      servicesCompletedCount: 0, 
+      usersCount: 0 
+    };
   }
 };

@@ -1,35 +1,31 @@
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation"; // <-- Import useRouter
+"use client";
+
+import { useState, useEffect, useMemo } from "react"; // <-- Import useMemo
+import { useRouter } from "next/navigation";
 import { joinQueue } from "@/lib/firebase-utils";
-// Assuming you have a Dialog component structure like Shadcn/UI.
-// If not, you can adapt this to your modal library.
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog"; // Adjust this import to your component library
+import { Dialog, DialogContent,DialogHeader, DialogTitle, DialogDescription /* ... other dialog imports */ } from "@/components/ui/dialog";
 import { Icon } from "@iconify/react";
+import { generateTimeSlots } from "@/lib/time-utils"; // <-- Import our new utility
+import { Service, Company, Provider } from "@/type"; // <-- Import types
 
-
+// --- Updated props interface ---
 interface BookServiceDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  companyId: string;
-  serviceId: string;
-  providerId: string;
+  service: Service;
+  company: Company;
+  selectedProvider: Provider;
 }
 
 export default function BookServiceDialog({
   open,
   onOpenChange,
-  companyId,
-  serviceId,
-  providerId,
+  service,
+  company,
+  selectedProvider,
 }: BookServiceDialogProps) {
-  const router = useRouter(); // <-- Initialize router
-  const [date, setDate] = useState("");
+  const router = useRouter();
+  const [date, setDate] = useState(""); // This can be your dual-calendar state later
   const [time, setTime] = useState("");
   const [userName, setUserName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -37,7 +33,11 @@ export default function BookServiceDialog({
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
 
-  const timeSlots = ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00"];
+  // --- DYNAMICALLY GENERATE TIME SLOTS ---
+  const timeSlots = useMemo(() => {
+    // useMemo prevents recalculating on every render
+    return generateTimeSlots(company.workingHours, service.estimatedWaitTime);
+  }, [company.workingHours, service.estimatedWaitTime]);
 
   const handleBook = async () => {
     if (!userName || !phoneNumber || !date || !time) {
@@ -48,21 +48,18 @@ export default function BookServiceDialog({
     setError("");
     try {
       const queueData = {
-        serviceId,
-        providerId,
+        serviceId: service.id,
+        providerId: selectedProvider.id,
         userName,
         phoneNumber,
         queueType: "booking",
-        userUid: "guest", // Replace with actual user later
+        userUid: "guest",
         notes: `Booking for ${date} at ${time}`,
       };
-      await joinQueue(companyId, serviceId, queueData);
+      await joinQueue(company.id, service.id, queueData); // Use company.id
       setSuccess(true);
-
-      // *** REDIRECTION LOGIC ***
-      // Show success message for 2 seconds, then redirect.
       setTimeout(() => {
-        router.push("/users"); // Redirect to the user dashboard
+        router.push("/");
       }, 2000);
 
     } catch (e) {
@@ -73,9 +70,9 @@ export default function BookServiceDialog({
     }
   };
 
-  // Reset form when dialog is closed
   useEffect(() => {
     if (!open) {
+      // Reset form
       setSuccess(false);
       setError("");
       setLoading(false);
@@ -110,8 +107,13 @@ export default function BookServiceDialog({
             <div>
               <label className="block mb-1 font-medium text-sm text-slate-600">Select Time</label>
               <select className="w-full border p-2 rounded" value={time} onChange={(e) => setTime(e.target.value)}>
-                <option value="">Select a time</option>
-                {timeSlots.map((slot) => (<option key={slot} value={slot}>{slot}</option>))}
+                <option value="">Select an available time</option>
+                {/* --- The options are now dynamic --- */}
+                {timeSlots.length > 0 ? (
+                  timeSlots.map((slot) => (<option key={slot} value={slot}>{slot}</option>))
+                ) : (
+                  <option disabled>No time slots available</option>
+                )}
               </select>
             </div>
             <input className="w-full border p-2 rounded" placeholder="Your Name" value={userName} onChange={(e) => setUserName(e.target.value)} />

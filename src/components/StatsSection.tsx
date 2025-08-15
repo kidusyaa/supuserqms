@@ -1,56 +1,66 @@
 // src/components/StatsSection.tsx
 
-"use client"; // We need this to use the useEffect hook for fetching data.
+"use client";
 
 import { useState, useEffect } from 'react';
+// Make sure the path to your firebase-utils is correct
 import { getGlobalStats } from '@/lib/firebase-utils';
+// Import the icons we'll use
+import { Building2, ClipboardList, BadgeCheck, Users } from 'lucide-react';
+import React from 'react';
 
-// --- Step 1: Define the structure for a single stat ---
+// Define the structure for a single stat, including the icon
 interface StatItem {
-      // Emoji or SVG icon
-  value: string;      // The number or text to display (e.g., "1,234")
-  label: string;      // The description (e.g., "Active Services")
-  loading: boolean;   // To show a loading state while fetching
+  icon: React.ReactNode;
+  value: string;
+  label: string;
+  loading: boolean;
 }
 
-// --- Step 2: Create the StatsSection Component ---
+// A reusable loading skeleton component for a clean UI
+const StatCardSkeleton = () => (
+    <div className="flex flex-col items-center justify-center gap-4 bg-white p-6 text-center border-[1px] border-gray-100 rounded-lg shadow-md">
+        <div className="h-12 w-12 rounded-full bg-gray-200 animate-pulse"></div>
+        <div className="h-9 w-24 bg-gray-200 rounded-md animate-pulse"></div>
+        <div className="h-5 w-32 bg-gray-200 rounded-md animate-pulse"></div>
+    </div>
+);
+
 const StatsSection = () => {
-  // --- Step 3: Set up the initial state for our stats ---
+  // Set up the initial state with the correct order and new icons
   const [stats, setStats] = useState<StatItem[]>([
-    { value: '—', label: 'Companies Registered', loading: true },
-    { value: '—', label: 'Active Services', loading: true },
-    { value: '—', label: 'Users', loading: true },
-    { value: '—', label: 'Served Today', loading: true },
+    { icon: <Building2 size={32} />, label: 'Companies Registered', value: '—', loading: true },
+    { icon: <ClipboardList size={32} />, label: 'Active Services', value: '—', loading: true },
+    { icon: <BadgeCheck size={32} />, label: 'Services Completed', value: '—', loading: true },
+    { icon: <Users size={32} />, label: 'Registered Users', value: '—', loading: true },
   ]);
 
-  // Load stats from Firestore on mount
   useEffect(() => {
-    const load = async () => {
+    const loadStats = async () => {
       try {
+        // Fetch stats using our new, optimized function
         const s = await getGlobalStats();
+        
+        // Update the state with the fetched data in the correct order
         setStats([
-          { value: s.companies.toString(), label: 'Companies Registered', loading: false },
-          { value: s.activeServices.toString(), label: 'Active Services', loading: false },
-          { value: s.users.toString(), label: 'Users', loading: false },
-          { value: s.servedToday.toString(), label: 'Served Today', loading: false },
+          { icon: <Building2 size={32} className="text-orange-600" />, label: 'Companies Registered', value: s.companiesCount.toLocaleString(), loading: false },
+          { icon: <ClipboardList size={32} className="text-orange-600" />, label: 'Active Services', value: s.activeServicesCount.toLocaleString(), loading: false },
+          { icon: <BadgeCheck size={32} className="text-orange-600" />, label: 'Services Completed', value: s.servicesCompletedCount.toLocaleString(), loading: false },
+          { icon: <Users size={32} className="text-orange-600" />, label: 'Registered Users', value: s.usersCount.toLocaleString(), loading: false },
         ]);
-      } catch {
-        setStats([
-          { value: '0', label: 'Companies Registered', loading: false },
-          { value: '0', label: 'Active Services', loading: false },
-          { value: '0', label: 'Users', loading: false },
-          { value: '0', label: 'Served Today', loading: false },
-        ]);
+      } catch (error) {
+        console.error("Failed to load global stats:", error);
+        // On error, show 0s but stop the loading animation
+        setStats(prevStats => prevStats.map(stat => ({ ...stat, value: '0', loading: false })));
       }
     };
-    load();
+    loadStats();
   }, []);
 
-  // --- Step 5: Render the component with the stats data ---
   return (
-    <div className="bg-gray-50 py-12 sm:py-16">
+    <div className="bg-gray-50 py-16 sm:py-24">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-10">
+        <div className="text-center mb-12">
             <h2 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
                 Our Platform at a Glance
             </h2>
@@ -59,22 +69,29 @@ const StatsSection = () => {
             </p>
         </div>
         
-        {/* The Grid Layout for the stat cards */}
-        <div className="grid grid-cols-1 md:gap-6 grid-cols-2 md:grid-cols-4">
+        <div className="grid md:gap-6 grid-cols-2 lg:grid-cols-4 ">
           {stats.map((stat, index) => (
-            <div key={index} className="flex flex-col items-center justify-center md:rounded-lg bg-white p-6 md:shadow-md text-center border-[1px] border-gray-100">
+            <div key={index}>
               {stat.loading ? (
-                // Simple loading animation
-                <div className="h-9 w-24 bg-gray-200 rounded-md animate-pulse"></div>
+                <StatCardSkeleton />
               ) : (
-                // The actual stat value
-                <p className="text-4xl font-bold tracking-tight text-blue-600">
-                  {stat.value}
-                </p>
+                <div className="flex flex-col items-center justify-center gap-4 bg-white md:p-6 p-2 text-center border-[1px] border-gray-100 md:rounded-lg shadow-md transition-transform duration-300 hover:-translate-y-1 hover:shadow-xl ">
+                  {/* Icon with a themed background */}
+                  <div className="flex items-center justify-center h-16 w-16 rounded-full bg-orange-100">
+                    {stat.icon}
+                  </div>
+                  
+                  {/* The stat value */}
+                  <p className="text-4xl font-extrabold tracking-tight text-gray-900">
+                    {stat.value}
+                  </p>
+                  
+                  {/* The stat label */}
+                  <p className="text-base font-medium text-gray-500">
+                    {stat.label}
+                  </p>
+                </div>
               )}
-              <p className="mt-2 text-base font-medium text-gray-500">
-                {stat.label}
-              </p>
             </div>
           ))}
         </div>

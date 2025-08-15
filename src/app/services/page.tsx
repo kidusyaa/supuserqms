@@ -1,114 +1,163 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import { getAllServices } from "@/lib/firebase-utils";
-import FilterNav from "@/components/FilterNav";
-import { Service, FilterState } from "@/type";
-import Link from "next/link";
-// LocationOption and useAuth are not directly related to the fix, but keeping them.
-import { useAuth } from "@/lib/AuthContext";
-import { LocationOption } from "@/type";
+import { useState, useEffect } from "react";
+import { useParams, useSearchParams, useRouter } from "next/navigation";
+import { Icon } from "@iconify/react";
+import { Loader2 } from "lucide-react"; // <-- Import a spinner icon
 
-const initialFilterState: FilterState = {
-  searchTerm: '',
-  location: null,
-  categoryId: null,
-  showNoQueue: false,
-  isFavorite: false,
-};
+import { JoinQueueDialog } from "@/app/services/[servicesId]/book/_componet/JoinQueueDialog";
+import BookServiceDialog from "@/app/services/[servicesId]/book/_componet/BookServiceDialog";
+import { getServiceWithProviders, getCompanyById } from "@/lib/firebase-utils";
+import { Service, Provider, Company, ANY_PROVIDER_OPTION } from "@/type";
+import { ANY_PROVIDER_ID } from "@/lib/constants";
 
-export default function ServicesListPage() {
-  const { user } = useAuth();
-  const [services, setServices] = useState<Service[]>([]);
+export default function BookServicePage() {
+  const params = useParams();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  const serviceId = params.servicesId as string;
+  const companyId = searchParams.get("companyId") || "";
+  const providerId = searchParams.get("providerId");
+
+  const [mode, setMode] = useState<"queue" | "book" | null>(null);
+  const [service, setService] = useState<Service | null>(null);
+  const [company, setCompany] = useState<Company | null>(null);
+  const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState<FilterState>(initialFilterState);
+  const [error, setError] = useState("");
 
-  // Fetches active services from the database.
   useEffect(() => {
-    const fetchServices = async () => {
-      setLoading(true);
-      const allServices = await getAllServices(); // returns only active
-      setServices(allServices);
+    if (!companyId || !serviceId || !providerId) {
+      setError("Missing required information.");
       setLoading(false);
-    };
-    fetchServices();
-  }, []);
-
-  // useMemo hook now filters out inactive services first.
-  const filteredServices = useMemo(() => {
-    // --- THIS IS THE KEY CHANGE ---
-    // 1. Start by filtering for active services only.
-    let filtered = services.filter(service => service.status === 'active');
-
-    // 2. Then, apply all other user-driven filters to the already-active list.
-    
-    // Apply search term filter
-    if (filters.searchTerm) {
-      filtered = filtered.filter(service =>
-        service.name.toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
-        service.company?.name?.toLowerCase().includes(filters.searchTerm.toLowerCase())
-      );
+      return;
     }
 
-    // Apply category filter
-    if (filters.categoryId) {
-      filtered = filtered.filter(service => service.categoryId === filters.categoryId);
-    }
-
-    // Apply location filter
-    if (filters.location?.value) {
-        if (filters.location.value === 'my_location') {
-            console.log("Filtering by 'Near Me' is not yet implemented.");
-        } else {
-            // Filtering by a specific company location
-            filtered = filtered.filter(service => service.companyId === filters.location?.value);
+    const fetchAllData = async () => {
+      setLoading(true);
+      setError("");
+      try {
+        const [serviceData, companyData] = await Promise.all([
+            getServiceWithProviders(companyId, serviceId),
+            getCompanyById(companyId)
+        ]);
+        
+        if (!serviceData || !companyData) {
+          setError("Service or company not found.");
+          return;
         }
-    }
-    
-    // ... add other filters like isFavorite in the same way
+        setService(serviceData);
+        setCompany(companyData);
 
-    return filtered;
+        if (providerId === ANY_PROVIDER_ID) {
+          setSelectedProvider(ANY_PROVIDER_OPTION);
+        } else {
+          const provider = serviceData.providers?.find((p) => p.id === providerId);
+          if (provider) {
+            setSelectedProvider(provider);
+          } else {
+            setError("The selected provider could not be found.");
+          }
+        }
+      } catch (e) {
+        console.error("Failed to load service info:", e);
+        setError("Failed to load service information.");
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  }, [services, filters]); // Re-run when the full service list or filters change
+    fetchAllData();
+  }, [companyId, serviceId, providerId]);
 
-  // The rest of your JSX is perfect and requires no changes.
+  // --- FIX: Implement the loading state UI ---
+  // This check now runs first and stops anything else from rendering.
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-screen bg-slate-50">
+        <div className="flex items-center gap-3 text-lg text-slate-600">
+          <Loader2 className="animate-spin h-8 w-8" />
+          <span>Loading Booking Details...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // The error state UI
+  if (error) {
+    return (
+      <div className="p-8 text-center text-red-600 bg-red-50 rounded-lg max-w-md mx-auto mt-10">
+        {error}
+      </div>
+    );
+  }
+
+  // This check is now a final "catch-all" for any unexpected issues
+  if (!service || !selectedProvider || !company) {
+    return (
+      <div className="p-8 text-center text-slate-600">
+        Could not load booking details. Please try again later.
+      </div>
+    );
+  }
+
+  // --- Main UI ---
+  // This part will only render when loading is false AND there is no error.
   return (
-    <div className="max-w-6xl mx-auto p-4 md:p-6">
-      <div className="mb-6">
-        <h1 className="text-3xl md:text-4xl font-bold text-slate-800">Find a Service</h1>
-        <p className="text-slate-500 mt-1">Discover and book services from top companies near you.</p>
+    <div className="bg-slate-50 min-h-screen p-4 md:p-8 flex justify-center items-start">
+      <div className="w-full max-w-lg">
+        <button
+          onClick={() => router.back()}
+          className="mb-6 flex items-center gap-2 text-slate-600 hover:text-blue-900 transition-colors"
+        >
+          <Icon icon="lucide:arrow-left" width="20" height="20" />
+          Back to Service Details
+        </button>
+
+        <div className="bg-white rounded-xl shadow-lg border border-slate-200 p-6 md:p-8">
+          <h1 className="text-3xl font-bold text-slate-800">Choose Your Action</h1>
+          <p className="text-slate-600 mt-2 mb-1">
+            Service: <span className="font-semibold">{service.name}</span>
+          </p>
+          <p className="text-slate-600 mb-6">
+            With: <span className="font-semibold">{selectedProvider.name}</span>
+          </p>
+          
+          <div className="space-y-4">
+            <button
+              className="w-full flex items-center justify-center gap-3 text-lg font-bold py-4 rounded-lg bg-green-900 text-white/90 hover:bg-green-700 transition-all"
+              onClick={() => setMode("queue")}
+            >
+              <Icon icon="lucide:users" />
+              Join Queue Now
+            </button>
+            <button
+              className="w-full flex items-center justify-center gap-3 text-lg font-bold py-4 rounded-lg bg-blue-900 text-white hover:bg-blue-800 transition-all"
+              onClick={() => setMode("book")}
+            >
+              <Icon icon="lucide:calendar-plus" />
+              Schedule an Appointment
+            </button>
+          </div>
+        </div>
       </div>
 
-      <FilterNav onFilterChange={setFilters} />
-
-      {loading ? (
-        <div className="text-center text-slate-500 mt-10">Loading services...</div>
-      ) : filteredServices.length === 0 ? (
-        <div className="text-center text-slate-500 mt-10 bg-slate-50 p-8 rounded-lg">
-          <h3 className="text-xl font-semibold text-slate-700">No Services Found</h3>
-          <p>Try adjusting your filters or check back later.</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
-          {filteredServices.map(service => (
-            <Link 
-              key={service.id} 
-              href={`/services/${service.id}?companyId=${service.companyId}`} 
-              className="block bg-white rounded-lg shadow border border-slate-200 p-5 hover:shadow-lg hover:-translate-y-1 transition-all"
-            >
-              <div className="text-xl font-bold text-blue-900 mb-1">{service.name}</div>
-              {service.company && (
-                <div className="text-sm font-medium text-slate-500 mb-2">{service.company.name}</div>
-              )}
-              <p className="text-slate-600 mb-4 text-sm line-clamp-2">{service.description}</p>
-              <div className="flex gap-4 text-sm text-slate-700 border-t pt-3 mt-3">
-                <span><strong className="text-green-600">${service.price}</strong></span>
-                <span className="border-l pl-4">~{service.estimatedWaitTime} min</span>
-              </div>
-            </Link>
-          ))}
-        </div>
-      )}
+      {/* Dialogs */}
+      <JoinQueueDialog
+        open={mode === "queue"}
+        onOpenChange={(isOpen) => !isOpen && setMode(null)}
+        service={service}
+        company={company}
+        selectedProvider={selectedProvider}
+      />
+      <BookServiceDialog
+        open={mode === "book"}
+        onOpenChange={(isOpen) => !isOpen && setMode(null)}
+        service={service}
+        company={company}
+        selectedProvider={selectedProvider}
+      />
     </div>
   );
 }
