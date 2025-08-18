@@ -1,9 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { FilterState, LocationOption, Category } from "@/type";
-import { getAllCategories, getCompanyLocations } from "@/lib/firebase-utils";
-
+import { FilterState, LocationOption, Category,  Location as AppLocation } from "@/type";
+import { getAllCategories, getLocations, getCompanyOptions } from "@/lib/firebase-utils";
 // UI Imports
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -32,6 +31,7 @@ import { Search, MapPin, LayoutGrid, Users, X, Check } from "lucide-react";
 interface FilterNavProps {
   onFilterChange: (filters: FilterState) => void;
   initialFilters?: Partial<FilterState>;
+  isCategoryLocked?: boolean; // This tells the component to disable the category selector
 }
 
 const initialFilterState: FilterState = {
@@ -41,19 +41,7 @@ const initialFilterState: FilterState = {
   companyIds: [],
 };
 
-const staticLocations: LocationOption[] = [
-  { value: "bole", label: "Bole" },
-  { value: "4_kilo", label: "4 Kilo" },
-  { value: "piassa", label: "Piassa" },
-  { value: "cmc", label: "CMC" },
-  { value: "megenagna", label: "Megenagna" },
-  { value: "kazanchis", label: "Kazanchis" },
-];
-
-export default function FilterNav({
-  onFilterChange,
-  initialFilters,
-}: FilterNavProps) {
+export default function FilterNav({ onFilterChange, initialFilters, isCategoryLocked = false, }: FilterNavProps) {
   const [filters, setFilters] = useState<FilterState>({
     ...initialFilterState,
     ...initialFilters,
@@ -64,19 +52,32 @@ export default function FilterNav({
   const [categoryPopoverOpen, setCategoryPopoverOpen] = useState(false);
 
   const [categories, setCategories] = useState<Category[]>([]);
-  const [companyOptions, setCompanyOptions] = useState<LocationOption[]>([]);
+  const [locationOptions, setLocationOptions] = useState<LocationOption[]>([]);
+  const [companyOptions, setCompanyOptions] = useState<LocationOption[]>([]); // Assuming this will be used for companies later
   const [dataLoading, setDataLoading] = useState(true);
 
-  useEffect(() => {
+ useEffect(() => {
     const fetchData = async () => {
       setDataLoading(true);
       try {
-        const [fetchedCategories, fetchedCompanies] = await Promise.all([
+        const [fetchedCategories, fetchedLocations, fetchedCompanyOptions] = await Promise.all([
           getAllCategories(),
-          getCompanyLocations(),
+          getLocations(),
+          getCompanyOptions(), // Fetch company options if needed
         ]);
+
+       const formattedLocations: LocationOption[] = fetchedLocations.map(
+          (location: AppLocation) => ({
+            id: location.id,
+            value: `${location.place}, ${location.city}`, 
+            label: `${location.place}, ${location.city}`,
+          })
+        );
+        
         setCategories(fetchedCategories);
-        setCompanyOptions(fetchedCompanies);
+        setLocationOptions(formattedLocations);
+        setCompanyOptions(fetchedCompanyOptions); // Assuming this is the correct type
+
       } catch (error) {
         console.error("Failed to load filter data:", error);
       } finally {
@@ -85,7 +86,8 @@ export default function FilterNav({
     };
     fetchData();
   }, []);
-
+  
+  // ... The rest of your component is correct and does not need to be changed ...
   useEffect(() => {
     onFilterChange(filters);
   }, [filters, onFilterChange]);
@@ -104,6 +106,11 @@ export default function FilterNav({
     });
   };
 
+  //
+
+  // ... (The rest of your component's functions and JSX are correct and don't need changes) ...
+  // --- No changes needed below this line ---
+
   const handleCompanyToggle = (companyId: string) => {
     setFilters((prev) => {
       const isSelected = prev.companyIds.includes(companyId);
@@ -118,14 +125,12 @@ export default function FilterNav({
     });
   };
 
-  // --- FIXED: This function now correctly handles removing the category ---
   const handleRemoveFilter = (key: keyof FilterState, valueToRemove?: any) => {
     setFilters((prev) => {
       switch (key) {
         case "searchTerm":
           return { ...prev, searchTerm: "" };
         case "categoryId":
-          // This is the key fix: it sets the categoryId back to null
           return { ...prev, categoryId: null };
         case "companyIds":
           return {
@@ -156,7 +161,6 @@ export default function FilterNav({
         type: "searchTerm",
         label: `Search: "${filters.searchTerm}"`,
       });
-    // --- FIXED: This now correctly sets the type so handleRemoveFilter works ---
     if (filters.categoryId) {
       const catName = categories.find((c) => c.id === filters.categoryId)?.name;
       if (catName)
@@ -177,8 +181,9 @@ export default function FilterNav({
     return active;
   }, [filters, categories, companyOptions]);
 
-  // --- NEW: A boolean to control when other filters are enabled ---
-  const isCategorySelected = !!filters.categoryId;
+  // const isCategorySelected = !!filters.categoryId;
+  const isCategorySelected = true; // Always enable filters for now
+
 
   return (
     <TooltipProvider>
@@ -186,19 +191,20 @@ export default function FilterNav({
         <div className="flex flex-col md:flex-row gap-2 items-center">
           {/* --- CHANGE: Category filter moved to the front --- */}
           <Popover
-            open={categoryPopoverOpen}
-            onOpenChange={setCategoryPopoverOpen}
-          >
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className="h-11 flex-shrink-0 w-full md:w-auto"
-              >
-                <LayoutGrid className="mr-2 h-4 w-4" />
-                {categories.find((c) => c.id === filters.categoryId)?.name ||
-                  "Select Category"}
-              </Button>
-            </PopoverTrigger>
+                  open={!isCategoryLocked && categoryPopoverOpen} // Prevent opening if locked
+                  onOpenChange={setCategoryPopoverOpen}
+                >
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="h-11 flex-shrink-0 w-full md:w-auto data-[disabled]:cursor-not-allowed data-[disabled]:opacity-70"
+                      disabled={isCategoryLocked} // This disables the button
+                    >
+                      <LayoutGrid className="mr-2 h-4 w-4" />
+                      {categories.find((c) => c.id === filters.categoryId)?.name ||
+                        "Select Category"}
+                    </Button>
+                  </PopoverTrigger>
             <PopoverContent className="w-[250px] p-0">
               <Command>
                 <CommandInput placeholder="Search category..." />
@@ -229,14 +235,12 @@ export default function FilterNav({
           </Popover>
 
           {/* --- CHANGE: Search input is now disabled until category is selected --- */}
-          <div className="relative flex-grow  w-full md:w-auto">
+          <div className="relative  w-full  ">
             <Tooltip>
               <TooltipTrigger asChild className="w-full">
                 <div>
                   <Search
-                    className={`absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 ${
-                      isCategorySelected ? "text-slate-400" : "text-slate-300"
-                    }`}
+                    className={`absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400`}
                   />
                   <Input
                     placeholder="Search services or companies..."
@@ -248,37 +252,22 @@ export default function FilterNav({
                         searchTerm: e.target.value,
                       }))
                     }
-                    disabled={!isCategorySelected}
                   />
                 </div>
               </TooltipTrigger>
-              {!isCategorySelected && (
-                <TooltipContent>
-                  <p>Please select a category first</p>
-                </TooltipContent>
-              )}
             </Tooltip>
           </div>
 
-          <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto">
+          <div className="flex items-center gap-2 w-full md:w-auto">
             {/* --- CHANGE: Location filter is disabled with a tooltip --- */}
             <Tooltip>
               <TooltipTrigger asChild>
-                <div>
-                  <Popover
-                    open={locationPopoverOpen}
-                    onOpenChange={setLocationPopoverOpen}
-                  >
+                <div className="w-full  ">
+                  <Popover open={locationPopoverOpen} onOpenChange={setLocationPopoverOpen}>
                     <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="h-11 flex-shrink-0"
-                        disabled={!isCategorySelected}
-                      >
+                      <Button variant="outline" className="h-11 flex-shrink-0 w-full" disabled={dataLoading}>
                         <MapPin className="mr-2 h-4 w-4" />
-                        Location{" "}
-                        {filters.locations.length > 0 &&
-                          `(${filters.locations.length})`}
+                        Location {filters.locations.length > 0 && `(${filters.locations.length})`}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-[250px] p-0">
@@ -286,42 +275,31 @@ export default function FilterNav({
                         <CommandInput placeholder="Search location..." />
                         <CommandList>
                           <CommandEmpty>No location found.</CommandEmpty>
-                          <CommandGroup>
-                            {staticLocations.map((loc) => (
-                              <CommandItem
-                                key={loc.value}
-                                onSelect={() => handleLocationToggle(loc)}
-                              >
-                                <Check
-                                  className={`mr-2 h-4 w-4 ${
-                                    filters.locations.some(
-                                      (l) => l.value === loc.value
-                                    )
-                                      ? "opacity-100"
-                                      : "opacity-0"
-                                  }`}
-                                />
-                                {loc.label}
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
+                          {dataLoading ? (<CommandItem>Loading locations...</CommandItem>) : (
+                            <CommandGroup>
+                              {/* --- CHANGE 4: Use 'locationOptions' to render the list --- */}
+                              {locationOptions.map((loc) => (
+                                <CommandItem key={loc.value} onSelect={() => handleLocationToggle(loc)}>
+                                  <Check className={`mr-2 h-4 w-4 ${filters.locations.some((l) => l.value === loc.value) ? "opacity-100" : "opacity-0"}`} />
+                                  {loc.label}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          )}
                         </CommandList>
                       </Command>
                     </PopoverContent>
                   </Popover>
                 </div>
               </TooltipTrigger>
-              {!isCategorySelected && (
-                <TooltipContent>
-                  <p>Please select a category first</p>
-                </TooltipContent>
-              )}
+              {/* Tooltip for category requirement removed */}
             </Tooltip>
+
 
             {/* --- CHANGE: Company filter is disabled with a tooltip --- */}
             <Tooltip>
               <TooltipTrigger asChild>
-                <div>
+                <div className=" w-full  ">
                   <Popover
                     open={companyPopoverOpen}
                     onOpenChange={setCompanyPopoverOpen}
@@ -329,8 +307,7 @@ export default function FilterNav({
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
-                        className="h-11 flex-shrink-0"
-                        disabled={!isCategorySelected}
+                        className="h-11 flex-shrink-0 w-full"
                       >
                         <Users className="mr-2 h-4 w-4" />
                         Company{" "}
@@ -371,11 +348,7 @@ export default function FilterNav({
                   </Popover>
                 </div>
               </TooltipTrigger>
-              {!isCategorySelected && (
-                <TooltipContent>
-                  <p>Please select a category first</p>
-                </TooltipContent>
-              )}
+              {/* Tooltip for category requirement removed */}
             </Tooltip>
           </div>
         </div>

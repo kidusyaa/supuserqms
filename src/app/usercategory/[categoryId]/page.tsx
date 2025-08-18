@@ -114,10 +114,11 @@ const ServicesListPage = () => {
 
       {/* --- YOUR FILTERNAV COMPONENT (UNCHANGED) --- */}
       <div className="my-6">
-        <FilterNav
-          onFilterChange={setFilters}
-          initialFilters={{ categoryId: categoryId }}
-        />
+         <FilterNav
+            onFilterChange={setFilters}
+            initialFilters={{ categoryId: categoryId }}
+            isCategoryLocked={true}
+          />
       </div>
 
       {/* --- UI/UX IMPROVEMENT: BETTER "NO RESULTS" STATE --- */}

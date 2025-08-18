@@ -151,8 +151,8 @@ function ServiceDetailContent() {
                     <Icon icon="lucide:instagram" width="24" height="24" />
                   </a>
                 )}
-                {company.socials.twitter && (
-                  <a href={company.socials.twitter} target="_blank" rel="noopener noreferrer" aria-label="Twitter or X" className="text-slate-500 hover:text-blue-900 transition-colors">
+                {company.socials.tiktok && (
+                  <a href={company.socials.tiktok} target="_blank" rel="noopener noreferrer" aria-label="Twitter or X" className="text-slate-500 hover:text-blue-900 transition-colors">
                     <Icon icon="ri:tiktok-line" width="24" height="24" />
                   </a>
                 )}

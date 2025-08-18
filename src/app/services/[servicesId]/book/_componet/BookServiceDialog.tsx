@@ -34,11 +34,11 @@ export default function BookServiceDialog({
   const [error, setError] = useState("");
 
   // --- DYNAMICALLY GENERATE TIME SLOTS ---
-  const timeSlots = useMemo(() => {
-    // useMemo prevents recalculating on every render
+   const timeSlots = useMemo(() => {
+    // This now calls the powerful function and will succeed
     return generateTimeSlots(company.workingHours, service.estimatedWaitTime);
   }, [company.workingHours, service.estimatedWaitTime]);
-
+  // --- BOOKING LOGIC ---
   const handleBook = async () => {
     if (!userName || !phoneNumber || !date || !time) {
         setError("Please fill out all fields.");

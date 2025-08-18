@@ -1,5 +1,6 @@
 // Firebase utilities with proper error handling
-import type { Company, Service, QueueItem, CreateQueueItem, User, Category, Provider, MessageTemplate, LocationOption,GlobalStatsData } from '../type';
+import type { Company, Service, QueueItem, CreateQueueItem, User, Category, Provider, MessageTemplate, LocationOption,GlobalStatsData, Location } from '../type';
+
 // Import Firebase modules directly - this should work now with the updated config
 import { 
   collection, 
@@ -24,18 +25,17 @@ import {
 import { db } from './firebase-simple';
 // ✅ correct
 
-export const getCompanyLocations = async (): Promise<LocationOption[]> => {
-  const companiesCol = collection(db, "companies");
-  const snapshot = await getDocs(query(companiesCol));
-  
-  // Maps your company data to the format the FilterNav needs
-  return snapshot.docs.map(doc => ({
-    value: doc.id, // The company ID
-    label: doc.data().name, // The company Name
-    // Optionally include coordinates if your company documents have them
-    coordinates: doc.data().coordinates || null,
-  })) as LocationOption[];
+export const getLocations = async (): Promise<Location[]> => {
+  try {
+    const snapshot = await getDocs(collection(db, 'location'));
+    // We combine 'place' and 'city' for the display name
+    return snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as Location));
+  } catch (error) {
+    console.error('Error getting location:', error);
+    return [];
+  }
 };
+
 
 // ... keep all existing imports and functions
 export const getAllCategories = async (): Promise<Category[]> => {
@@ -310,6 +310,34 @@ export const updateCompany = async (id: string, updates: Partial<Company>): Prom
     throw error;
   }
 };
+
+export const getAllCompanies = async (): Promise<Company[]> => {
+  try {
+    const snapshot = await getDocs(collection(db, 'companies'));
+    return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Company));
+  } catch (error) {
+    console.error('Error getting all companies:', error);
+    return [];
+  }
+};
+
+// --- NEW FUNCTION 2: Get and format companies for the filter UI ---
+export const getCompanyOptions = async (): Promise<LocationOption[]> => {
+  try {
+    const companies = await getAllCompanies();
+    // Transform the data to the { id, value, label } shape
+    return companies.map((company) => ({
+      id: company.id,
+      value: company.id,    // The unique ID for filtering
+      label: company.name,  // The display name for the user
+    }));
+  } catch (error) {
+    console.error("Error getting formatted company options:", error);
+    return [];
+  }
+};
+
+
 
 // Services
 export const createService = async (companyId: string, serviceData: Omit<Service, 'id' | 'companyId'>): Promise<string> => {

@@ -12,7 +12,7 @@ export type Company = {
   socials?: {
     facebook?: string;
     instagram?: string;
-    twitter?: string;
+    tiktok?: string;
     website?: string;
   } 
 };
@@ -120,19 +120,21 @@ export type Category = {
   popular?: boolean; // make optional to match mock
   trending?: boolean; // make optional to match mock
 };
-// types/filters.ts
-export interface LocationOption {
-  value: string; // e.g., 'my_location', 'nyc', 'la'
-  label: string; // e.g., 'Near Me', 'New York', 'Los Angeles'
-  coordinates?: { lat: number; lon: number };
-}
 
+// location.ts
+export interface Location {
+  id: string;
+  city: string;
+  place: string;
+}
+// types/filters.ts
 export interface FilterState {
   searchTerm: string;
   locations: LocationOption[]; // Changed from location: LocationOption | null
   categoryId: string | null;
   companyIds: string[];        // Changed from companyId: string | null
 }
+
 export type MessageTemplate = {
   id: string
   name: string
@@ -143,10 +145,9 @@ export type MessageTemplate = {
 // This allows us to treat it uniformly in our UI.
 
 export interface LocationOption {
+  id: string;
   value: string;
   label: string;
-  // This can be optional if you don't always have coordinates
-  coordinates?: { lat: number; lon: number };
 }
 export interface CompanyFilterOption {
   id: string;

@@ -1,61 +1,84 @@
-// File: src/lib/time-utils.ts
+// In /lib/time-utils.ts
 
 /**
- * Converts a time string "HH:mm" to the total number of minutes from midnight.
- * @param timeStr - The time string (e.g., "09:30").
- * @returns The total minutes from midnight (e.g., 570).
+ * Parses a single time string like "8am" or "5:30pm" into a 24-hour format object.
+ * This function is reliable for individual time strings.
+ * @param timeStr The time string (e.g., "8am", "5:30pm").
+ * @returns An object with hour and minute, or null if invalid.
  */
-function timeToMinutes(timeStr: string): number {
-  const [hours, minutes] = timeStr.split(':').map(Number);
-  return hours * 60 + minutes;
-}
+const parseTime = (timeStr: string): { hour: number; minute: number } | null => {
+  const match = timeStr.match(/(\d{1,2}):?(\d{2})?\s*(am|pm)/i);
+  if (!match) return null;
 
-/**
- * Converts total minutes from midnight back to a "HH:mm" time string.
- * @param totalMinutes - The total minutes from midnight.
- * @returns The formatted time string (e.g., "09:30").
- */
-function minutesToTime(totalMinutes: number): string {
-  const hours = Math.floor(totalMinutes / 60).toString().padStart(2, '0');
-  const minutes = (totalMinutes % 60).toString().padStart(2, '0');
-  return `${hours}:${minutes}`;
-}
+  let [, hourStr, minuteStr, period] = match;
+  let hour = parseInt(hourStr, 10);
+  const minute = minuteStr ? parseInt(minuteStr, 10) : 0;
 
-/**
- * Generates an array of time slots based on company working hours and service duration.
- * @param workingHoursString - The raw string from Firestore (e.g., "09:00 - 17:00, Monday - Friday").
- * @param slotDurationMinutes - The duration of the service in minutes (e.g., 40).
- * @returns An array of time slot strings (e.g., ["09:00", "09:40", "10:20", ...]).
- */
-export function generateTimeSlots(
-  workingHoursString: string | undefined | null,
-  slotDurationMinutes: number
-): string[] {
-  if (!workingHoursString || !slotDurationMinutes) {
-    return []; // Return empty if data is missing
+  if (period.toLowerCase() === 'pm' && hour < 12) {
+    hour += 12;
+  }
+  if (period.toLowerCase() === 'am' && hour === 12) {
+    hour = 0; // Midnight case
   }
 
-  // Use a regular expression to safely extract the start and end times
-  const timeRegex = /(\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})/;
-  const match = workingHoursString.match(timeRegex);
+  return { hour, minute };
+};
 
-  if (!match) {
-    console.error("Could not parse working hours string:", workingHoursString);
-    return []; // Return empty if the format is wrong
+/**
+ * Generates available time slots based on company working hours and service duration.
+ * This function is robust and can handle messy working hour strings.
+ * @param workingHoursStr The string from the company document, e.g., " - , Mon - Sat (8am - 5pm)".
+ * @param serviceDuration The duration of the service in minutes.
+ * @returns An array of formatted time slots (e.g., ["08:00 AM", "08:30 AM"]).
+ */
+export const generateTimeSlots = (workingHoursStr: string | undefined, serviceDuration: number): string[] => {
+  if (!workingHoursStr || !serviceDuration || serviceDuration <= 0) {
+    return [];
   }
 
-  const [, startTimeStr, endTimeStr] = match;
+  // --- THIS IS THE FIX ---
+  // A much simpler and more robust regex to find time strings.
+  // It looks for a number, an optional colon + minutes part, and then am/pm.
+  const timeMatches = workingHoursStr.match(/\d{1,2}(:\d{2})?\s*(am|pm)/gi);
 
-  const startMinutes = timeToMinutes(startTimeStr);
-  const endMinutes = timeToMinutes(endTimeStr);
-  
+  if (!timeMatches || timeMatches.length < 2) {
+    // This console.error will now only trigger if there are genuinely no times in the string.
+    console.error(`Could not parse working hours string: ${workingHoursStr}`);
+    return [];
+  }
+
+  // Assume the first found time is the start and the last is the end.
+  const startTime = parseTime(timeMatches[0]);
+  const endTime = parseTime(timeMatches[timeMatches.length - 1]);
+
+  if (!startTime || !endTime) {
+    return [];
+  }
+
   const slots: string[] = [];
-  let currentMinutes = startMinutes;
+  const now = new Date();
+  
+  const currentTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), startTime.hour, startTime.minute);
+  const closingTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), endTime.hour, endTime.minute);
 
-  while (currentMinutes + slotDurationMinutes <= endMinutes) {
-    slots.push(minutesToTime(currentMinutes));
-    currentMinutes += slotDurationMinutes;
+  while (currentTime < closingTime) {
+    // Check that the appointment can FINISH before or exactly at closing time.
+    const appointmentEndTime = new Date(currentTime.getTime() + serviceDuration * 60000);
+
+    if (appointmentEndTime <= closingTime) {
+      const formattedTime = currentTime.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+      });
+      slots.push(formattedTime);
+    }
+    
+    // Increment by the duration of the service to find the next available slot.
+    // NOTE: This assumes back-to-back booking. For more complex scenarios
+    // with breaks, a different increment (e.g., 15 minutes) might be needed.
+    currentTime.setMinutes(currentTime.getMinutes() + serviceDuration);
   }
 
   return slots;
-}
+};
