@@ -1,39 +1,43 @@
 export type UserRole = "company" | "user"
 import { ANY_PROVIDER_ID } from "@/lib/constants";
+import { Timestamp } from "firebase/firestore";
 export type Company = {
   id: string;
   name: string;
   phone: string;
   email: string;
   address: string;
-  workingHours: string;
+  working_hours: string;
   logo?: string;
-  location?: string;
+  location_text: string;
+  location_link: string;
+  owner_uid: string; // The UID of the user who owns this company
+  createdAt?: Timestamp | Date;
   socials?: {
     facebook?: string;
     instagram?: string;
     tiktok?: string;
     website?: string;
   } 
+  services?: Service[];  // An array of Service objects
+  providers?: Provider[];
 };
 export type Service = {
   id: string;
-  companyId: string;
+  company_id: string;
   name: string;
-  categoryId?: string; 
+  category_id: string; // Category for this specific service
   description: string;
-  estimatedWaitTime: number; // in minutes
+  estimated_wait_time_mins: number; // in minutes
   status: "active" | "inactive";
   code: string;
   createdAt: Date;
   providers: Provider[];
   price: string;
-  company?: Company; 
-  locationLink?: string;
-  allowWalkIns: boolean;
-  walkInBuffer: number;
-  maxWalkInsPerHour: number;
-  featureEnabled: boolean;
+  photo?: string;
+  featureEnabled: true;
+    // An array of Provider objects linked via service_providers
+  queue_entries?: QueueItem[]; 
 };
 
 export type QueueItem = {
@@ -44,7 +48,8 @@ export type QueueItem = {
   userName: string
   phoneNumber: string
   position: number
-  joinedAt: Date
+  joinedAt: Timestamp | Date
+  servedAt?: any;
   status: "waiting" | "served" | "skipped" | "cancelled" | "no-show"
   estimatedServiceTime?: Date
   // This type is now perfectly aligned with our logic.
@@ -52,25 +57,13 @@ export type QueueItem = {
   notes?: string
   priority?: "normal" | "high" | "urgent"
   appointmentTime?: Date
+  
 }
 
-// ... your other types (Company, Service, etc.)
-export type CreateQueueItem = {
-  serviceId: string
-  providerId: string 
-  userName: string
-  phoneNumber: string
-  queueType: string
-  userUid: string; // Including userUid as it's passed separately
-  notes?: string
-}
-// This is the final shape of the data we want to display in the UI
-export interface ServiceWithDetails extends Service {
-  queueCount: number; // The number of people currently in the queue
-  // company property is already part of your Service type if you added it
-  company?: Company; 
-}
-
+export type ServiceWithDetails = Service & {
+  company?: Company; // The company object, can be optional
+  queueCount: number; // The calculated number of people in the queue
+};
 export type User = {
   id: string
   phoneNumber: string
@@ -81,33 +74,21 @@ export type Provider = {
   id: string;
   name: string;
   specialization: string;
-  isActive: boolean;
+ is_active: boolean; // <-- CHANGED to snake_case
+  
   createdAt: Date;
-  rating?: number;
-  completedServices?: number;
-  averageServiceTime?: number;
   isAny?: boolean; // This flag is very useful!
 };
-
-// This is your virtual "Any Provider" object. It conforms to the Provider type.
 export const ANY_PROVIDER_OPTION: Provider = {
   id: ANY_PROVIDER_ID, // Use the constant here
-  name: 'Any Available Specialist',
+  name: 'Any Provider',
   specialization: 'General',
-  isActive: true,
+  is_active: true,// <-- CHANGED to snake_case
   createdAt: new Date(),
   isAny: true, // The special flag to easily identify this option
 };
 
 
-export type WalkInSettings = {
-  enabled: boolean
-  maxWalkInsPerHour: number
-  bufferTime: number // minutes between appointments
-  prioritySystem: boolean
-  allowProviderSelection: boolean
-  estimatedWaitMultiplier: number // multiply normal wait time for walk-ins
-}
 export type Category = {
   id: string;
   name: string;
@@ -120,21 +101,19 @@ export type Category = {
   popular?: boolean; // make optional to match mock
   trending?: boolean; // make optional to match mock
 };
-
-// location.ts
+// types/filters.ts
 export interface Location {
   id: string;
   city: string;
   place: string;
 }
-// types/filters.ts
 export interface FilterState {
   searchTerm: string;
-  locations: LocationOption[]; // Changed from location: LocationOption | null
-  categoryId: string | null;
-  companyIds: string[];        // Changed from companyId: string | null
+  location: Location | null;
+  categoryId: string | null; // null means 'All Categories'
+  showNoQueue: boolean;
+  isFavorite: boolean; // For a potential "My Favorites" filter
 }
-
 export type MessageTemplate = {
   id: string
   name: string
@@ -144,33 +123,19 @@ export type MessageTemplate = {
 // Add a virtual provider object to represent the "Any Provider" queue.
 // This allows us to treat it uniformly in our UI.
 
-export interface LocationOption {
-  id: string;
-  value: string;
-  label: string;
-}
-export interface CompanyFilterOption {
-  id: string;
-  name: string;
-}
+// in src/type.ts (or a similar file)
 
-//stats section
-export interface GlobalStatsData {
-  companiesCount: number;
-  activeServicesCount: number;
-  servicesCompletedCount: number;
-  usersCount: number;
-}
-//category service 
-// ... your other types (Company, Service, etc.)
-
-// This is the final shape of the data we want to display in the UI
-export enum CategoryId {
-  HAIRCUT = 'haircut',
-  SPA_WELLNESS = 'spa-wellness',
-  HEALTH = 'health',
-  FITNESS = 'fitness',
-  AUTOMOTIVE = 'automotive',
-  FOOD = 'food',
-  PET_SERVICES = 'pet-services',
+// This represents the data collected from the new Add/Edit Service Form
+export interface ServiceRegistrationData {
+  serviceName: string;
+  categoryId: string;
+  description: string;
+  cost: string;
+  offers: string;
+  estimatedTime: string;
+  serviceProviders: Array<{ name: string; specialization: string }>;
+  photos: File[];
+  allowWalkIns: boolean;
+  walkInBuffer: number;
+  maxWalkInsPerHour: number;
 }
