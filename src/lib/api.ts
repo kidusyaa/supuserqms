@@ -241,3 +241,132 @@ export const deleteService = async (serviceId: string): Promise<void> => {
     throw new Error('Failed to delete service');
   }
 };
+
+// --- Get Services by Category ---
+export const getServicesByCategory = async (categoryId: string): Promise<Service[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('services')
+      .select(`
+        *,
+        companies (*),
+        service_providers (
+          providers (*)
+        )
+      `)
+      .eq('category_id', categoryId)
+      .eq('status', 'active');
+
+    if (error) {
+      console.error('Error getting services by category:', error);
+      return [];
+    }
+
+    return (data || []).map((service: any) => ({
+      ...service,
+      companyId: service.company_id,
+      categoryId: service.category_id,
+      estimatedWaitTime: service.estimated_wait_time,
+      allowWalkIns: service.allow_walk_ins,
+      walkInBuffer: service.walk_in_buffer,
+      maxWalkInsPerHour: service.max_walk_ins_per_hour,
+      featureEnabled: service.feature_enabled,
+      locationLink: service.location_link,
+      createdAt: new Date(service.created_at),
+      company: service.companies,
+      providers: service.service_providers
+        ? service.service_providers
+            .map((sp: any) => sp.providers)
+            .filter(Boolean)
+        : []
+    })) as Service[];
+  } catch (error) {
+    console.error('Error getting services by category:', error);
+    return [];
+  }
+};
+
+// --- Get All Services ---
+export const getAllServices = async (): Promise<Service[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('services')
+      .select(`
+        *,
+        companies (*),
+        service_providers (
+          providers (*)
+        )
+      `)
+      .eq('status', 'active');
+
+    if (error) {
+      console.error('Error getting all services:', error);
+      return [];
+    }
+
+    return (data || []).map((service: any) => ({
+      ...service,
+      companyId: service.company_id,
+      categoryId: service.category_id,
+      estimatedWaitTime: service.estimated_wait_time,
+      allowWalkIns: service.allow_walk_ins,
+      walkInBuffer: service.walk_in_buffer,
+      maxWalkInsPerHour: service.max_walk_ins_per_hour,
+      featureEnabled: service.feature_enabled,
+      locationLink: service.location_link,
+      createdAt: new Date(service.created_at),
+      company: service.companies,
+      providers: service.service_providers
+        ? service.service_providers
+            .map((sp: any) => sp.providers)
+            .filter(Boolean)
+        : []
+    })) as Service[];
+  } catch (error) {
+    console.error('Error getting all services:', error);
+    return [];
+  }
+};
+
+// --- Get Categories with Service Counts ---
+export const getCategoriesWithServiceCounts = async (): Promise<Category[]> => {
+  try {
+    const { data: categories, error: categoriesError } = await supabase
+      .from('global_categories')
+      .select('*');
+
+    if (categoriesError) {
+      console.error('Error getting categories:', categoriesError);
+      return [];
+    }
+
+    // Get service counts for each category
+    const { data: serviceCounts, error: countsError } = await supabase
+      .from('services')
+      .select('category_id')
+      .eq('status', 'active');
+
+    if (countsError) {
+      console.error('Error getting service counts:', countsError);
+      return categories || [];
+    }
+
+    // Count services by category
+    const countMap = new Map<string, number>();
+    (serviceCounts || []).forEach((service: any) => {
+      if (service.category_id) {
+        const current = countMap.get(service.category_id) || 0;
+        countMap.set(service.category_id, current + 1);
+      }
+    });
+
+    return (categories || []).map((category: any) => ({
+      ...category,
+      services: countMap.get(category.id) || 0
+    }));
+  } catch (error) {
+    console.error('Error getting categories with service counts:', error);
+    return [];
+  }
+};

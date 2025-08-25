@@ -2,12 +2,12 @@
 
 import { useState, useEffect, useMemo } from "react"; // <-- Import useMemo
 import { useRouter } from "next/navigation";
-import { joinQueue } from "@/lib/firebase-utils";
+
 import { Dialog, DialogContent,DialogHeader, DialogTitle, DialogDescription /* ... other dialog imports */ } from "@/components/ui/dialog";
 import { Icon } from "@iconify/react";
 import { generateTimeSlots } from "@/lib/time-utils"; // <-- Import our new utility
-import { Service, Company, Provider } from "@/type"; // <-- Import types
-
+import { Service, Company, Provider,QueueItem } from "@/type"; // <-- Import types
+import { createQueueEntry, CreateQueuePayload } from "@/lib/supabase-utils"; 
 // --- Updated props interface ---
 interface BookServiceDialogProps {
   open: boolean;
@@ -17,13 +17,7 @@ interface BookServiceDialogProps {
   selectedProvider: Provider;
 }
 
-export default function BookServiceDialog({
-  open,
-  onOpenChange,
-  service,
-  company,
-  selectedProvider,
-}: BookServiceDialogProps) {
+export default function BookServiceDialog({ open, onOpenChange, service, company, selectedProvider }: BookServiceDialogProps) {
   const router = useRouter();
   const [date, setDate] = useState(""); // This can be your dual-calendar state later
   const [time, setTime] = useState("");
@@ -36,30 +30,33 @@ export default function BookServiceDialog({
   // --- DYNAMICALLY GENERATE TIME SLOTS ---
    const timeSlots = useMemo(() => {
     // This now calls the powerful function and will succeed
-    return generateTimeSlots(company.workingHours, service.estimatedWaitTime);
-  }, [company.workingHours, service.estimatedWaitTime]);
+    return generateTimeSlots(company.working_hours, service.estimated_wait_time_mins);
+  }, [company.working_hours, service.estimated_wait_time_mins]);
   // --- BOOKING LOGIC ---
   const handleBook = async () => {
-    if (!userName || !phoneNumber || !date || !time) {
-        setError("Please fill out all fields.");
-        return;
-    }
+    // ... your validation is fine ...
     setLoading(true);
     setError("");
     try {
-      const queueData = {
-        serviceId: service.id,
-        providerId: selectedProvider.id,
-        userName,
-        phoneNumber,
-        queueType: "booking",
-        userUid: "guest",
+      // --- THE FIX: Construct the payload for our new function ---
+      // Combine date and time into a single ISO string for the database
+      const appointmentDateTime = new Date(`${date}T${time}`);
+
+      const queueData: CreateQueuePayload = {
+        user_name: userName,
+        phone_number: phoneNumber,
+        service_id: service.id,
+        provider_id: selectedProvider.id,
+        queue_type: "booking", // This is for a scheduled appointment
         notes: `Booking for ${date} at ${time}`,
       };
-      await joinQueue(company.id, service.id, queueData); // Use company.id
+
+      // --- THE FIX: Call the new Supabase API function ---
+      await createQueueEntry(queueData);
+
       setSuccess(true);
       setTimeout(() => {
-        router.push("/");
+        router.push("/user/dashboard"); // Redirect
       }, 2000);
 
     } catch (e) {

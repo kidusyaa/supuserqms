@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { getAllServices } from "@/lib/firebase-utils";
+import { getAllServices } from "@/lib/api";
 import FilterNav from "@/components/FilterNav";
 import { Service, FilterState } from "@/type";
 import Link from "next/link";
@@ -11,8 +11,10 @@ import { LocationOption } from "@/type";
 const initialFilterState: FilterState = {
   searchTerm: "",
   locations: [],
-  categoryId: null, // This is ready to be used
+  categoryId: null, 
   companyIds: [],
+  showNoQueue: false,
+  isFavorite: false,
 };
 
 export default function ServicesListPage() {
@@ -46,7 +48,7 @@ export default function ServicesListPage() {
 
     if (filters.companyIds.length > 0) {
       filtered = filtered.filter((service) =>
-        filters.companyIds.includes(service.companyId)
+        filters.companyIds.includes(service.company_id)
       );
     }
 
@@ -57,17 +59,15 @@ export default function ServicesListPage() {
       filtered = filtered.filter(
         (service) =>
           // Check if the company's location string is in our array of selected locations
-          service.company?.location &&
-          selectedLocationValues.includes(service.company.location)
+          service.company?.location_text &&
+          selectedLocationValues.includes(service.company.location_text)
       );
     }
 
-
-    // --- THIS IS THE NEW LOGIC ---
     // If a categoryId is selected in the filters, apply this filter.
     if (filters.categoryId) {
       filtered = filtered.filter(
-        (service) => service.categoryId === filters.categoryId
+        (service) => service.category_id === filters.categoryId
       );
     }
 
@@ -95,7 +95,7 @@ export default function ServicesListPage() {
           {filteredServices.map(service => (
             <Link 
               key={service.id} 
-              href={`/services/${service.id}?companyId=${service.companyId}`} 
+              href={`/services/${service.id}?companyId=${service.company_id}`} 
               className="block bg-white rounded-lg shadow border border-slate-200 p-5 hover:shadow-lg hover:-translate-y-1 transition-all"
             >
               <div className="text-xl font-bold text-blue-900 mb-1">{service.name}</div>
@@ -105,7 +105,7 @@ export default function ServicesListPage() {
               <p className="text-slate-600 mb-4 text-sm line-clamp-2">{service.description}</p>
               <div className="flex gap-4 text-sm text-slate-700 border-t pt-3 mt-3">
                 <span><strong className="text-green-600">${service.price}</strong></span>
-                <span className="border-l pl-4">~{service.estimatedWaitTime} min</span>
+                <span className="border-l pl-4">~{service.estimated_wait_time_mins} min</span>
               </div>
             </Link>
           ))}

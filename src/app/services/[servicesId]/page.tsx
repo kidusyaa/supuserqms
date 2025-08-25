@@ -1,72 +1,72 @@
-// --- Paste this entire updated component into your file ---
+// Paste this updated function into your file
+// src/app/services/[servicesId]/page.tsx
 
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { Icon } from "@iconify/react";
-import { getServiceWithProviders, getCompanyById } from "@/lib/firebase-utils";
-import { Service, Provider, Company, ANY_PROVIDER_OPTION } from "@/type";
+import { Service, Provider, ANY_PROVIDER_OPTION } from "@/type";
+// --- THE FIX: Import the single, powerful Supabase function ---
+import { getServiceDetails } from "@/lib/supabase-utils"; // Adjust path if necessary
 
 function ServiceDetailContent() {
   const [service, setService] = useState<Service | null>(null);
-  const [company, setCompany] = useState<Company | null>(null);
+  // --- THE FIX: No separate company state needed ---
+  // const [company, setCompany] = useState<Company | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
 
   const router = useRouter();
   const params = useParams();
-  const searchParams = useSearchParams();
 
+  // --- THE FIX: We only need the serviceId from the URL params ---
   const serviceId = params.servicesId as string;
-  const companyId = searchParams.get("companyId");
 
   useEffect(() => {
     const loadData = async () => {
-      if (!companyId || !serviceId) {
+      if (!serviceId) {
+        setError("Service ID is missing.");
+        setIsLoading(false);
         return;
       }
       setIsLoading(true);
       setError("");
       try {
-        const [serviceData, companyData] = await Promise.all([
-          getServiceWithProviders(companyId, serviceId),
-          getCompanyById(companyId)
-        ]);
+        // --- THE FIX: One single API call to get everything ---
+        const serviceData = await getServiceDetails(serviceId);
 
         if (serviceData) {
           setService(serviceData);
+          // Initialize the selected provider
           if (serviceData.providers && serviceData.providers.length === 1) {
+            // If only one provider, select them by default
             setSelectedProvider(serviceData.providers[0]);
           } else {
+            // Otherwise, select the "Any Provider" option
             setSelectedProvider(ANY_PROVIDER_OPTION);
           }
         } else {
-          setError(`This service is inactive or not available.`);
-        }
-
-        if (companyData) {
-          setCompany(companyData);
-        } else {
-          setError(prev => prev + " Company data not found.");
+          setError(`This service is inactive or could not be found.`);
         }
       } catch (err) {
-        console.error("Failed to fetch service/company details:", err);
+        console.error("Failed to fetch service details:", err);
         setError("An unexpected error occurred. Please try refreshing the page.");
       } finally {
         setIsLoading(false);
       }
     };
     loadData();
-  }, [companyId, serviceId]);
+  }, [serviceId]); // Dependency array is now much simpler
 
   const handleBooking = () => {
-    if (!selectedProvider) {
+    if (!selectedProvider || !service) {
       alert("An error occurred. Please refresh and try again.");
       return;
     }
-    router.push(`/services/${serviceId}/book?companyId=${companyId}&providerId=${selectedProvider.id}`);
+    // --- THE FIX: companyId is now retrieved from the service object ---
+    router.push(`/services/${serviceId}/book?companyId=${service.company_id}&providerId=${selectedProvider.id}`);
   };
 
   if (isLoading) {
@@ -77,11 +77,15 @@ function ServiceDetailContent() {
     return <div className="p-8 text-center text-red-600 bg-red-50 rounded-lg max-w-md mx-auto mt-10 font-semibold">{error}</div>;
   }
 
-  if (!service || !company) {
+  // --- THE FIX: We only need to check for the service object, as it contains the company ---
+  if (!service || !service.company) {
     return <div className="p-8 text-center text-slate-600">Service or company details could not be loaded.</div>;
   }
+  
+  // Destructure company from service for easier access in JSX
+  const { company } = service;
 
-  // --- Main Component JSX ---
+  // --- Main Component JSX (now uses `company` from `service`) ---
   return (
     <div className="bg-slate-50 min-h-screen">
       <div className="container mx-auto max-w-3xl p-4 md:p-8">
@@ -94,46 +98,45 @@ function ServiceDetailContent() {
         </button>
 
         <div className="bg-white p-6 md:p-8 rounded-xl shadow-lg border border-slate-200">
-          {/* --- Main Service Info --- */}
+          {/* Main Service Info */}
           <div>
             <span className="text-sm font-semibold text-blue-900 uppercase tracking-wider">{company.name}</span>
             <div className="flex items-center justify-between mt-2 mb-4">
                 <h1 className="text-4xl md:text-5xl font-bold text-slate-800 mt-1 mb-4">{service.name}</h1>
-                <p className="text-sm ">Scode:<span className="font-semibold   bg-gray-100 rounded-md p-1">{service.code}</span></p>
+                <p className="text-sm ">Scode:<span className="font-semibold bg-gray-100 rounded-md p-1">{service.code}</span></p>
             </div>
             <p className="text-slate-600 text-lg mb-6">{service.description}</p>
             <div className="flex flex-col sm:flex-row gap-6 mb-6">
                 <div className="flex items-center gap-3"><Icon icon="lucide:dollar-sign" width="20" height="20" /><span className="text-2xl font-bold text-green-600">${service.price}</span></div>
-                <div className="flex items-center gap-3 text-slate-700"><Icon icon="lucide:clock" width="20" height="20" /><span className="text-lg">~{service.estimatedWaitTime} min duration</span></div>
+                <div className="flex items-center gap-3 text-slate-700"><Icon icon="lucide:clock" width="20" height="20" /><span className="text-lg">~{service.estimated_wait_time_mins} min duration</span></div>
             </div>
           </div>
 
           <hr className="my-6 border-slate-200" />
 
-          {/* --- NEW: Revamped Company Details Section --- */}
+          {/* Revamped Company Details Section */}
           <div>
             <h2 className="text-xl font-bold text-slate-700 mb-4">About {company.name}</h2>
             <div className="space-y-3">
-              {/* Address */}
               <div className="flex items-start gap-3 text-slate-600">
                 <Icon icon="lucide:map-pin" className="mt-1 flex-shrink-0" width="18" height="18" />
-                <span>{company.address}</span>
+                {/* --- THE FIX: Use location_text from your Supabase table --- */}
+                <span>{company.location_text}</span>
               </div>
-              {/* Phone */}
               <div className="flex items-start gap-3 text-slate-600">
                 <Icon icon="lucide:phone" className="mt-1 flex-shrink-0" width="18" height="18" />
+                {/* --- THE FIX: Ensure your Company type has `phone_number` --- */}
                 <a href={`tel:${company.phone}`} className="text-blue-900 hover:underline">{company.phone}</a>
               </div>
-              {/* Working Hours - Added from your data */}
-              {company.workingHours && (
+              {company.working_hours && (
                 <div className="flex items-start gap-3 text-slate-600">
                   <Icon icon="lucide:calendar-clock" className="mt-1 flex-shrink-0" width="18" height="18" />
-                  <span>{company.workingHours}</span>
+                  <span>{company.working_hours}</span>
                 </div>
               )}
             </div>
 
-            {/* Social Media Links - Dynamically rendered */}
+            {/* Social Media Links */}
             {company.socials && (
               <div className="mt-5 pt-4 border-t border-slate-100 flex items-center gap-4">
                 {company.socials.website && (
@@ -152,18 +155,16 @@ function ServiceDetailContent() {
                   </a>
                 )}
                 {company.socials.tiktok && (
-                  <a href={company.socials.tiktok} target="_blank" rel="noopener noreferrer" aria-label="Twitter or X" className="text-slate-500 hover:text-blue-900 transition-colors">
+                  <a href={company.socials.tiktok} target="_blank" rel="noopener noreferrer" aria-label="TikTok" className="text-slate-500 hover:text-blue-900 transition-colors">
                     <Icon icon="ri:tiktok-line" width="24" height="24" />
                   </a>
                 )}
               </div>
             )}
           </div>
-          {/* --- END: Revamped Company Details Section --- */}
-
         </div>
 
-        {/* --- Providers Section (Unchanged) --- */}
+        {/* Providers Section */}
         {service.providers && service.providers.length > 0 && (
           <div className="mt-10">
             <h2 className="text-2xl font-bold text-slate-800 mb-4">Choose Your Specialist</h2>
@@ -186,19 +187,19 @@ function ServiceDetailContent() {
                 <button
                   key={provider.id}
                   onClick={() => setSelectedProvider(provider)}
-                  disabled={!provider.isActive}
+                  disabled={!provider.is_active}
                   className={`p-4 border rounded-lg text-center transition-all duration-200 flex flex-col items-center gap-3
                     ${selectedProvider?.id === provider.id
                       ? "bg-blue-900 text-white ring-2 ring-blue-900 ring-offset-2"
                       : "bg-white hover:border-blue-800 hover:bg-blue-50"}
-                    ${!provider.isActive ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'cursor-pointer'}
+                    ${!provider.is_active ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'cursor-pointer'}
                   `}
                 >
                   <div className="p-2 bg-slate-100 rounded-full text-slate-700"><Icon icon="lucide:user" width="32" height="32" /></div>
                   <p className="font-semibold text-lg">{provider.name}</p>
                   <div className="flex items-center gap-2 text-sm">
-                    <span className={`w-2.5 h-2.5 rounded-full ${provider.isActive ? 'bg-green-500' : 'bg-slate-400'}`}></span>
-                    {provider.isActive ? 'Available' : 'Unavailable'}
+                    <span className={`w-2.5 h-2.5 rounded-full ${provider.is_active ? 'bg-green-500' : 'bg-slate-400'}`}></span>
+                    {provider.is_active ? 'Available' : 'Unavailable'}
                   </div>
                 </button>
               ))}
@@ -209,7 +210,7 @@ function ServiceDetailContent() {
           </div>
         )}
 
-        {/* --- Call to Action (CTA) Button (Unchanged) --- */}
+        {/* Call to Action Button */}
         <div className="mt-10 pt-6 border-t border-slate-200">
           <button
             onClick={handleBooking}

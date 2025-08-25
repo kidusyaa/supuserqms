@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { FilterState, LocationOption, Category,  Location as AppLocation } from "@/type";
-import { getAllCategories, getLocations, getCompanyOptions } from "@/lib/firebase-utils";
+import { getCategories, getLocations } from "@/lib/api";
+import { getCompanyOptions } from "@/lib/supabase-utils";
 // UI Imports
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,8 @@ const initialFilterState: FilterState = {
   locations: [],
   categoryId: null,
   companyIds: [],
+  showNoQueue: false,
+  isFavorite: false,
 };
 
 export default function FilterNav({ onFilterChange, initialFilters, isCategoryLocked = false, }: FilterNavProps) {
@@ -61,7 +64,7 @@ export default function FilterNav({ onFilterChange, initialFilters, isCategoryLo
       setDataLoading(true);
       try {
         const [fetchedCategories, fetchedLocations, fetchedCompanyOptions] = await Promise.all([
-          getAllCategories(),
+          getCategories(),
           getLocations(),
           getCompanyOptions(), // Fetch company options if needed
         ]);

@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Category } from "@/type";
 import { useRouter } from "next/navigation";
-import { getGlobalCategoriesWithServiceCounts } from "@/lib/firebase-utils";
+import { getCategoriesWithServiceCounts } from "@/lib/api";
 import DivCenter from "./divCenter";
 
 export default function ServiceCategoriesPage() {
@@ -14,7 +14,7 @@ export default function ServiceCategoriesPage() {
   useEffect(() => {
     const fetchCategories = async () => {
       setIsLoading(true);
-      const data = await getGlobalCategoriesWithServiceCounts();
+      const data = await getCategoriesWithServiceCounts();
       setCategories(data);
       setIsLoading(false);
     };
