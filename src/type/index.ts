@@ -42,25 +42,22 @@ export type Service = {
   queue_entries?: QueueItem[]; 
 };
 
+// src/type.ts
+
 export type QueueItem = {
-  id: string
-  serviceId: string
-  // FIX: providerId is now required. It will be 'any_provider' for the general queue.
-  providerId: string 
-  userName: string
-  phoneNumber: string
-  position: number
-  joinedAt: Timestamp | Date
-  servedAt?: any;
-  status: "waiting" | "served" | "skipped" | "cancelled" | "no-show"
-  estimatedServiceTime?: Date
-  // This type is now perfectly aligned with our logic.
-  queueType:string
-  notes?: string
-  priority?: "normal" | "high" | "urgent"
-  appointmentTime?: Date
-  
-}
+  id: string;
+  service_id: string;
+  provider_id: string;
+  user_id: string; // Foreign key to your new users table
+  user_name: string;
+  phone_number: string;
+  status: "waiting" | "served" | "no-show" | "cancelled";
+  position: number;
+  queue_type: "walk-in" | "booking";
+  notes?: string;
+  appointment_time?: Date | string; // Can be a Date object or ISO string
+  created_at: Date | string; // Supabase provides this automatically
+};
 
 export type ServiceWithDetails = Service & {
   company?: Company; // The company object, can be optional
@@ -94,14 +91,11 @@ export const ANY_PROVIDER_OPTION: Provider = {
 export type Category = {
   id: string;
   name: string;
-  image:string;
   description: string;
   icon: string;
-  gradient: string;
+
   services: number;
-  avgWait: string;
-  popular?: boolean; // make optional to match mock
-  trending?: boolean; // make optional to match mock
+   // make optional to match mock
 };
 // types/filters.ts
 export interface LocationOption {
@@ -119,8 +113,8 @@ export interface FilterState {
   locations: LocationOption[]; 
   categoryId: string | null; 
   companyIds: string[]; 
-  showNoQueue: boolean;
-  isFavorite: boolean; // For a potential "My Favorites" filter
+
+  // For a potential "My Favorites" filter
 }
 export type MessageTemplate = {
   id: string

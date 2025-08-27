@@ -13,6 +13,11 @@ import type {
   GlobalStatsData
 } from '../type';
 
+
+export type CategoryWithServices = Category & {
+  services: Service[];
+};
+
 // ===== LOCATIONS =====
 export const getLocations = async (): Promise<Location[]> => {
   try {
@@ -311,53 +316,10 @@ export const searchServices = async (searchTerm: string, categoryId?: string): P
 };
 
 // Featured services: status active AND featureEnabled true
-export const getFeaturedServices = async (): Promise<Service[]> => {
-  try {
-    const { data, error } = await supabase
-      .from('services')
-      .select(`
-        *,
-        companies (*),
-        service_providers (
-          providers (*)
-        )
-      `)
-      .eq('status', 'active')
-      .eq('feature_enabled', true);
-
-    if (error) {
-      console.error('Error getting featured services:', error);
-      return [];
-    }
-
-    return (data || []).map((service: any) => ({
-      ...service,
-      companyId: service.company_id,
-      categoryId: service.category_id,
-      estimatedWaitTime: service.estimated_wait_time,
-      allowWalkIns: service.allow_walk_ins,
-      walkInBuffer: service.walk_in_buffer,
-      maxWalkInsPerHour: service.max_walk_ins_per_hour,
-      featureEnabled: service.feature_enabled,
-      locationLink: service.location_link,
-      createdAt: new Date(service.created_at),
-      company: service.companies,
-      providers: service.service_providers
-        ? service.service_providers
-            .map((sp: any) => sp.providers)
-            .filter(Boolean)
-        : []
-    })) as Service[];
-  } catch (error) {
-    console.error('Error getting featured services:', error);
-    return [];
-  }
-};
 
 // Global stats for the landing page
 export const getGlobalStats = async (): Promise<GlobalStatsData> => {
   try {
-    // Get counts for different entities
     const [companiesResult, servicesResult, completedResult, usersResult] = await Promise.all([
       supabase.from('companies').select('id', { count: 'exact', head: true }),
       supabase.from('services').select('id', { count: 'exact', head: true }).eq('status', 'active'),
@@ -567,3 +529,75 @@ const findOrCreateUser = async (phoneNumber: string, name: string): Promise<{ id
       throw new Error('Failed to join the queue.');
     }
   };
+  //featured services
+  export const getFeaturedServices = async (): Promise<Service[]> => {
+    try {
+      const { data, error } = await supabase
+        .from('services')
+        .select(`
+          *,
+          company:companies ( name, id ) 
+        `)
+        .eq('status', 'active')
+        .eq('featureEnabled', true); // Assumes column name is `featureEnabled`
+  
+      if (error) {
+        console.error("Error fetching featured services:", error);
+        throw error;
+      }
+  
+      return data || [];
+    } catch (error) {
+      console.error("Error in getFeaturedServices function:", error);
+      return [];
+    }
+  };
+
+
+//services with category 
+export const getCategoryWithServices = async (categoryId: string): Promise<CategoryWithServices | null> => {
+  try {
+    // First, get the category
+    const { data: categoryData, error: categoryError } = await supabase
+      .from('global_categories')
+      .select('*')
+      .eq('id', categoryId)
+      .single();
+
+    if (categoryError) {
+      if (categoryError.code === 'PGRST116') {
+        console.log(`No category found with ID: ${categoryId}`);
+        return null;
+      }
+      console.error("Supabase category query error:", categoryError);
+      throw categoryError;
+    }
+
+    // Then, get the services for this category
+    const { data: servicesData, error: servicesError } = await supabase
+      .from('services')
+      .select(`
+        *,
+        company:companies ( name, id )
+      `)
+      .eq('category_id', categoryId)
+      .eq('status', 'active');
+
+    if (servicesError) {
+      console.error("Supabase services query error:", servicesError);
+      throw servicesError;
+    }
+
+    // Combine the data
+    const result: CategoryWithServices = {
+      ...categoryData,
+      services: servicesData || []
+    };
+    
+    return result;
+
+  } catch (error) {
+    console.error("Error fetching category with services:", error);
+    return null;
+  }
+};

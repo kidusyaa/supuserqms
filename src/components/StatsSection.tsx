@@ -4,7 +4,8 @@
 
 import { useState, useEffect } from 'react';
 // Make sure the path to your firebase-utils is correct
-import { getGlobalStats } from '@/lib/firebase-utils';
+
+import {getGlobalStats} from '@/lib/supabase-utils';
 // Import the icons we'll use
 import { Building2, ClipboardList, BadgeCheck, Users } from 'lucide-react';
 import React from 'react';
@@ -38,7 +39,7 @@ const StatsSection = () => {
   useEffect(() => {
     const loadStats = async () => {
       try {
-        // Fetch stats using our new, optimized function
+        // This will now call the Supabase function because we changed the import
         const s = await getGlobalStats();
         
         // Update the state with the fetched data in the correct order

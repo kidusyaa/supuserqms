@@ -1,9 +1,12 @@
+// src/components/FeaturedServices.tsx
+
 "use client";
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { Flame, ArrowRight, Star, Clock } from "lucide-react";
-import { getFeaturedServices, getAllCategories } from "@/lib/firebase-utils";
+import { Flame, ArrowRight, Clock } from "lucide-react";
+// --- THE FIX: Import the new Supabase functions ---
+import { getFeaturedServices, getAllCategories } from "@/lib/supabase-utils";
 import type { Service, Category } from "@/type";
 
 import {
@@ -30,6 +33,7 @@ const FeaturedServices = () => {
     const loadData = async () => {
       setIsLoading(true);
       try {
+        // This now calls our new Supabase functions!
         const [services, categories] = await Promise.all([
           getFeaturedServices(),
           getAllCategories(),
@@ -48,6 +52,7 @@ const FeaturedServices = () => {
     loadData();
   }, []);
 
+  // Intersection observer logic remains the same
   useEffect(() => {
     const observer = new IntersectionObserver(([entry]) => {
       setIsInView(entry.isIntersecting);
@@ -92,16 +97,18 @@ const FeaturedServices = () => {
                       </CarouselItem>
                     ))
                   : featuredServices.map((service) => {
-                      // --- THE FIX: Check if categoryId exists BEFORE using it ---
-                      const category = service.categoryId ? categoryMap.get(service.categoryId) : undefined;
+                      // --- THE FIX: Use snake_case property `category_id` ---
+                      const category = service.category_id ? categoryMap.get(service.category_id) : undefined;
 
                       return (
                         <CarouselItem key={service.id} className="basis-full md:basis-1/2 lg:basis-1/3 flex items-center justify-center">
-                          <Link href={`/services/${service.id}?companyId=${service.companyId}`} passHref>
+                          {/* --- THE FIX: Use snake_case property `company_id` --- */}
+                          <Link href={`/services/${service.id}?companyId=${service.company_id}`} passHref>
                             <div className="rounded-xl overflow-hidden min-w-[320px] backdrop-blur border border-gray-200 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer bg-white/80">
                               <div className="p-4">
                                 <div className="flex items-center gap-3 mb-3">
                                   <div className="w-12 h-12 bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl flex items-center justify-center text-3xl">
+                                    {/* Using category.icon from your Category type */}
                                     {category ? category.icon : '✨'}
                                   </div>
                                   <div className="flex-1 overflow-hidden">
@@ -113,7 +120,8 @@ const FeaturedServices = () => {
                                    <div className="flex items-center gap-3">
                                       <div className="flex items-center gap-1 text-gray-500">
                                         <Clock className="w-4 h-4" />
-                                        <span className="text-sm">{service.estimatedWaitTime} min</span>
+                                        {/* --- THE FIX: Use snake_case property `estimated_wait_time_mins` --- */}
+                                        <span className="text-sm">{service.estimated_wait_time_mins} min</span>
                                       </div>
                                     </div>
                                     <div className="text-lg font-bold text-green-600">${service.price}</div>
