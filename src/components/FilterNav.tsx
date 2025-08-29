@@ -40,8 +40,7 @@ const initialFilterState: FilterState = {
   locations: [],
   categoryId: null,
   companyIds: [],
-  showNoQueue: false,
-  isFavorite: false,
+  
 };
 
 export default function FilterNav({ onFilterChange, initialFilters, isCategoryLocked = false, }: FilterNavProps) {

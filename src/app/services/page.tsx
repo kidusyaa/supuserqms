@@ -5,7 +5,7 @@ import { getAllServices } from "@/lib/api";
 import FilterNav from "@/components/FilterNav";
 import { Service, FilterState } from "@/type";
 import Link from "next/link";
-import { useAuth } from "@/lib/AuthContext"; 
+
 import { LocationOption } from "@/type";
 
 const initialFilterState: FilterState = {
@@ -13,12 +13,9 @@ const initialFilterState: FilterState = {
   locations: [],
   categoryId: null, 
   companyIds: [],
-  showNoQueue: false,
-  isFavorite: false,
 };
 
 export default function ServicesListPage() {
-  const { user } = useAuth();
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<FilterState>(initialFilterState);
