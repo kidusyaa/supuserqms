@@ -56,7 +56,7 @@ export default function BookServiceDialog({ open, onOpenChange, service, company
 
       setSuccess(true);
       setTimeout(() => {
-        router.push("/user/dashboard"); // Redirect
+        router.push("/services"); // Redirect
       }, 2000);
 
     } catch (e) {

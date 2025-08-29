@@ -58,7 +58,7 @@ export function JoinQueueDialog({ open, onOpenChange, service, company, selected
       setJoinSuccess(true);
 
       setTimeout(() => {
-        router.push("/"); // Or a success/dashboard page
+        router.push("/services"); // Or a success/dashboard page
       }, 2000);
 
     } catch (err: any) {

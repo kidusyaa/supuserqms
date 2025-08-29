@@ -47,18 +47,21 @@ export type Service = {
 export type QueueItem = {
   id: string;
   service_id: string;
-  provider_id: string;
-  user_id: string; // Foreign key to your new users table
+  provider_id: string | null; // Provider can be null
+  user_uid: string | null;    // user_uid can be null
   user_name: string;
   phone_number: string;
   status: "waiting" | "served" | "no-show" | "cancelled";
   position: number;
   queue_type: "walk-in" | "booking";
   notes?: string;
-  appointment_time?: Date | string; // Can be a Date object or ISO string
-  created_at: Date | string; // Supabase provides this automatically
+  appointment_time?: Date | string;
+  // --- THE FIX: Change `created_at` to `joined_at` ---
+  joined_at: Date | string; 
 };
 
+// Your CreateQueuePayload does not need to be changed.
+// It's correct because we don't send the timestamp from the client.
 export type ServiceWithDetails = Service & {
   company?: Company; // The company object, can be optional
   queueCount: number; // The calculated number of people in the queue

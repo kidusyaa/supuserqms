@@ -583,68 +583,68 @@ export const subscribeToUserQueues = (
 };
 
 // Search functions
-export const searchServices = async (searchTerm: string, categoryId?: string): Promise<Service[]> => {
-  try {
-    // Use collection group search to get only active services first
-    const constraints: any[] = [where('status', '==', 'active')];
-    if (categoryId) {
-      constraints.push(where('categoryId', '==', categoryId));
-    }
-    const servicesQuery = query(collectionGroup(db, 'services'), ...constraints);
-    const servicesSnapshot = await getDocs(servicesQuery);
-
-    const companiesSnapshot = await getDocs(collection(db, 'companies'));
-    const companiesMap = new Map(
-      companiesSnapshot.docs.map(doc => [doc.id, { id: doc.id, ...doc.data() } as Company])
-    );
-
-    const services: Service[] = servicesSnapshot.docs.map((serviceDoc: any) => {
-      const serviceData = serviceDoc.data() as any;
-      return {
-        ...serviceData,
-        id: serviceDoc.id,
-        company: companiesMap.get(serviceData.companyId)
-      } as unknown as Service;
-    });
-
-    const q = searchTerm.trim().toLowerCase();
-    const tokens = q.split(/\s+/).filter(Boolean);
-    if (tokens.length === 0) return [];
-
-    const matches = (text?: string) =>
-      text ? tokens.some(t => text.toLowerCase().includes(t)) : false;
-
-    return services.filter(service =>
-      matches(service.name) ||
-      matches(service.code) ||
-      matches(service.company?.name) ||
-      matches((service as any).description)
-    );
-  } catch (error) {
-    console.error('Error searching services:', error);
-    // Fallback: use active services loader and filter in memory
+  export const searchServices = async (searchTerm: string, categoryId?: string): Promise<Service[]> => {
     try {
-      let services = await getAllServices();
+      // Use collection group search to get only active services first
+      const constraints: any[] = [where('status', '==', 'active')];
       if (categoryId) {
-        services = services.filter(s => s.categoryId === categoryId);
+        constraints.push(where('categoryId', '==', categoryId));
       }
+      const servicesQuery = query(collectionGroup(db, 'services'), ...constraints);
+      const servicesSnapshot = await getDocs(servicesQuery);
+
+      const companiesSnapshot = await getDocs(collection(db, 'companies'));
+      const companiesMap = new Map(
+        companiesSnapshot.docs.map(doc => [doc.id, { id: doc.id, ...doc.data() } as Company])
+      );
+
+      const services: Service[] = servicesSnapshot.docs.map((serviceDoc: any) => {
+        const serviceData = serviceDoc.data() as any;
+        return {
+          ...serviceData,
+          id: serviceDoc.id,
+          company: companiesMap.get(serviceData.companyId)
+        } as unknown as Service;
+      });
+
       const q = searchTerm.trim().toLowerCase();
       const tokens = q.split(/\s+/).filter(Boolean);
       if (tokens.length === 0) return [];
+
       const matches = (text?: string) =>
         text ? tokens.some(t => text.toLowerCase().includes(t)) : false;
+
       return services.filter(service =>
         matches(service.name) ||
         matches(service.code) ||
         matches(service.company?.name) ||
         matches((service as any).description)
       );
-    } catch (fallbackError) {
-      console.error('Fallback searchServices failed:', fallbackError);
-      return [];
+    } catch (error) {
+      console.error('Error searching services:', error);
+      // Fallback: use active services loader and filter in memory
+      try {
+        let services = await getAllServices();
+        if (categoryId) {
+          services = services.filter(s => s.categoryId === categoryId);
+        }
+        const q = searchTerm.trim().toLowerCase();
+        const tokens = q.split(/\s+/).filter(Boolean);
+        if (tokens.length === 0) return [];
+        const matches = (text?: string) =>
+          text ? tokens.some(t => text.toLowerCase().includes(t)) : false;
+        return services.filter(service =>
+          matches(service.name) ||
+          matches(service.code) ||
+          matches(service.company?.name) ||
+          matches((service as any).description)
+        );
+      } catch (fallbackError) {
+        console.error('Fallback searchServices failed:', fallbackError);
+        return [];
+      }
     }
-  }
-}; 
+  }; 
 
 // Featured services: status active AND featureEnabled true
 export const getFeaturedServices = async (): Promise<Service[]> => {

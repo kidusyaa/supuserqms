@@ -478,57 +478,71 @@ const findOrCreateUser = async (phoneNumber: string, name: string): Promise<{ id
     // No user_uid needed here for guest checkout
   }
   
-  export const createQueueEntry = async (queueData: CreateQueuePayload): Promise<QueueItem> => {
-    try {
-      // --- STEP 1: REMOVED findOrCreateUser. Not needed for guest checkout ---
-  
-      // --- STEP 2: Calculate position for 'walk-in' types ---
-      let position = 1; // Default position
-      if (queueData.queue_type === 'walk-in') {
+// In your Supabase utility file (e.g., src/lib/supabase-utils.ts)
+
+// In your Supabase utility file (e.g., src/lib/supabase-utils.ts)
+
+export const createQueueEntry = async (queueData: CreateQueuePayload): Promise<QueueItem> => {
+  try {
+    let finalProviderId: string | null = queueData.provider_id;
+
+    if (finalProviderId === 'any') {
+      const { data: bestProviderId, error: rpcError } = await supabase
+        .rpc('find_least_busy_provider', { service_id_param: queueData.service_id });
+      
+      if (rpcError || !bestProviderId) {
+        console.error("Could not find an available provider, falling back to unassigned:", rpcError);
+        finalProviderId = null; 
+      } else {
+        finalProviderId = bestProviderId;
+      }
+    }
+    
+    let position = 1; // Default position for non-walk-ins
+    if (queueData.queue_type === 'walk-in') {
         const { count, error: countError } = await supabase
           .from('queue_entries')
           .select('*', { count: 'exact', head: true })
           .eq('service_id', queueData.service_id)
           .eq('status', 'waiting');
-          
         if (countError) throw countError;
         position = (count ?? 0) + 1;
-      }
-  
-      // --- STEP 3: Prepare the data object to PERFECTLY match your table ---
-      const entryToInsert = {
-        service_id: queueData.service_id,
-        provider_id: queueData.provider_id,
-        user_name: queueData.user_name,
-        phone_number: queueData.phone_number,
-        position: position,
-        queue_type: queueData.queue_type,
-        notes: queueData.notes,
-        user_uid: null, // Set to null for guest users, as per your schema
-        // `status` and `joined_at` are handled by the database default values.
-      };
-  
-      // --- STEP 4: Insert into the correct table ---
-      const { data: newEntry, error } = await supabase
-        .from('queue_entries') // This must be the exact name of your table
-        .insert(entryToInsert)
-        .select()
-        .single();
-  
-      if (error) {
-        // This will now show the actual database error in your console for debugging
-        console.error("Supabase insert error:", error); 
-        throw error;
-      }
-  
-      return newEntry as QueueItem;
-  
-    } catch (error) {
-      // This catch block will now have more detailed info from the DB error
-      console.error('Error in createQueueEntry function:', error);
-      throw new Error('Failed to join the queue.');
     }
-  };
+
+    // --- THE FIX: REMOVED the incorrect 'created_at' and 'status' properties ---
+    // The database will automatically set these with its DEFAULT values.
+    const entryToInsert = {
+      service_id: queueData.service_id,
+      provider_id: finalProviderId,
+      user_name: queueData.user_name,
+      phone_number: queueData.phone_number,
+      position: position,
+      queue_type: queueData.queue_type,
+      notes: queueData.notes,
+      user_uid: null,
+      // No `status` needed - defaults to 'waiting'
+      // No `joined_at` needed - defaults to now()
+    };
+
+    const { data: newEntry, error } = await supabase
+      .from('queue_entries')
+      .insert(entryToInsert)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Supabase insert error:", error); 
+      throw error;
+    }
+    
+    // --- THE FIX: REMOVED the stray line of code that was causing a syntax error ---
+    return newEntry as QueueItem;
+
+  } catch (error) {
+    console.error('Error in createQueueEntry function:', error);
+    throw new Error('Failed to join the queue.');
+  }
+};
   //featured services
   export const getFeaturedServices = async (): Promise<Service[]> => {
     try {
@@ -601,3 +615,44 @@ export const getCategoryWithServices = async (categoryId: string): Promise<Categ
     return null;
   }
 };
+ 
+//--search from all---
+// export const searchServices = async (searchTerm: string): Promise<Service[]> => {
+//   const trimmedTerm = searchTerm.trim();
+//   // Don't search if the query is too short
+//   if (trimmedTerm.length < 2) {
+//     return [];
+//   }
+
+//   // Prepare the search term for a "contains" query (case-insensitive)
+//   const formattedTerm = `%${trimmedTerm}%`;
+
+//   try {
+//     const { data, error } = await supabase
+//       .from('services')
+//       .select(`
+//         id,
+//         name,
+//         code,
+//         company_id,
+//         company:companies ( name )
+//       `)
+//       .eq('status', 'active') // Only search for active services
+//       .or(
+//         `name.ilike.${formattedTerm},` +          // Search in service name
+//         `code.ilike.${formattedTerm},` +          // Search in service code
+//         `companies.name.ilike.${formattedTerm}`   // Search in the joined company name
+//       )
+//       .limit(8); // Limit the number of results to keep the dropdown clean
+
+//     if (error) {
+//       console.error("Error searching services:", error);
+//       throw error;
+//     }
+
+//     return data || [];
+//   } catch (error) {
+//     console.error("Error in searchServices function:", error);
+//     return [];
+//   }
+// };
