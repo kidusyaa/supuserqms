@@ -4,10 +4,31 @@ import { useState, useEffect, useMemo } from "react"; // <-- Import useMemo
 import { useRouter } from "next/navigation";
 
 import { Dialog, DialogContent,DialogHeader, DialogTitle, DialogDescription /* ... other dialog imports */ } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Icon } from "@iconify/react";
 import { generateTimeSlots } from "@/lib/time-utils"; // <-- Import our new utility
 import { Service, Company, Provider,QueueItem } from "@/type"; // <-- Import types
 import { createQueueEntry, CreateQueuePayload } from "@/lib/supabase-utils"; 
+// Country codes data
+const countryCodes = [
+  { code: "+251", country: "Ethiopia", flag: "🇪🇹" },
+  { code: "+1", country: "United States", flag: "🇺🇸" },
+  { code: "+44", country: "United Kingdom", flag: "🇬🇧" },
+  { code: "+91", country: "India", flag: "🇮🇳" },
+  { code: "+86", country: "China", flag: "🇨🇳" },
+  { code: "+49", country: "Germany", flag: "🇩🇪" },
+  { code: "+33", country: "France", flag: "🇫🇷" },
+  { code: "+81", country: "Japan", flag: "🇯🇵" },
+  { code: "+234", country: "Nigeria", flag: "🇳🇬" },
+  { code: "+27", country: "South Africa", flag: "🇿🇦" },
+];
+
 // --- Updated props interface ---
 interface BookServiceDialogProps {
   open: boolean;
@@ -23,6 +44,7 @@ export default function BookServiceDialog({ open, onOpenChange, service, company
   const [time, setTime] = useState("");
   const [userName, setUserName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
+  const [countryCode, setCountryCode] = useState("+251"); // Default to Ethiopia
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
@@ -42,9 +64,10 @@ export default function BookServiceDialog({ open, onOpenChange, service, company
       // Combine date and time into a single ISO string for the database
       const appointmentDateTime = new Date(`${date}T${time}`);
 
+      const fullPhoneNumber = countryCode + phoneNumber;
       const queueData: CreateQueuePayload = {
         user_name: userName,
-        phone_number: phoneNumber,
+        phone_number: fullPhoneNumber,
         service_id: service.id,
         provider_id: selectedProvider.id,
         queue_type: "booking", // This is for a scheduled appointment
@@ -75,6 +98,9 @@ export default function BookServiceDialog({ open, onOpenChange, service, company
       setLoading(false);
       setDate("");
       setTime("");
+      setUserName("");
+      setPhoneNumber("");
+      setCountryCode("+251");
     }
   }, [open]);
 
@@ -114,7 +140,33 @@ export default function BookServiceDialog({ open, onOpenChange, service, company
               </select>
             </div>
             <input className="w-full border p-2 rounded" placeholder="Your Name" value={userName} onChange={(e) => setUserName(e.target.value)} />
-            <input className="w-full border p-2 rounded" placeholder="Phone Number" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} />
+            
+            <div>
+              <label className="block mb-1 font-medium text-sm text-slate-600">Phone Number</label>
+              <div className="flex gap-2">
+                <Select value={countryCode} onValueChange={setCountryCode}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="Country" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {countryCodes.map((country) => (
+                      <SelectItem key={country.code} value={country.code}>
+                        <span className="flex items-center gap-2">
+                          <span>{country.flag}</span>
+                          <span>{country.code}</span>
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <input 
+                  className="flex-1 border p-2 rounded" 
+                  placeholder="912345678" 
+                  value={phoneNumber} 
+                  onChange={(e) => setPhoneNumber(e.target.value)} 
+                />
+              </div>
+            </div>
             
             <button
               className="w-full bg-blue-900 text-white font-bold py-3 rounded-lg disabled:bg-slate-400 hover:bg-blue-800 transition-colors"
