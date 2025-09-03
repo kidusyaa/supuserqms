@@ -278,8 +278,8 @@ export const ANY_PROVIDER_OPTION: Provider = {
 export type Category = {
   id: string;
   name: string;
-  description: string | null; 
-  icon: string | null; 
+  description: string; 
+  icon: string ; 
   services?: number | null; 
 };
 
