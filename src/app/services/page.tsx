@@ -90,9 +90,9 @@ export default function ServicesListPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
           {filteredServices.map(service => (
-            <Link 
-              key={service.id} 
-              href={`/services/${service.id}?companyId=${service.company_id}`} 
+            <Link
+              key={service.id}
+              href={`/booking/${service.id}`}
               className="block bg-white rounded-lg shadow border border-slate-200 p-5 hover:shadow-lg hover:-translate-y-1 transition-all"
             >
               <div className="text-xl font-bold text-blue-900 mb-1">{service.name}</div>

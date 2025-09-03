@@ -264,9 +264,9 @@ export const getServicesByCategory = async (categoryId: string): Promise<Service
 
     return (data || []).map((service: any) => ({
       ...service,
-      companyId: service.company_id,
-      categoryId: service.category_id,
-      estimatedWaitTime: service.estimated_wait_time,
+      company_id: service.company_id,
+      category_id: service.category_id,
+      estimated_wait_time_mins: service.estimated_wait_time,
       allowWalkIns: service.allow_walk_ins,
       walkInBuffer: service.walk_in_buffer,
       maxWalkInsPerHour: service.max_walk_ins_per_hour,
@@ -307,9 +307,9 @@ export const getAllServices = async (): Promise<Service[]> => {
 
     return (data || []).map((service: any) => ({
       ...service,
-      companyId: service.company_id,
-      categoryId: service.category_id,
-      estimatedWaitTime: service.estimated_wait_time,
+      company_id: service.company_id,
+      category_id: service.category_id,
+      estimated_wait_time_mins: service.estimated_wait_time,
       allowWalkIns: service.allow_walk_ins,
       walkInBuffer: service.walk_in_buffer,
       maxWalkInsPerHour: service.max_walk_ins_per_hour,

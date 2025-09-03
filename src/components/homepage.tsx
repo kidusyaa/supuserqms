@@ -9,12 +9,13 @@ import { StatsFs } from 'node:fs'
 import StatsSection from './StatsSection'
 import FeaturedServices from './Featuredservice'
 import Footer from './footer'
-
+import HeroSection from './herosection'
 export default function Homepage() {
   const SERVICES_SECTION_ID = "services-list";
   return (
     <div>
       <NavSection servicesSectionId={SERVICES_SECTION_ID} />
+      <HeroSection/>
       <StatsSection/>
       <FeaturedServices/>
       <ServiceCategoriesPage/>

@@ -103,7 +103,7 @@ const FeaturedServices = () => {
                       return (
                         <CarouselItem key={service.id} className="basis-full md:basis-1/2 lg:basis-1/3 flex items-center justify-center">
                           {/* --- THE FIX: Use snake_case property `company_id` --- */}
-                          <Link href={`/services/${service.id}?companyId=${service.company_id}`} passHref>
+                          <Link href={`/company/${service.company_id}`} passHref>
                             <div className="rounded-xl overflow-hidden min-w-[320px] backdrop-blur border border-gray-200 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer bg-white/80">
                               <div className="p-4">
                                 <div className="flex items-center gap-3 mb-3">
