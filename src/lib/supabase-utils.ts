@@ -7,6 +7,9 @@ import type {
   User, 
   Category, 
   Provider, 
+  Booking,
+  BookingStatus, 
+  QueueEntryStatus,
   MessageTemplate, 
   Location,
   LocationOption,
@@ -18,6 +21,7 @@ export type CategoryWithServices = Category & {
   services: Service[];
 };
 
+const SERVICE_IMAGES_BUCKET = 'service-images';
 
   // The main function to create a new queue entry
  export type CreateQueuePayload = {
@@ -438,48 +442,64 @@ export const getCompanyOptions = async (): Promise<LocationOption[]> => {
  * Fetches a single service with ALL its related data (company and providers).
  * This version fetches all providers, regardless of their active status.
  */
-export const getServiceDetails = async (serviceId: string): Promise<Service | null> => {
+  export const getServiceDetails = async (serviceId: string): Promise<Service | null> => {
   try {
     const { data, error } = await supabase
       .from('services')
       .select(`
         *,
-        company:companies ( * ),
+        company:companies (*),
         service_providers (
-          providers ( * )
+          providers (*)
+        ),
+        service_photos (
+          url
         )
-      `)
+      `) // <-- CORRECTED QUERY STRUCTURE
       .eq('id', serviceId)
-      .eq('status', 'active') 
-      .single(); 
+      .eq('status', 'active')
+      .single();
 
     if (error) {
-      if (error.code === 'PGRST116') {
+      if (error.code === 'PGRST116') { // This code means .single() found no rows
         console.log(`No active service found with ID: ${serviceId}`);
         return null;
       }
-      console.error("Supabase query error in getServiceDetails:", error); 
+      console.error("Supabase query error in getServiceDetails:", error);
       throw error;
     }
-    
+
     if (!data) {
       return null;
     }
 
-    const rawServiceData = data as any; 
+    // --- CORRECTED DATA PROCESSING ---
 
+    // 1. Cast the raw data for easier access
+    const rawServiceData = data as any;
+
+    // 2. Extract and map providers
     const providers: Provider[] = rawServiceData.service_providers
       ? rawServiceData.service_providers
-          .map((sp: any) => mapToProvider(sp.providers))
-          .filter(Boolean)
+          .map((sp: any) => sp.providers ? mapToProvider(sp.providers) : null)
+          .filter(Boolean) // Remove any nulls if a provider relation was missing
       : [];
-    
-    const company = rawServiceData.company ? mapToCompany(rawServiceData.company) : undefined;
 
+    // 3. Extract and map the company
+    const company = rawServiceData.company ? mapToCompany(rawServiceData.company) : undefined;
+    
+    // 4. Extract the photo URL
+    let publicPhotoUrl: string | null = null;
+    if (rawServiceData.service_photos && rawServiceData.service_photos.length > 0) {
+      publicPhotoUrl = rawServiceData.service_photos[0].url;
+    }
+
+    // 5. Construct the final Service object
     const service: Service = {
-      ...mapToService(rawServiceData),
-      providers: providers,
-      company: company,
+      ...mapToService(rawServiceData), // Map the base service properties
+      photo: publicPhotoUrl,           // Add the processed photo URL
+      providers: providers,            // Add the mapped providers
+      company: company,                // Add the mapped company
     };
 
     return service;
@@ -560,13 +580,12 @@ export const createQueueEntry = async (payload: CreateQueuePayload): Promise<Que
         id: data.id,
         service_id: data.service_id,
         provider_id: data.provider_id || null,
-        user_uid: data.user_uid || null, // Assuming user_uid might be null from the DB for walk-ins
+        user_id: data.user_uid || null, // Assuming user_uid might be null from the DB for walk-ins
         user_name: data.user_name,
         phone_number: data.phone_number,
         status: data.status,
         queue_type: data.queue_type,
         notes: data.notes || null,
-        appointment_time: data.appointment_time || null,
         joined_at: data.created_at,
         position:data.position, // Use created_at from Supabase for joined_at
     };
@@ -674,37 +693,176 @@ export const getCurrentQueueCount = async (serviceId: string): Promise<number> =
 
 
  
-export const getCompanyWithServices = async (companyId: string): Promise<Company & { services: Service[] } | null> => {
+ // <--- CORRECTED BUCKET NAME
+
+export async function getCompanyWithServices(companyId: string): Promise<Company | null> {
+  const { data: companyData, error } = await supabase
+    .from('companies')
+    .select(`
+      *,
+      services (
+        *,
+        service_photos (
+          url
+        )
+      )
+    `)
+    .eq('id', companyId)
+    .single();
+
+  if (error) {
+    console.error("Error fetching company with services:", error.message);
+    return null;
+  }
+
+  if (!companyData) {
+    return null;
+  }
+
+  const servicesWithPhotoUrls = companyData.services?.map((service: any) => {
+    let publicPhotoUrl = null;
+
+    if (service.service_photos && service.service_photos.length > 0) {
+      // Get the URL stored in the database
+      const dbUrl = service.service_photos[0].url;
+
+      // --- THIS IS THE FIX ---
+      // Since the full URL is already in the database, we just use it directly.
+      // We DO NOT call getPublicUrl() again.
+      publicPhotoUrl = dbUrl;
+    }
+
+    return {
+      ...service,
+      photo: publicPhotoUrl,
+      service_photos: undefined,
+    };
+  });
+
+  return {
+    ...companyData,
+    services: servicesWithPhotoUrls,
+  };
+}
+
+
+export type NewQueueEntryData = Omit<QueueItem, 'id' | 'joined_at' | 'status' | 'position'> & {
+  status?: QueueEntryStatus; // Make status optional for insert, default to 'waiting'
+  position?: number | null;  // Make position optional and allow null.
+                             // The DB often handles position with a default or trigger.
+}
+
+export async function joinQueue(
+  queueEntryData: NewQueueEntryData // Use the new, explicit type here
+): Promise<QueueItem> {
+  const { data, error } = await supabase
+    .from('queue_entries')
+    .insert({
+      ...queueEntryData,
+      status: queueEntryData.status || 'waiting', // Default status if not provided
+      // No need to explicitly set position here if DB handles it,
+      // or set to null if DB expects it and allows null.
+      // If position is NOT set by DB, you might calculate it here:
+      // position: queueEntryData.position ?? null, // Default to null if undefined
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error joining queue:', error);
+    throw error;
+  }
+  return data;
+}
+
+export async function createBooking(
+  // Update Omit to reflect the new field names in Booking.
+  // We're omitting 'id', 'created_at', and 'status' (as status can be overridden).
+  // The rest of the properties in Booking are expected directly.
+  bookingData: Omit<Booking, 'id' | 'created_at' | 'status'> & { status?: BookingStatus }
+): Promise<Booking> {
+  const { data, error } = await supabase
+    .from('bookings')
+    .insert({
+      ...bookingData,
+      status: bookingData.status || 'pending',
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error creating booking:', error);
+    throw error;
+  }
+  return data;
+}
+
+export async function getConfirmedBookingsForProvider(
+  providerId: string,
+  startDate: Date,
+  endDate: Date
+): Promise<Booking[]> {
+  const { data, error } = await supabase
+    .from('bookings')
+    .select('*')
+    .eq('provider_id', providerId)
+    .eq('status', 'confirmed') // Only confirmed bookings block slots
+    .gte('start_time', startDate.toISOString())
+    .lt('end_time', endDate.toISOString())
+    .order('start_time', { ascending: true });
+
+  if (error) {
+    console.error('Error fetching confirmed bookings:', error);
+    throw error;
+  }
+  return data || [];
+}
+
+export async function getActiveQueueEntriesForProvider(serviceId: string, providerId: string): Promise<QueueItem[]> {
+  const { data, error } = await supabase
+    .from('queue_entries')
+    .select('*')
+    .eq('service_id', serviceId)
+    .eq('provider_id', providerId)
+    .in('status', ['waiting', 'serving'])
+    .order('joined_at', { ascending: true });
+
+  if (error) {
+    console.error('Error fetching active queue entries:', error);
+    throw error;
+  }
+  return data || [];
+}
+
+
+// This is the function your public page at app/company/[slug]/page.tsx will use
+export const getCompanyBySlug = async (slug: string): Promise<Company | null> => {
   try {
-    const { data: companyData, error: companyError } = await supabase
+    const { data, error } = await supabase
       .from('companies')
-      .select('*')
-      .eq('id', companyId)
+      .select(`
+        *,
+        services (
+          *,
+          service_photos ( url )
+        )
+      `)
+      .eq('slug', slug) // <-- The key change: query by slug
       .single();
 
-    if (companyError || !companyData) {
-      console.error('Error fetching company:', companyError?.message);
-      return null;
-    }
+    if (error) throw error;
+    if (!data) return null;
 
-    const company = mapToCompany(companyData);
+    // Process photo URLs for services (like we did before)
+    const processedServices = data.services?.map((service: any) => {
+      const photoUrl = service.service_photos?.[0]?.url || null;
+      return { ...service, photo: photoUrl };
+    });
 
-    const { data: rawServices, error: servicesError } = await supabase
-      .from('services')
-      .select('*') 
-      .eq('company_id', companyId)
-      .eq('status', 'active'); 
+    return { ...data, services: processedServices } as Company;
 
-    if (servicesError) {
-      console.error('Error fetching services:', servicesError?.message);
-      return { ...company, services: [] }; 
-    }
-
-    const services: Service[] = (rawServices || []).map((s: any) => mapToService(s));
-
-    return { ...company, services: services };
   } catch (error) {
-    console.error('Error in getCompanyWithServices:', error);
+    console.error('Error fetching company by slug:', error);
     return null;
   }
 };
