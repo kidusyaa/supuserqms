@@ -4,11 +4,11 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { Flame, ArrowRight, Clock } from "lucide-react";
+import { Flame, ArrowRight, Clock,Building } from "lucide-react";
 // --- THE FIX: Import the new Supabase functions ---
 import { getFeaturedServices, getAllCategories } from "@/lib/supabase-utils";
 import type { Service, Category } from "@/type";
-
+import Image from "next/image";
 import {
   Carousel,
   CarouselContent,
@@ -70,17 +70,17 @@ const FeaturedServices = () => {
   }
 
   return (
-    <div className="py-8 sm:py-12 bg-amber-500/15">
+    <div className=" my-10 py-28 bg-tertiary">
       <DivCenter>
         <div className="container">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-              <Flame className="w-6 h-6 text-orange-500" />
+          <div className="flex items-center justify-between md:mb-10 mb-4">
+            <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+              <Flame className="w-6 h-6 text-orange-500 " />
               Featured Services
             </h2>
             <Link href="/services" passHref>
-              <Button variant="secondary">
-                <span className="inline-flex items-center text-sm font-semibold">
+              <Button variant="ghost">
+                <span className="inline-flex items-center text-sm font-semibold text-white hover:underline">
                   See all <ArrowRight className="w-4 h-4 ml-1" />
                 </span>
               </Button>
@@ -92,7 +92,7 @@ const FeaturedServices = () => {
               <CarouselContent>
                 {isLoading
                   ? Array.from({ length: 4 }).map((_, index) => (
-                      <CarouselItem key={index} className="basis-full md:basis-1/2 lg:basis-1/3">
+                      <CarouselItem key={index} className="basis-1/2 md:basis-1/2 lg:basis-1/3">
                         <ServiceCardSkeleton />
                       </CarouselItem>
                     ))
@@ -101,15 +101,29 @@ const FeaturedServices = () => {
                       const category = service.category_id ? categoryMap.get(service.category_id) : undefined;
 
                       return (
-                        <CarouselItem key={service.id} className="basis-full md:basis-1/2 lg:basis-1/3 flex items-center justify-center">
+                        <CarouselItem key={service.id} className="basis-1/3 lg:basis-1/3 flex items-center justify-center">
                           {/* --- THE FIX: Use snake_case property `company_id` --- */}
                           <Link href={`/company/${service.company_id}`} passHref>
-                            <div className="rounded-xl overflow-hidden min-w-[320px] backdrop-blur border border-gray-200 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer bg-white/80">
-                              <div className="p-4">
-                                <div className="flex items-center gap-3 mb-3">
-                                  <div className="w-12 h-12 bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl flex items-center justify-center text-3xl">
-                                    {/* Using category.icon from your Category type */}
-                                    {category ? category.icon : '✨'}
+                            <div className="rounded-xl overflow-hidden md:min-w-[320px]  w-full backdrop-blur border border-gray-200 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer bg-white/80">
+                              <div className="p-2">
+                                <div className="flex  md:flex-row flex-col items-center  md:gap-3 mb-3">
+                                  <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden">
+                                    {/* --- FIX APPLIED HERE --- */}
+                                    {service?.company?.logo ? (
+                                        <Image
+                                          src={service.company.logo} // Use the correct property
+                                          alt={service.company.name || "Company logo"}
+                                          width={48}
+                                          height={48}
+                                          className="w-full h-full object-cover"
+                                        />
+                                    ) : category?.icon ? (
+                                        // If no company image, display category icon as text
+                                        <span className="text-3xl">{category.icon}</span>
+                                    ) : (
+                                        // Fallback to a generic Lucide icon
+                                        <Building className="w-6 h-6 text-gray-400" />
+                                    )}
                                   </div>
                                   <div className="flex-1 overflow-hidden">
                                     <h3 className="font-semibold text-gray-900 truncate">{service.name}</h3>
@@ -124,7 +138,7 @@ const FeaturedServices = () => {
                                         <span className="text-sm">{service.estimated_wait_time_mins} min</span>
                                       </div>
                                     </div>
-                                    <div className="text-lg font-bold text-green-600">${service.price}</div>
+                                    <div className="md:text-lg  font-bold text-green-600">${service.price}</div>
                                 </div>
                               </div>
                             </div>

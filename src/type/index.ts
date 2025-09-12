@@ -347,3 +347,9 @@ export interface GlobalStatsData {
   servicesCompletedCount: number;
   usersCount: number;
 }
+export interface FilterState {
+  searchTerm: string;
+  locations: LocationOption[]; // Array of selected location options
+  categoryId: string | null;   // ID of selected category
+  companyIds: string[];        // Array of selected company IDs
+}

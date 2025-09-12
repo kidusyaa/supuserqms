@@ -31,13 +31,15 @@ export default function ServiceCategoriesPage() {
   }
 
   return (
-    <div className=" min-h-screen py-12">
+    <div className=" py-12 bg-tertiary/80">
       <DivCenter>
         <div className="container mx-auto px-4">
-          {/* Header */}
-          <h1 className="text-4xl font-extrabold text-center mb-10 text-orange-600">
-            Service Categories
-          </h1>
+          <div className="flex items-center justify-between  mb-10">
+            <h2 className="text-2xl font-bold  text-wi flex items-center gap-2">
+             Servics Categories
+            </h2>
+            
+          </div>
 
           {/* Categories Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -47,10 +49,10 @@ export default function ServiceCategoriesPage() {
                 href={`/usercategory/${category.id}`}
                 passHref
               >
-                <div className="group block bg-white rounded-2xl border border-orange-200 shadow-md hover:shadow-xl hover:border-orange-400 transition-all duration-300 cursor-pointer overflow-hidden">
+                <div className="group block bg-white rounded-2xl border border-tertiary/80 shadow-md hover:shadow-xl hover:border-tertiary transition-all duration-300 cursor-pointer overflow-hidden">
                   {/* Icon + Title */}
                   <div className="p-6 flex items-center gap-4">
-                    <div className="flex-shrink-0 w-16 h-16 flex items-center justify-center rounded-full bg-orange-100 text-4xl group-hover:bg-orange-200 transition-colors duration-300">
+                    <div className="flex-shrink-0 w-16 h-16 flex items-center justify-center rounded-full bg-orange-100 text-4xl  transition-colors duration-300">
                       {category.icon}
                     </div>
                     <div>
@@ -64,7 +66,7 @@ export default function ServiceCategoriesPage() {
                   </div>
 
                   {/* Footer */}
-                  <div className="bg-orange-50 px-6 py-4 text-sm font-semibold text-orange-700 group-hover:bg-orange-100 transition-colors duration-300">
+                  <div className="bg-tertiary/90 px-6 py-4 text-sm font-semibold text-white  group-hover:bg-tertiary transition-colors duration-300">
                     {category.services}{" "}
                     {category.services === 1 ? "service" : "services"} available
                   </div>

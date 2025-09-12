@@ -13,7 +13,8 @@ import type {
   MessageTemplate, 
   Location,
   LocationOption,
-  GlobalStatsData
+  GlobalStatsData,
+  FilterState
 } from '../type';
 
 
@@ -867,45 +868,101 @@ export const getCompanyBySlug = async (slug: string): Promise<Company | null> =>
   }
 };
 
+export async function getRecentCompanies(limit: number = 8): Promise<Company[]> {
+  const { data, error } = await supabase
+    .from('companies')
+    .select('id, name, logo, location_text, created_at') // Select only necessary fields for display
+    .order('created_at', { ascending: false }) // Order by creation date, newest first
+    .limit(limit); // Limit the number of companies returned
 
-//--search from all---
-// export const searchServices = async (searchTerm: string): Promise<Service[]> => {
-//   const trimmedTerm = searchTerm.trim();
-//   // Don't search if the query is too short
-//   if (trimmedTerm.length < 2) {
-//     return [];
-//   }
+  if (error) {
+    console.error('Error fetching recent companies:', error);
+    return [];
+  }
+  return data as Company[];
+}
 
-//   // Prepare the search term for a "contains" query (case-insensitive)
-//   const formattedTerm = `%${trimmedTerm}%`;
+export const getFilteredServices = async (
+  filters: FilterState
+): Promise<Service[]> => {
+  try {
+    let query = supabase
+      .from('services')
+      .select(`
+        *,
+        company:companies (
+          id,
+          name,
+          location_text,
+          address // Assuming address might contain location info
+        ),
+        category:global_categories (
+          id,
+          name
+        )
+      `)
+      .eq('status', 'active');
 
-//   try {
-//     const { data, error } = await supabase
-//       .from('services')
-//       .select(`
-//         id,
-//         name,
-//         code,
-//         company_id,
-//         company:companies ( name )
-//       `)
-//       .eq('status', 'active') // Only search for active services
-//       .or(
-//         `name.ilike.${formattedTerm},` +          // Search in service name
-//         `code.ilike.${formattedTerm},` +          // Search in service code
-//         `companies.name.ilike.${formattedTerm}`   // Search in the joined company name
-//       )
-//       .limit(8); // Limit the number of results to keep the dropdown clean
+    // Apply category filter
+    if (filters.categoryId) {
+      query = query.eq('category_id', filters.categoryId);
+    }
 
-//     if (error) {
-//       console.error("Error searching services:", error);
-//       throw error;
-//     }
+    // Apply company filter
+    if (filters.companyIds && filters.companyIds.length > 0) {
+      query = query.in('company_id', filters.companyIds);
+    }
 
-//     return data || [];
-//   } catch (error) {
-//     console.error("Error in searchServices function:", error);
-//     return [];
-//   }
-// };
+    // Execute query to get initial data, then apply client-side filters
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error getting filtered services from Supabase:', error);
+      return [];
+    }
+
+    if (!data) {
+      return [];
+    }
+
+    // Map raw data to Service type with nested company/category
+    let services: Service[] = data.map((item: any) => mapToService(item));
+
+    // Client-side filtering for location (since server-side filtering on joined text is complex)
+    if (filters.locations && filters.locations.length > 0) {
+        const locationKeywords = filters.locations.map(loc => loc.value.toLowerCase()); // e.g., "New York, NY"
+        services = services.filter(service => {
+            const companyLocationText = service.company?.location_text?.toLowerCase();
+            const companyAddress = service.company?.address?.toLowerCase();
+            return locationKeywords.some(keyword =>
+                (companyLocationText && companyLocationText.includes(keyword)) ||
+                (companyAddress && companyAddress.includes(keyword))
+            );
+        });
+    }
+
+    // Client-side filtering for searchTerm (to include company.name and description)
+    if (filters.searchTerm) {
+        const q = filters.searchTerm.trim().toLowerCase();
+        if (q.length > 0) {
+            const tokens = q.split(/\s+/).filter(Boolean);
+            services = services.filter(service => {
+                const companyName = service.company?.name?.toLowerCase();
+                return tokens.some(token =>
+                    (service.name && service.name.toLowerCase().includes(token)) ||
+                    (service.code && service.code.toLowerCase().includes(token)) ||
+                    (service.description && service.description.toLowerCase().includes(token)) ||
+                    (companyName && companyName.includes(token))
+                );
+            });
+        }
+    }
+
+    return services;
+
+  } catch (error) {
+    console.error('Error in getFilteredServices function:', error);
+    return [];
+  }
+};
 
