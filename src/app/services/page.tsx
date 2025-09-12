@@ -13,13 +13,20 @@ export default async function ServicesPage({
   searchParams: { [key: string]: string | string[] | undefined };
 }) {
   // --- FIX START ---
-  // Convert searchParams to a plain object to ensure it's fully resolved and accessible client-side.
+  // The Next.js documentation for `sync-dynamic-apis` explicitly states
+  // that `searchParams` should be awaited before using iteration methods
+  // like `Object.entries`, `Object.keys`, or `Object.values`.
+  // This resolves the dynamic API and ensures its properties are fully available.
+  const awaitedSearchParams = await searchParams; // Await searchParams as per Next.js docs
+
+  // Convert awaited searchParams to a plain object, filtering out undefined values.
   const plainSearchParams: { [key: string]: string | string[] | undefined } = Object.fromEntries(
-    Object.entries(searchParams).filter(([, value]) => value !== undefined)
+    Object.entries(awaitedSearchParams).filter(([, value]) => value !== undefined)
   );
 
   // Add logging for debugging
-  console.log("ServicesPage (Server Component): Original searchParams received:", searchParams);
+  console.log("ServicesPage (Server Component): Original searchParams received (pre-await):", searchParams);
+  console.log("ServicesPage (Server Component): Awaited searchParams (for iteration):", awaitedSearchParams);
   console.log("ServicesPage (Server Component): Passing plainSearchParams to client:", plainSearchParams);
   // --- FIX END ---
 
