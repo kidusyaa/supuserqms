@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
 import "./globals.css";
+import NavSection from "@/components/navsection";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -23,9 +24,10 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const SERVICES_SECTION_ID = "services-list";
   return (
     <html lang="en">
-    
+     <NavSection servicesSectionId={SERVICES_SECTION_ID}/>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >

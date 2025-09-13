@@ -746,6 +746,40 @@ export async function getCompanyWithServices(companyId: string): Promise<Company
   };
 }
 
+export async function getCompanyLocationOptions(): Promise<LocationOption[]> {
+  // Fetch all location_text values (potentially with duplicates)
+  const { data, error } = await supabase
+    .from('companies')
+    .select('location_text') // Select only the location_text column
+    .not('location_text', 'is', null) // Filter out null location_text values
+    .not('location_text', 'eq', '');   // Filter out empty string location_text values
+
+  if (error) {
+    console.error("Error fetching company locations for options:", error.message);
+    return [];
+  }
+
+  if (!data || data.length === 0) {
+    return [];
+  }
+
+  // Use a Set to collect unique location_text values
+  const uniqueLocationTexts = new Set<string>();
+  data.forEach((item: { location_text: string | null }) => {
+    if (item.location_text && item.location_text.trim() !== '') {
+      uniqueLocationTexts.add(item.location_text.trim());
+    }
+  });
+
+  // Convert the Set of unique texts back to an array of LocationOption objects
+  const locationOptions: LocationOption[] = Array.from(uniqueLocationTexts).map(text => ({
+    id: text, // Using text as ID for simplicity
+    value: text,
+    label: text,
+  }));
+
+  return locationOptions;
+}
 
 export type NewQueueEntryData = Omit<QueueItem, 'id' | 'joined_at' | 'status' | 'position'> & {
   status?: QueueEntryStatus; // Make status optional for insert, default to 'waiting'

@@ -15,8 +15,8 @@ export default function ServiceCard({ service }: ServiceCardProps) {
   const isAvailable = service.status === 'active';
 
   return (
-    <Card className="bg-slate-800 border border-slate-700 rounded-lg overflow-hidden transition-all duration-300 hover:border-amber-500 hover:shadow-2xl hover:shadow-amber-900/20 group">
-      <div className="aspect-video relative overflow-hidden">
+    <div className="bg-gray-50 border text-tertiary rounded-lg overflow-hidden transition-all duration-300 hover:border-amber-500 hover:shadow-2xl hover:shadow-amber-900/20 group ">
+      <div className="aspect-video relative overflow-hidden bg-green-400">
         <Image
           src={service.photo || "/placeholder-service.png"}
           alt={service.name}
@@ -31,15 +31,15 @@ export default function ServiceCard({ service }: ServiceCardProps) {
           </Badge>
         )}
       </div>
-
-      <CardHeader>
-        <CardTitle className="text-lg font-bold text-white">{service.name}</CardTitle>
+<div className="p-4 flex flex-col justify-between space-y-8">
+      <div>
+        <CardTitle className="text-lg font-bold ">{service.name}</CardTitle>
         {service.description && (
           <CardDescription className="mt-1 line-clamp-2 text-slate-400">{service.description}</CardDescription>
         )}
-      </CardHeader>
+      </div>
 
-      <CardContent>
+      <div>
         <div className="flex items-center justify-between text-sm">
           {service.estimated_wait_time_mins != null && service.estimated_wait_time_mins > 0 && (
             <div className="flex items-center gap-2 text-slate-400">
@@ -47,13 +47,13 @@ export default function ServiceCard({ service }: ServiceCardProps) {
               <span>~{service.estimated_wait_time_mins} mins</span>
             </div>
           )}
-           <Badge variant="outline" className={isAvailable ? "border-green-500/50 bg-green-900/30 text-green-300" : "border-slate-600 bg-slate-700 text-slate-400"}>
+           <Badge variant="outline" className={isAvailable ? "border-green-500/50 bg-green-700 text-white" : "border-slate-600 bg-slate-700 text-slate-400"}>
             {isAvailable ? "Available" : "Not Available"}
           </Badge>
         </div>
-      </CardContent>
+      </div>
       
-      <CardFooter>
+      <div>
         <Button 
           asChild 
           className="w-full bg-amber-600 text-white font-semibold hover:bg-amber-700 disabled:bg-slate-600 disabled:text-slate-400 disabled:cursor-not-allowed"
@@ -64,7 +64,8 @@ export default function ServiceCard({ service }: ServiceCardProps) {
             {isAvailable ? 'Book Now' : 'Currently Unavailable'}
           </Link>
         </Button>
-      </CardFooter>
-    </Card>
+      </div>
+    </div>
+    </div>
   )
 }

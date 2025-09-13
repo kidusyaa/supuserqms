@@ -21,25 +21,25 @@ const InfoItem = ({ icon: Icon, children }: { icon: React.ElementType, children:
 
 export default function CompanySidebar({ company }: CompanySidebarProps) {
   return (
-    <Card className="sticky top-24 bg-slate-800 border-slate-700 text-slate-200">
+    <Card className="sticky top-24 bg-gray-50  text-tertiary ">
       <CardHeader>
-        <CardTitle className="text-xl text-white">Company Details</CardTitle>
+        <CardTitle className="text-xl textte">Company Details</CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Contact Info Section */}
         <div className="space-y-4">
-          <h4 className="font-semibold text-white">Contact</h4>
+          <h4 className="font-semibold">Contact</h4>
           {company.phone && (
             <InfoItem icon={Phone}>
-              <a href={`tel:${company.phone}`} className="hover:text-amber-400 transition-colors">
+              <a href={`tel:${company.phone}`} className="hover:text-amber-400 transition-colors text-tertiary ">
                 {company.phone}
               </a>
             </InfoItem>
           )}
           {company.email && (
             <InfoItem icon={Mail}>
-              <a href={`mailto:${company.email}`} className="hover:text-amber-400 transition-colors">
-                {company.email}
+              <a href={`mailto:${company.email}`} className="hover:text-amber-400 transition-colors text-tertiary">
+                {company. email}
               </a>
             </InfoItem>
           )}
@@ -47,15 +47,15 @@ export default function CompanySidebar({ company }: CompanySidebarProps) {
 
         {/* Address Section */}
         {company.address && (
-          <div className="space-y-4 border-t border-slate-700 pt-6">
-            <h4 className="font-semibold text-white">Location</h4>
+          <div className="space-y-4 border-t border-slate-700  ">
+            <h4 className="font-semibold ">Location</h4>
             <InfoItem icon={MapPin}>
-              <p>{company.address}</p>
+              <p className="text-tertiary">{company.address}</p>
             </InfoItem>
             {company.location_link && (
-              <Button variant="outline" size="sm" asChild className="w-full bg-transparent border-amber-500 text-amber-500 hover:bg-amber-500/10 hover:text-amber-400">
-                <a href={company.location_link} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="w-4 h-4 mr-2" />
+              <Button variant="outline" size="sm" asChild className="w-full bg-transparent  text-amber-500 hover:bg-primary hover:text-white ">
+                <a href={company.location_link} target="_blank" rel="noopener noreferrer" className="text-tertiary">
+                  <ExternalLink className="w-4 h-4 mr-2 " />
                   View on Map
                 </a>
               </Button>
@@ -65,8 +65,8 @@ export default function CompanySidebar({ company }: CompanySidebarProps) {
 
         {/* Working Hours Section */}
         {company.working_hours && (
-          <div className="space-y-4 border-t border-slate-700 pt-6">
-             <h4 className="font-semibold text-white">Working Hours</h4>
+          <div className="space-y-2  border-t pt-2 border-slate-700">
+             <h4 className="font-semibold    ">Working Hours</h4>
             <InfoItem icon={Clock}>
                {/* Same logic, just wrapped in the new component */}
                {(() => {
@@ -81,22 +81,12 @@ export default function CompanySidebar({ company }: CompanySidebarProps) {
                 if (rangesForToday && rangesForToday.length > 0) {
                     return <span className="font-medium text-green-400">Open Today: {rangesForToday.map(r => `${format(r.start, "h:mm a")} - ${format(r.end, "h:mm a")}`).join(', ')}</span>;
                 }
-                return <span className="text-slate-400">Closed Today</span>;
+                return <span className="text-tertiary">Closed Today</span>;
                })()}
             </InfoItem>
           </div>
         )}
 
-        {/* Social Links Section */}
-        <div className="space-y-4 border-t border-slate-700 pt-6">
-          <h4 className="font-semibold text-white">Follow Us</h4>
-          <div className="flex flex-wrap gap-2">
-            {company.socials?.website && <SocialButton href={company.socials.website} icon={Globe} />}
-            {company.socials?.facebook && <SocialButton href={company.socials.facebook} icon={Facebook} />}
-            {company.socials?.instagram && <SocialButton href={company.socials.instagram} icon={Instagram} />}
-            {company.socials?.tiktok && <SocialButton href={company.socials.tiktok} icon={() => <Icon icon="simple-icons:tiktok" className="w-4 h-4" />} />}
-          </div>
-        </div>
       </CardContent>
     </Card>
   )

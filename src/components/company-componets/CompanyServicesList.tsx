@@ -10,7 +10,7 @@ export default function CompanyServicesList({ services }: CompanyServicesListPro
   return (
     // ✨ The top margin is removed as it's handled by the main page layout now.
     <div>
-      <h2 className="text-3xl font-bold text-white mb-6 border-l-4 border-amber-500 pl-4">
+      <h2 className="text-3xl font-bold text-tertiary mb-6 border-l-4 border-amber-500 pl-4">
         Our Services
       </h2>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

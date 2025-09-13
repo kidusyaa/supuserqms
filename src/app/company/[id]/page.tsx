@@ -85,10 +85,11 @@ export default function CompanyDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-200">
-      <DivCenter><div>
+    <div className="mx-auto">
+    <div className="  text-slate-200">
+   <div>
       {/* ✨ Combined & Themed Navigation Bar */}
-      <div className="bg-slate-800/50 border-b border-slate-700 backdrop-blur-sm sticky top-0 z-50">
+      {/* <div className="  bg-transparent border-b border-slate-700 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
           <nav className="flex items-center space-x-2 text-sm text-slate-400">
             <Link href="/" className="flex items-center hover:text-amber-400 transition-colors">
@@ -108,12 +109,14 @@ export default function CompanyDetailPage() {
             Back
           </Button>
         </div>
-      </div>
+      </div> */}
 
       {/* Company Header with Banner */}
+     
       <CompanyHeader company={company} />
 
       {/* Main Content Area */}
+      <DivCenter>
       <main className="container mx-auto px-4 py-8 lg:py-12">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-12">
           {/* Services List */}
@@ -126,7 +129,10 @@ export default function CompanyDetailPage() {
             <CompanySidebar company={company} />
           </div>
         </div>
-      </main></div></DivCenter>
+      </main>
+      </DivCenter>
+      </div>
+    </div>
     </div>
   )
 }

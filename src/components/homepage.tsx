@@ -21,8 +21,6 @@ export default function Homepage() {
     <div>
       {/* NavSection should be rendered here, outside of HeroSection */}
       {/* Pass the heroSectionHeight to NavSection */}
-      <NavSection servicesSectionId={SERVICES_SECTION_ID}/>
-
       {/* HeroSection will now report its height */}
       <HeroSection />
        <StatsSection/>
