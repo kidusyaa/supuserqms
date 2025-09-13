@@ -8,7 +8,6 @@ import { ArrowLeft, SearchX } from "lucide-react";
 
 import FilterNav from "@/components/FilterNav";
 import { Service, FilterState } from "@/type";
-// --- THE FIX: Import the new, single Supabase function ---
 import { getCategoryWithServices } from "@/lib/supabase-utils";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -26,7 +25,7 @@ const ServicesListPage = () => {
   const [categoryName, setCategoryName] = useState<string>("");
   const [categoryIcon, setCategoryIcon] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
-  const [filters, setFilters] = useState<FilterState>(initialFilterState);
+  const [filters, setFilters] = useState<FilterState>(initialFilterState); // State to hold current filters
   const router = useRouter();
   const params = useParams();
   const categoryId = params.categoryId as string;
@@ -35,15 +34,15 @@ const ServicesListPage = () => {
     if (categoryId) {
       const fetchData = async () => {
         setIsLoading(true);
-        // --- THE FIX: One single, efficient API call ---
         const categoryData = await getCategoryWithServices(categoryId);
 
         if (categoryData) {
-          setServices(categoryData.services || []); // Use the nested services array
+          setServices(categoryData.services || []);
           setCategoryName(categoryData.name);
           setCategoryIcon(categoryData.icon);
+          // --- FIX 1: Initialize the filters state with the categoryId ---
+          setFilters((prevFilters) => ({ ...prevFilters, categoryId: categoryId }));
         } else {
-          // Handle case where category isn't found
           setCategoryName("Category not found");
           setServices([]);
         }
@@ -51,10 +50,21 @@ const ServicesListPage = () => {
       };
       fetchData();
     }
-  }, [categoryId]);
+  }, [categoryId]); // Depend on categoryId to re-fetch/update filters when it changes
 
   const filteredServices = useMemo(() => {
     let filtered = services;
+    // The `filters` state now includes `categoryId` from the `useEffect`
+    // No need to explicitly filter by categoryId here if `services` are already
+    // pre-filtered by category from `getCategoryWithServices`.
+    // However, if `services` is the full list, then:
+    if (filters.categoryId && services.length > 0 && services[0].category_id !== filters.categoryId) {
+      // This condition ensures we don't re-filter if already filtered by the API
+      // If getCategoryWithServices already returns services only for that category, this filter is redundant.
+      // If `services` is ALL services, then this filter applies.
+      filtered = filtered.filter(service => service.category_id === filters.categoryId);
+    }
+
     if (filters.searchTerm) {
       const lowercasedTerm = filters.searchTerm.toLowerCase();
       filtered = filtered.filter(
@@ -64,14 +74,12 @@ const ServicesListPage = () => {
       );
     }
     if (filters.companyIds.length > 0) {
-      // --- THE FIX: Use snake_case to match Supabase schema ---
       filtered = filtered.filter((service) =>
         filters.companyIds.includes(service.company_id)
       );
     }
     if (filters.locations.length > 0) {
       const selectedLocationValues = filters.locations.map((loc) => loc.value);
-      // Ensure your company object has `location_text`
       filtered = filtered.filter(
         (service) =>
           service.company?.location_text &&
@@ -81,7 +89,6 @@ const ServicesListPage = () => {
     return filtered;
   }, [services, filters]);
 
-  // Loading state UI remains the same
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-screen">
@@ -96,7 +103,6 @@ const ServicesListPage = () => {
   return (
     <DivCenter>
       <div className="container my-20">
-        {/* Header UI remains the same */}
         <div className=" flex justify-between items-center    ">
           <Button
             variant="ghost"
@@ -112,7 +118,6 @@ const ServicesListPage = () => {
               <h1 className="text-2xl md:text-4xl font-bold text-slate-800 uppercase">
                 {categoryName}
               </h1>
-
             </div>
           </div>
         </div>
@@ -120,22 +125,26 @@ const ServicesListPage = () => {
         <div className="my-6">
           <FilterNav
             onFilterChange={setFilters}
-            initialFilters={{ categoryId: categoryId }}
+            filters={filters} // --- FIX 2: Pass the 'filters' state here ---
             isCategoryLocked={true}
           />
         </div>
 
         {filteredServices.length === 0 ? (
-          // "No results" UI remains the same
           <div className="text-center mt-12">
-            {/* ... */}
+             <SearchX className="mx-auto h-16 w-16 text-slate-400" />
+            <h3 className="mt-2 text-xl font-semibold text-slate-800">
+              No services found
+            </h3>
+            <p className="mt-1 text-slate-500">
+              Try adjusting your filters or check back later.
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
             {filteredServices.map((service) => (
               <Link
                 key={service.id}
-                // --- THE FIX: Use snake_case to match Supabase schema ---
                 href={`/services/${service.id}?companyId=${service.company_id}`}
                 className="block bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:shadow-md hover:-translate-y-1 transition-all duration-200"
               >
@@ -154,7 +163,6 @@ const ServicesListPage = () => {
                   <span className="text-green-600 font-bold text-base">
                     ${service.price}
                   </span>
-                  {/* --- THE FIX: Use snake_case to match Supabase schema --- */}
                   {service.estimated_wait_time_mins && (
                     <span className="bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full text-xs font-medium">
                       ~{service.estimated_wait_time_mins} min
