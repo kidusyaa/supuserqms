@@ -1,38 +1,24 @@
-// src/app/services/[id]/book/_componet/BookServiceDialog.tsx
-"use client";
+// components/book/_componet/BookServiceDialog.tsx
+"use client"
 
-import { useState, useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation";
-
-import { Dialog, DialogContent,DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { useState } from "react"
+import { useRouter } from "next/navigation"
+import { format } from "date-fns" // Added isToday for clearer display (if not already there)
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Icon } from "@iconify/react";
-import { generateTimeSlots } from "@/lib/time-utils";
-import { Service, Company, Provider } from "@/type";
-import { createQueueEntry, CreateQueuePayload } from "@/lib/supabase-utils"; 
-
-// Country codes data (unchanged)
-const countryCodes = [
-  { code: "+251", country: "Ethiopia", flag: "🇪🇹" },
-  { code: "+1", country: "United States", flag: "🇺🇸" },
-  { code: "+44", country: "United Kingdom", flag: "🇬🇧" },
-  { code: "+91", country: "India", flag: "🇮🇳" },
-  { code: "+86", country: "China", flag: "🇨🇳" },
-  { code: "+49", country: "Germany", flag: "🇩🇪" },
-  { code: "+33", country: "France", flag: "🇫🇷" },
-  { code: "+81", country: "Japan", flag: "🇯🇵" },
-  { code: "+234", country: "Nigeria", flag: "🇳🇬" },
-  { code: "+27", country: "South Africa", flag: "🇿🇦" },
-];
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import Image from "next/image"
+import { Button } from "@/components/ui/button"
+import { toast } from "sonner"
+import { createBooking } from "@/lib/supabase-utils"
+import type { Company, Service, Provider, AvailableSlot } from "@/type"
 
 interface BookServiceDialogProps {
   open: boolean;
@@ -40,161 +26,142 @@ interface BookServiceDialogProps {
   service: Service;
   company: Company;
   selectedProvider: Provider;
+  selectedSlot: AvailableSlot | null;
 }
 
-export default function BookServiceDialog({ open, onOpenChange, service, company, selectedProvider }: BookServiceDialogProps) {
+export default function BookServiceDialog({
+  open,
+  onOpenChange,
+  service,
+  company,
+  selectedProvider,
+  selectedSlot,
+}: BookServiceDialogProps) {
   const router = useRouter();
-  const [date, setDate] = useState("");
-  const [time, setTime] = useState("");
-  const [userName, setUserName] = useState("");
-  const [phoneNumber, setPhoneNumber] = useState("");
-  const [countryCode, setCountryCode] = useState("+251");
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [userName, setUserName] = useState(""); // <-- Changed
+  const [phoneNumber, setPhoneNumber] = useState(""); // <-- Changed
+  const [notes, setNotes] = useState("");
 
-  const timeSlots = useMemo(() => {
-    // Provide sensible defaults if company.working_hours or service.estimated_wait_time_mins are null
-    const effectiveWorkingHours = company.working_hours || "09:00-17:00"; // Default to a standard 9-5
-    const effectiveServiceDuration = service.estimated_wait_time_mins || 30; // Default to 30 mins
-    return generateTimeSlots(effectiveWorkingHours, effectiveServiceDuration);
-  }, [company.working_hours, service.estimated_wait_time_mins]);
 
-  const handleBook = async () => {
-    if (!date || !time || !userName || !phoneNumber) {
-      setError("Please fill in all required fields.");
-      return;
-    }
-    
-    setLoading(true);
-    setError("");
+  const handleBookingConfirm = async () => {
+    setIsLoading(true);
     try {
-      // Ensure time is in HH:MM format, then append :00 for seconds
-      const appointmentDateTime = `${date}T${time}:00`; 
+      if (!userName.trim()) { // <-- Changed
+        toast.error("Please provide your name to book this service.");
+        setIsLoading(false);
+        return;
+      }
+      // phone_number is optional based on your DB/type schema.
 
-      const fullPhoneNumber = countryCode + phoneNumber;
-      const queueData: CreateQueuePayload = {
-        user_name: userName,
-        phone_number: fullPhoneNumber,
+      if (!selectedSlot) {
+        toast.error("No time slot selected.");
+        setIsLoading(false);
+        return;
+      }
+
+      const newBooking = {
+        user_id: null,
+        user_name: userName.trim(), // <-- Changed
+        phone_number: phoneNumber.trim() || null, // <-- Changed
         service_id: service.id,
+        company_id: company.id,
         provider_id: selectedProvider.id,
-        queue_type: "booking",
-        appointment_time: appointmentDateTime, // Pass the scheduled time
-        notes: `Booking for ${service.name} on ${date} at ${time}`,
+        start_time: selectedSlot.start.toISOString(),
+        end_time: selectedSlot.end.toISOString(),
+        status: 'confirmed' as const,
+        notes: notes.trim() || null,
       };
 
-      await createQueueEntry(queueData);
+      await createBooking(newBooking);
 
-      setSuccess(true);
-      setTimeout(() => {
-        router.push("/dashboard"); // Redirect to a user dashboard or bookings page
-      }, 2000);
-
-    } catch (e: any) {
-      console.error("Booking failed:", e);
-      setError(e.message || "Failed to book the appointment. Please try again.");
+      toast.success("Service booked successfully!");
+      onOpenChange(false);
+      router.push('/booking/confirmation');
+    } catch (error) {
+      console.error("Error creating booking:", error);
+      toast.error("Failed to book service. Please try again.");
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
-
-  useEffect(() => {
-    if (!open) {
-      // Reset form on close
-      setSuccess(false);
-      setError("");
-      setLoading(false);
-      setDate("");
-      setTime("");
-      setUserName("");
-      setPhoneNumber("");
-      setCountryCode("+251");
-    }
-  }, [open]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle className="text-2xl">Schedule Appointment</DialogTitle>
+          <DialogTitle>Confirm Appointment</DialogTitle>
           <DialogDescription>
-            Fill in the details below to book your time slot for <strong>{service.name}</strong> with <strong>{selectedProvider.name}</strong>.
+            Review your appointment details and confirm.
           </DialogDescription>
         </DialogHeader>
-        
-        {success ? (
-          <div className="flex flex-col items-center justify-center p-8 text-center">
-            <Icon icon="lucide:check-circle-2" className="w-16 h-16 text-green-400 mb-4" />
-            <h3 className="text-xl font-bold text-slate-800">Booking Confirmed!</h3>
-            <p className="text-slate-600 mt-2">Your appointment for {service.name} is scheduled for {date} at {time}.</p>
-            <p className="text-slate-600 mt-2">Redirecting you to your dashboard...</p>
+        <div className="grid gap-4 py-4">
+          <div className="flex items-center space-x-4">
+            <Image
+              src={service.photo || "/placeholder.svg?height=60&width=60"}
+              alt={service.name}
+              width={60}
+              height={60}
+              className="rounded-md object-cover"
+            />
+            <div>
+              <p className="text-lg font-semibold">{service.name}</p>
+              <p className="text-sm text-muted-foreground">{company.name}</p>
+            </div>
           </div>
-        ) : (
-          <div className="space-y-4 pt-4">
-            <div>
-              <Label htmlFor="date">Select Date</Label>
-              <Input id="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          {selectedSlot ? (
+            <div className="space-y-2">
+              <p><strong>Date:</strong> {format(selectedSlot.start, 'PPP')}</p>
+              <p><strong>Time:</strong> {format(selectedSlot.start, 'p')} - {format(selectedSlot.end, 'p')}</p>
+              <p><strong>Provider:</strong> {selectedProvider.name}</p>
+              <p><strong>Duration:</strong> {service.estimated_wait_time_mins} minutes</p>
+              <p><strong>Price:</strong> {service.price}</p>
             </div>
-            <div>
-              <Label htmlFor="time">Select Time</Label>
-              <Select value={time} onValueChange={setTime}>
-                <SelectTrigger id="time" className="w-full">
-                  <SelectValue placeholder="Select an available time" />
-                </SelectTrigger>
-                <SelectContent>
-                  {timeSlots.length > 0 ? (
-                    timeSlots.map((slot) => (<SelectItem key={slot} value={slot}>{slot}</SelectItem>))
-                  ) : (
-                    <SelectItem value="no-slots" disabled>No time slots available</SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="userName">Your Name</Label>
-              <Input id="userName" placeholder="Your Name" value={userName} onChange={(e) => setUserName(e.target.value)} />
-            </div>
-            
-            <div>
-              <Label htmlFor="phoneNumberInput">Phone Number</Label>
-              <div className="flex gap-2">
-                <Select value={countryCode} onValueChange={setCountryCode}>
-                  <SelectTrigger className="w-[140px]">
-                    <SelectValue placeholder="Country" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {countryCodes.map((country) => (
-                      <SelectItem key={country.code} value={country.code}>
-                        <span className="flex items-center gap-2">
-                          <span>{country.flag}</span>
-                          <span>{country.code}</span>
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Input 
-                  id="phoneNumberInput"
-                  className="flex-1" 
-                  placeholder="912345678" 
-                  value={phoneNumber} 
-                  onChange={(e) => setPhoneNumber(e.target.value)} 
-                />
-              </div>
-            </div>
-            
-            <DialogFooter>
-              <Button
-                className="w-full bg-blue-900 text-white font-bold py-3 rounded-lg disabled:bg-slate-400 hover:bg-blue-800 transition-colors"
-                onClick={handleBook}
-                disabled={loading || !date || !time || !userName || !phoneNumber}
-              >
-                {loading ? "Booking..." : "Confirm Booking"}
-              </Button>
-            </DialogFooter>
-            {error && <div className="text-red-500 text-sm text-center">{error}</div>}
+          ) : (
+            <p className="text-red-500">No time slot selected.</p>
+          )}
+
+          {/* Always show name and phone inputs for booking */}
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="userName" className="text-right">Your Name</Label> {/* <-- Changed */}
+            <Input
+              id="userName"
+              value={userName}
+              onChange={(e) => setUserName(e.target.value)}
+              className="col-span-3"
+              required
+            />
           </div>
-        )}
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="phoneNumber" className="text-right">Your Phone</Label> {/* <-- Changed */}
+            <Input
+              id="phoneNumber"
+              value={phoneNumber}
+              onChange={(e) => setPhoneNumber(e.target.value)}
+              className="col-span-3"
+              placeholder="Optional"
+            />
+          </div>
+
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="notes" className="text-right">Notes</Label>
+            <Input
+              id="notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="col-span-3"
+              placeholder="Any special requests?"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
+            Cancel
+          </Button>
+          <Button onClick={handleBookingConfirm} disabled={isLoading || !selectedSlot || !userName.trim()}>
+            {isLoading ? "Booking..." : "Confirm Booking"}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
