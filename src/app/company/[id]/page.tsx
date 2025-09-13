@@ -4,64 +4,65 @@
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, ChevronRight, Home } from "lucide-react"
+import { ArrowLeft, ChevronRight, Home, XCircle } from "lucide-react"
 import Link from "next/link"
-import { Company } from "@/type" // Ensure your Company type is correct
-import { getCompanyWithServices } from "@/lib/supabase-utils" // Your actual data fetching utility
-import { toast } from "sonner" // For toast notifications
-
-// Import the new components
-
+import { Company } from "@/type"
+import { getCompanyWithServices } from "@/lib/supabase-utils"
+import { toast } from "sonner"
+import DivCenter from "@/components/divCenter"
+// Import the redesigned components
 import CompanyHeader from "@/components/company-componets/CompanyHeader"
 import CompanyServicesList from "@/components/company-componets/CompanyServicesList"
 import CompanySidebar from "@/components/company-componets/CompanySidebar"
-import DivCenter from "@/components/divCenter"
+
 export default function CompanyDetailPage() {
   const params = useParams()
   const router = useRouter()
   const [company, setCompany] = useState<Company | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const companyId = params.id as string; 
+  const companyId = params.id as string
 
   useEffect(() => {
+    // ... (your existing data fetching logic remains the same)
     const fetchCompanyData = async () => {
       try {
-        setLoading(true)
+        setLoading(true);
         if (!companyId) {
-          toast.error("Company ID is missing from URL.")
-          router.push('/')
-          return
+          toast.error("Company ID is missing from URL.");
+          router.push('/');
+          return;
         }
-        const companyData = await getCompanyWithServices(companyId)
+        const companyData = await getCompanyWithServices(companyId);
 
         if (!companyData) {
-          toast.error("Company not found")
-          router.push('/')
-          return
+          toast.error("Company not found");
+          router.push('/');
+          return;
         }
 
-        setCompany(companyData)
+        setCompany(companyData);
       } catch (error) {
-        console.error('Error fetching company data:', error)
-        toast.error("Failed to load company details")
-        router.push('/')
+        console.error('Error fetching company data:', error);
+        toast.error("Failed to load company details");
+        router.push('/');
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
+    };
 
     if (companyId) {
-      fetchCompanyData()
+      fetchCompanyData();
     }
   }, [companyId, router])
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="min-h-screen bg-slate-900 text-slate-200 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading company details...</p>
+          {/* ✨ Themed Spinner */}
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500 mx-auto mb-4"></div>
+          <p className="text-slate-400">Loading Company Details...</p>
         </div>
       </div>
     )
@@ -69,66 +70,63 @@ export default function CompanyDetailPage() {
 
   if (!company) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold mb-2">Company not found</h2>
-          <p className="text-muted-foreground mb-4">The company you're looking for doesn't exist or has been removed.</p>
-          <Button onClick={() => router.push('/')}>
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Home
-          </Button>
+      <div className="min-h-screen bg-slate-900 text-slate-200 flex items-center justify-center">
+        <div className="text-center p-8">
+            <XCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold mb-2">Company Not Found</h2>
+            <p className="text-slate-400 mb-6">The company you're looking for doesn't exist or has been removed.</p>
+            <Button onClick={() => router.push('/')} className="bg-amber-600 hover:bg-amber-700 text-white">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back to Home
+            </Button>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Breadcrumb Navigation */}
-      <div className="bg-gray-50 border-b">
-        <div className="container mx-auto px-4 py-3">
-          <nav className="flex items-center space-x-2 text-sm text-gray-600">
-            <Link href="/" className="flex items-center hover:text-blue-600">
-              <Home className="h-4 w-4 mr-1" />
+    <div className="min-h-screen bg-slate-900 text-slate-200">
+      <DivCenter><div>
+      {/* ✨ Combined & Themed Navigation Bar */}
+      <div className="bg-slate-800/50 border-b border-slate-700 backdrop-blur-sm sticky top-0 z-50">
+        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
+          <nav className="flex items-center space-x-2 text-sm text-slate-400">
+            <Link href="/" className="flex items-center hover:text-amber-400 transition-colors">
+              <Home className="h-4 w-4 mr-1.5" />
               Home
             </Link>
-            <ChevronRight className="h-4 w-4" />
-            <span className="text-gray-900 font-medium">{company.name}</span>
+            <ChevronRight className="h-4 w-4 text-slate-600" />
+            <span className="font-medium text-slate-200">{company.name}</span>
           </nav>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.back()}
+            className="hover:bg-slate-700 hover:text-slate-100"
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back
+          </Button>
         </div>
       </div>
 
-      {/* Back button */}
-      <div className="pt-6">
-        <Button
-          variant="ghost"
-          onClick={() => router.back()}
-          className="mb-4"
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back
-        </Button>
-      </div>
-
-      {/* Company Header */}
+      {/* Company Header with Banner */}
       <CompanyHeader company={company} />
 
-      {/* Main Content Area - Services and Company Info Sidebar */}
-      <DivCenter>
-      <div className="w-11/12">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Main Content - Services List */}
+      {/* Main Content Area */}
+      <main className="container mx-auto px-4 py-8 lg:py-12">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-12">
+          {/* Services List */}
           <div className="lg:col-span-2">
             <CompanyServicesList services={company.services} />
           </div>
 
-          {/* Sidebar - Company Information */}
-          <div className="lg:col-span-1 mt-16">
+          {/* Sidebar */}
+          <div className="lg:col-span-1">
             <CompanySidebar company={company} />
           </div>
         </div>
-      </div>
- </DivCenter>
+      </main></div></DivCenter>
     </div>
   )
 }

@@ -7,7 +7,7 @@ import { MapPin, Clock } from 'lucide-react'; // Changed CalendarDays to Clock f
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import DivCenter from '@/components/divCenter'; // Assuming this is your centralizing component
- // For working hours display
+import { parseWorkingHours } from "@/lib/booking-utils"; // For working hours display
 
 // Skeleton for a single company card (re-used from RecentJoinSection)
 const CompanyCardSkeleton = () => (

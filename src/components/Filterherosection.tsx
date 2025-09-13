@@ -157,17 +157,26 @@ export default function Filterherosection() {
           {/* --- NEW: Search input field outside the grid, for a full-width appearance --- */}
           <div className="relative mb-6">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-            <Input
-              placeholder="Search services or companies..."
-              className="w-full pl-12 h-12 text-base border-border/50 focus:border-accent text-foreground hover:bg-muted"
-              value={filters.searchTerm}
-              onChange={(e) =>
-                setFilters((prev) => ({
-                  ...prev,
-                  searchTerm: e.target.value,
-                }))
-              }
-            />
+           <Input
+  placeholder="Search services or companies..."
+  className="w-full pl-12 h-12 text-base border-border/50 focus:border-accent text-foreground hover:bg-muted"
+  value={filters.searchTerm}
+  onChange={(e) =>
+    setFilters((prev) => ({
+      ...prev,
+      searchTerm: e.target.value,
+    }))
+  }
+  onKeyDown={(e) => {
+    if (e.key === "Enter") {
+      e.preventDefault(); // prevent form submission or page reload
+      handleSearch();     // 🔑 trigger search
+    }
+  }}
+  // --- This makes the phone keyboard show a "Search" button instead of just Enter ---
+  type="search"
+  inputMode="search"
+/>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
