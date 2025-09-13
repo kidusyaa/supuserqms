@@ -15,7 +15,7 @@ const NavSection = ({ servicesSectionId }: NavSectionProps) => {
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
 
   return (
-    <nav className="sticky top-0 z-50 w-full bg-white shadow-md">
+    <nav className="sticky top-0 z-50 w-full bg-tertiary shadow-md">
       <div className="container mx-auto flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
 
         {/* Left: Logo */}
@@ -23,7 +23,7 @@ const NavSection = ({ servicesSectionId }: NavSectionProps) => {
           <Link href="/" passHref>
             <div className='flex items-center gap-2'>
               <img src="/images/logopro.svg" alt="Company Logo" className='h-8 w-auto' />
-              <span className="text-2xl font-bold text-gray-800 cursor-pointer">GizeBook</span>
+              <span className="text-2xl font-bold text-white cursor-pointer">GizeBook</span>
             </div>
           </Link>
         </div>
@@ -42,7 +42,7 @@ const NavSection = ({ servicesSectionId }: NavSectionProps) => {
         <div className="flex items-center gap-3">
           {/* Mobile Search Icon */}
           <button
-            className="md:hidden p-2 rounded-full hover:bg-gray-100"
+            className="md:hidden p-2 rounded-full hover:bg-gray-100 text-white"
             onClick={() => setMobileSearchOpen(true)}
           >
             <Icon icon="material-symbols-light:search-rounded" width="24" height="24" />

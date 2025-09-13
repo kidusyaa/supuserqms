@@ -38,6 +38,9 @@
 //   featureEnabled: true;
 //     // An array of Provider objects linked via service_providers
 //   company?: Company;      // The nested company object
+
+import { Qahiri } from "next/font/google";
+
   
 //   queue_entries?: QueueItem[]; 
 // };
@@ -158,14 +161,19 @@
 // src/type.ts
 
 export type UserRole = "company" | "user";
+export type BookingStatus = "pending" | "confirmed" | "completed" | "cancelled";
 
+export type QueueTypeStatus = 'walk_in' | 'online' | 'scheduled' | 'other'; // Adjust 'other' as needed for your DB enum values
+
+// --- Ensure your QueueEntryStatus for the 'status' column is also correct ---
+export type QueueEntryStatus = 'waiting' | 'serving' | 'completed' | 'cancelled';
 export type Company = {
   id: string;
   name: string;
   phone: string | null;
   email: string | null;
   address: string | null;
-  working_hours: string | null;
+  working_hours: WorkingHoursJsonb | null;
   logo?: string | null;
   location_text: string | null;
   location_link: string | null;
@@ -197,36 +205,39 @@ export type Service = {
   featureEnabled?: boolean; // Changed to boolean, default handled in mapping
   company?: Company;      
   queue_entries?: QueueItem[]; 
+  service_photos?: { url: string }[]; 
+  
 };
 
 export type QueueItem = {
   id: string;
-  service_id: string;
-  provider_id: string | null; 
-  user_uid: string | null;    
+  user_id: string | null; // As per your DB schema
   user_name: string;
-  phone_number: string;
-  status: "waiting" | "served" | "no-show" | "cancelled";
-  queue_type: "walk-in" | "booking";
-  notes?: string | null;
-  appointment_time?: string | null; 
-  joined_at: string; 
-  position: number;
+  phone_number: string | null;
+  service_id: string;
+  provider_id: string | null;
+  joined_at: string; // ISO string
+  status: QueueEntryStatus; // Use the defined union type
+  position: number | null; // Use position as per DB, and allow null as it might be set by trigger
+  queue_type: QueueTypeStatus; // <-- Use the defined union type here
+  notes: string | null;
+  // company_id: string; // Removed this earlier, ensure it's not here
 };
 
 export interface Booking {
   id: string;
-  user_id: string;
+  user_id: string | null;
+  user_name: string;
+  phone_number: string | null; // <--- CHANGED: To allow null, matching your component's usage
   service_id: string;
   company_id: string;
   provider_id: string | null;
-  start_time: string; // ISO 8601 string (e.g., "2023-10-27T09:00:00.000Z")
+  start_time: string; // ISO 8601 string
   end_time: string;   // ISO 8601 string
-  status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
+  status: BookingStatus;
   created_at: string;
   notes: string | null;
 }
-
 export interface DailyWorkingHours {
   start: Date; // Time component only (e.g., 9:00 AM on a dummy date)
   end: Date;   // Time component only (e.g., 5:00 PM on a dummy date)
@@ -235,7 +246,14 @@ export interface DailyWorkingHours {
 export type ParsedWorkingHours = {
   [key: number]: DailyWorkingHours[]; // Key: Day of week (0=Sun, 1=Mon, ...), Value: Array of time ranges
 };
+export interface WorkingHoursForDay {
+  start: string; // HH:mm format, e.g., "08:00"
+  end: string;   // HH:mm format, e.g., "17:00"
+}
 
+export interface WorkingHoursJsonb {
+  [dayIndex: number]: WorkingHoursForDay[]; // Day index 0-6 (Sun-Sat)
+}
 export interface AvailableSlot {
   start: Date; // Full date-time for the slot
   end: Date;   // Full date-time for the slot
@@ -328,4 +346,10 @@ export interface GlobalStatsData {
   activeServicesCount: number;
   servicesCompletedCount: number;
   usersCount: number;
+}
+export interface FilterState {
+  searchTerm: string;
+  locations: LocationOption[]; // Array of selected location options
+  categoryId: string | null;   // ID of selected category
+  companyIds: string[];        // Array of selected company IDs
 }

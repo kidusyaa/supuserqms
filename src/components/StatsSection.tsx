@@ -1,16 +1,11 @@
 // src/components/StatsSection.tsx
-
 "use client";
 
 import { useState, useEffect } from 'react';
-// Make sure the path to your firebase-utils is correct
-
-import {getGlobalStats} from '@/lib/supabase-utils';
-// Import the icons we'll use
+import { getGlobalStats } from '@/lib/supabase-utils';
 import { Building2, ClipboardList, BadgeCheck, Users } from 'lucide-react';
 import React from 'react';
 
-// Define the structure for a single stat, including the icon
 interface StatItem {
   icon: React.ReactNode;
   value: string;
@@ -18,17 +13,15 @@ interface StatItem {
   loading: boolean;
 }
 
-// A reusable loading skeleton component for a clean UI
 const StatCardSkeleton = () => (
-    <div className="flex flex-col items-center justify-center gap-4 bg-white p-6 text-center border-[1px] border-gray-100 rounded-lg shadow-md">
-        <div className="h-12 w-12 rounded-full bg-gray-200 animate-pulse"></div>
-        <div className="h-9 w-24 bg-gray-200 rounded-md animate-pulse"></div>
-        <div className="h-5 w-32 bg-gray-200 rounded-md animate-pulse"></div>
-    </div>
+  <div className="flex flex-col items-center justify-center gap-2 py-5 px-3 rounded-lg animate-pulse">
+    <div className="h-10 w-10 rounded-full bg-gray-200"></div>
+    <div className="h-7 w-20 bg-gray-200 rounded-md"></div>
+    <div className="h-4 w-28 bg-gray-200 rounded-md"></div>
+  </div>
 );
 
 const StatsSection = () => {
-  // Set up the initial state with the correct order and new icons
   const [stats, setStats] = useState<StatItem[]>([
     { icon: <Building2 size={32} />, label: 'Companies Registered', value: '—', loading: true },
     { icon: <ClipboardList size={32} />, label: 'Active Services', value: '—', loading: true },
@@ -39,10 +32,7 @@ const StatsSection = () => {
   useEffect(() => {
     const loadStats = async () => {
       try {
-        // This will now call the Supabase function because we changed the import
         const s = await getGlobalStats();
-        
-        // Update the state with the fetched data in the correct order
         setStats([
           { icon: <Building2 size={32} className="text-orange-600" />, label: 'Companies Registered', value: s.companiesCount.toLocaleString(), loading: false },
           { icon: <ClipboardList size={32} className="text-orange-600" />, label: 'Active Services', value: s.activeServicesCount.toLocaleString(), loading: false },
@@ -51,7 +41,6 @@ const StatsSection = () => {
         ]);
       } catch (error) {
         console.error("Failed to load global stats:", error);
-        // On error, show 0s but stop the loading animation
         setStats(prevStats => prevStats.map(stat => ({ ...stat, value: '0', loading: false })));
       }
     };
@@ -59,42 +48,37 @@ const StatsSection = () => {
   }, []);
 
   return (
-    <div className="bg-gray-50 py-16 sm:py-24">
+    <div className="">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
-                Our Platform at a Glance
-            </h2>
-            <p className="mt-4 text-lg leading-8 text-gray-600">
-                Join a growing ecosystem of trusted service providers and satisfied customers.
-            </p>
-        </div>
         
-        <div className="grid md:gap-6 grid-cols-2 lg:grid-cols-4 ">
+        {/* Stats Grid */}
+        <div className="grid md:grid-cols-4 grid-cols-2 gap-y-8 gap-x-6">
           {stats.map((stat, index) => (
             <div key={index}>
               {stat.loading ? (
                 <StatCardSkeleton />
               ) : (
-                <div className="flex flex-col items-center justify-center gap-4 bg-white md:p-6 p-2 text-center border-[1px] border-gray-100 md:rounded-lg shadow-md transition-transform duration-300 hover:-translate-y-1 hover:shadow-xl ">
-                  {/* Icon with a themed background */}
-                  <div className="flex items-center justify-center h-16 w-16 rounded-full bg-orange-100">
+                <div className="flex flex-col items-center justify-center gap-2 py-5 px-3 rounded-lg">
+                  <div className="flex items-center justify-center h-12 w-12 rounded-full bg-tertiary/20">
                     {stat.icon}
                   </div>
-                  
-                  {/* The stat value */}
-                  <p className="text-4xl font-extrabold tracking-tight text-gray-900">
+                  <p className="text-3xl sm:text-4xl font-extrabold tracking-tight text-gray-900">
                     {stat.value}
                   </p>
-                  
-                  {/* The stat label */}
-                  <p className="text-base font-medium text-gray-500">
+                  <p className="text-sm sm:text-base font-medium text-gray-500">
                     {stat.label}
                   </p>
                 </div>
               )}
             </div>
           ))}
+        </div>
+
+        {/* Bottom Tagline */}
+        <div className="mt-10 text-center">
+          <p className="mt-2 text-gray-600 max-w-2xl mx-auto">
+            Join our network of businesses and users who rely on us for seamless service booking and reliable professionals.
+          </p>
         </div>
       </div>
     </div>
