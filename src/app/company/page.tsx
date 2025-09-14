@@ -1,17 +1,9 @@
 // src/app/companies/page.tsx
 import { getAllCompanies, getCompanyLocationOptions } from '@/lib/supabase-utils';
-import CompaniesClientPage from '@/components/company-componets/CompaniesClientPage'; // Import the new client component
+import CompaniesClientPage from '@/components/company-componets/CompaniesClientPage';
+import React from 'react';
 
-
-// This is an async Server Component
-export default async function CompaniesPage({
-  searchParams,
-}: {
-  searchParams?: { [key: string]: string | string[] | undefined };
-}) {
-  console.log("SERVER: CompaniesPage Server Component rendering.");
-  console.log("SERVER: searchParams received:", searchParams);
-
+export default async function CompaniesPage() {
   try {
     const allCompanies = await getAllCompanies();
     const allLocationOptions = await getCompanyLocationOptions();
@@ -26,7 +18,9 @@ export default async function CompaniesPage({
     console.error("SERVER: Error in CompaniesPage Server Component:", error);
     return (
       <div className="flex justify-center items-center min-h-screen">
-        <p className="text-red-500">Error loading companies. Please try again later.</p>
+        <p className="text-red-500">
+          Error loading companies. Please try again later.
+        </p>
       </div>
     );
   }
