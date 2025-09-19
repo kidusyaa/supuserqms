@@ -2,9 +2,9 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { FilterState, LocationOption, Category, Location } from "@/type";
+import { FilterState, LocationOption, Category, CompanyType, Location } from "@/type";
 import { getCategories, getLocations } from "@/lib/api";
-import { getCompanyOptions } from "@/lib/supabase-utils";
+import { getCompanyOptions, getCompanyTypeOptions, getCategoriesByCompanyTypes } from "@/lib/supabase-utils";
 // UI Imports
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -27,7 +27,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Search, MapPin, LayoutGrid, Users, X, Check } from "lucide-react";
+import { Search, MapPin, LayoutGrid, Users, Building2, X, Check } from "lucide-react";
 
 interface FilterNavProps {
   // Now receives the current filters state as a prop
@@ -41,6 +41,7 @@ const initialFilterState: FilterState = {
   locations: [],
   categoryId: null,
   companyIds: [],
+  companyTypeIds: [],
 };
 
 export default function FilterNav({
@@ -54,21 +55,25 @@ export default function FilterNav({
   const [locationPopoverOpen, setLocationPopoverOpen] = useState(false);
   const [companyPopoverOpen, setCompanyPopoverOpen] = useState(false);
   const [categoryPopoverOpen, setCategoryPopoverOpen] = useState(false);
+  const [companyTypePopoverOpen, setCompanyTypePopoverOpen] = useState(false);
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [locationOptions, setLocationOptions] = useState<LocationOption[]>([]);
   const [companyOptions, setCompanyOptions] = useState<LocationOption[]>([]);
+  const [companyTypeOptions, setCompanyTypeOptions] = useState<LocationOption[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
       setDataLoading(true);
       try {
-        const [fetchedCategories, fetchedLocations, fetchedCompanyOptions] =
+        const [fetchedCategories, fetchedLocations, fetchedCompanyOptions, fetchedCompanyTypeOptions] =
           await Promise.all([
             getCategories(),
             getLocations(),
             getCompanyOptions(),
+            getCompanyTypeOptions(),
           ]);
 
         const formattedLocations: LocationOption[] = fetchedLocations.map(
@@ -82,6 +87,7 @@ export default function FilterNav({
         setCategories(fetchedCategories);
         setLocationOptions(formattedLocations);
         setCompanyOptions(fetchedCompanyOptions);
+        setCompanyTypeOptions(fetchedCompanyTypeOptions);
       } catch (error) {
         console.error("Failed to load filter data:", error);
       } finally {
@@ -90,6 +96,38 @@ export default function FilterNav({
     };
     fetchData();
   }, []);
+
+  // Update categories when company types change
+  useEffect(() => {
+    const updateCategories = async () => {
+      if (filters.companyTypeIds.length > 0) {
+        setCategoriesLoading(true);
+        try {
+          const filteredCategories = await getCategoriesByCompanyTypes(filters.companyTypeIds);
+          setCategories(filteredCategories);
+          
+          // If current category is not in filtered categories, clear it
+          if (filters.categoryId && !filteredCategories.find(c => c.id === filters.categoryId)) {
+            onFilterChange({ ...filters, categoryId: null });
+          }
+        } catch (error) {
+          console.error("Failed to load filtered categories:", error);
+        } finally {
+          setCategoriesLoading(false);
+        }
+      } else {
+        // If no company types selected, load all categories
+        try {
+          const allCategories = await getCategories();
+          setCategories(allCategories);
+        } catch (error) {
+          console.error("Failed to load all categories:", error);
+        }
+      }
+    };
+
+    updateCategories();
+  }, [filters.companyTypeIds]);
 
   // Handlers now call onFilterChange directly
   const handleLocationToggle = (location: LocationOption) => {
@@ -108,6 +146,14 @@ export default function FilterNav({
     onFilterChange({ ...filters, companyIds: newCompanyIds }); // Corrected
   };
 
+  const handleCompanyTypeToggle = (companyTypeId: string) => {
+    const isSelected = filters.companyTypeIds.includes(companyTypeId);
+    const newCompanyTypeIds = isSelected
+      ? filters.companyTypeIds.filter((id) => id !== companyTypeId)
+      : [...filters.companyTypeIds, companyTypeId];
+    onFilterChange({ ...filters, companyTypeIds: newCompanyTypeIds });
+  };
+
   const handleRemoveFilter = (key: keyof FilterState, valueToRemove?: any) => {
     switch (key) {
       case "searchTerm":
@@ -120,6 +166,12 @@ export default function FilterNav({
         onFilterChange({
           ...filters,
           companyIds: filters.companyIds.filter((id) => id !== valueToRemove),
+        });
+        break;
+      case "companyTypeIds":
+        onFilterChange({
+          ...filters,
+          companyTypeIds: filters.companyTypeIds.filter((id) => id !== valueToRemove),
         });
         break;
       case "locations":
@@ -162,11 +214,16 @@ export default function FilterNav({
       if (compName)
         active.push({ type: "companyIds", value: id, label: compName });
     });
+    filters.companyTypeIds.forEach((id) => {
+      const compTypeName = companyTypeOptions.find((c) => c.value === id)?.label;
+      if (compTypeName)
+        active.push({ type: "companyTypeIds", value: id, label: compTypeName });
+    });
     filters.locations.forEach((loc) => {
       active.push({ type: "locations", value: loc.value, label: loc.label });
     });
     return active;
-  }, [filters, categories, companyOptions]);  
+  }, [filters, categories, companyOptions, companyTypeOptions]);  
   // const isCategorySelected = !!filters.categoryId;
   const isCategorySelected = true; // Always enable filters for now
 
@@ -183,7 +240,7 @@ export default function FilterNav({
               <Button
                 variant="outline"
                 className="h-11 flex-shrink-0 w-full md:w-auto data-[disabled]:cursor-not-allowed data-[disabled]:opacity-70"
-                disabled={isCategoryLocked || dataLoading}
+                disabled={isCategoryLocked || dataLoading || categoriesLoading}
               >
                 <LayoutGrid className="mr-2 h-4 w-4" />
                 {categories.find((c) => c.id === filters.categoryId)?.name ||
@@ -194,7 +251,7 @@ export default function FilterNav({
               <Command>
                 <CommandInput placeholder="Search category..." />
                 <CommandList>
-                  {dataLoading ? (
+                  {dataLoading || categoriesLoading ? (
                     <CommandItem>Loading...</CommandItem>
                   ) : (
                     <CommandGroup>
@@ -341,6 +398,60 @@ export default function FilterNav({
                                     }`}
                                   />
                                   {company.label}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          )}
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </TooltipTrigger>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className=" w-full  ">
+                  <Popover
+                    open={companyTypePopoverOpen}
+                    onOpenChange={setCompanyTypePopoverOpen}
+                  >
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="h-11 flex-shrink-0 w-full"
+                        disabled={dataLoading}
+                      >
+                        <Building2 className="mr-2 h-4 w-4" />
+                        Business Type{" "}
+                        {filters.companyTypeIds.length > 0 &&
+                          `(${filters.companyTypeIds.length})`}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[250px] p-0">
+                      <Command>
+                        <CommandInput placeholder="Search business type..." />
+                        <CommandList>
+                          {dataLoading ? (
+                            <CommandItem>Loading...</CommandItem>
+                          ) : (
+                            <CommandGroup>
+                              {companyTypeOptions.map((companyType) => (
+                                <CommandItem
+                                  key={companyType.value}
+                                  onSelect={() =>
+                                    handleCompanyTypeToggle(companyType.value)
+                                  }
+                                >
+                                  <Check
+                                    className={`mr-2 h-4 w-4 ${
+                                      filters.companyTypeIds.includes(companyType.value)
+                                        ? "opacity-100"
+                                        : "opacity-0"
+                                    }`}
+                                  />
+                                  {companyType.label}
                                 </CommandItem>
                               ))}
                             </CommandGroup>

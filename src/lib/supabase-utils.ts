@@ -6,6 +6,7 @@ import type {
   QueueItem, 
   User, 
   Category, 
+  CompanyType,
   Provider, 
   Booking,
   BookingStatus, 
@@ -100,8 +101,9 @@ export const getLocations = async (): Promise<Location[]> => {
 export const getAllCategories = async (): Promise<Category[]> => {
   try {
     const { data, error } = await supabase
-      .from('global_categories')
-      .select('*');
+      .from('service_categories')
+      .select('*')
+      .order('name', { ascending: true });
 
     if (error) {
       console.error('Error getting categories:', error);
@@ -114,10 +116,54 @@ export const getAllCategories = async (): Promise<Category[]> => {
   }
 };
 
+export const getHierarchicalCategories = async (): Promise<Category[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('service_categories')
+      .select('*')
+      .order('name', { ascending: true });
+
+    if (error) {
+      console.error('Error getting hierarchical categories:', error);
+      return [];
+    }
+
+    // Build hierarchical structure
+    const categories = data || [];
+    const categoryMap = new Map<string, Category>();
+    const rootCategories: Category[] = [];
+
+    // First pass: create map and identify root categories
+    categories.forEach(category => {
+      categoryMap.set(category.id, category);
+      if (!category.parent_category_id) {
+        rootCategories.push(category);
+      }
+    });
+
+    // Second pass: build hierarchy
+    const buildHierarchy = (parent: Category): Category[] => {
+      const children = categories
+        .filter(cat => cat.parent_category_id === parent.id)
+        .map(child => ({ ...child, children: buildHierarchy(child) }));
+      
+      return children.length > 0 ? children : [];
+    };
+
+    return rootCategories.map(root => ({
+      ...root,
+      children: buildHierarchy(root)
+    }));
+  } catch (error) {
+    console.error('Error getting hierarchical categories:', error);
+    return [];
+  }
+};
+
 export const getCategoryById = async (id: string): Promise<Category | null> => {
   try {
     const { data, error } = await supabase
-      .from('global_categories')
+      .from('service_categories')
       .select('*')
       .eq('id', id)
       .single();
@@ -130,6 +176,77 @@ export const getCategoryById = async (id: string): Promise<Category | null> => {
   } catch (error) {
     console.error('Error getting category by ID:', error);
     return null;
+  }
+};
+
+// ===== COMPANY TYPES =====
+export const getAllCompanyTypes = async (): Promise<CompanyType[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('company_types')
+      .select('*')
+      .order('name', { ascending: true });
+
+    if (error) {
+      console.error('Error getting company types:', error);
+      return [];
+    }
+    return data || [];
+  } catch (error) {
+    console.error('Error getting company types:', error);
+    return [];
+  }
+};
+
+export const getCompanyTypeOptions = async (): Promise<LocationOption[]> => {
+  try {
+    const companyTypes = await getAllCompanyTypes();
+    return companyTypes.map((companyType) => ({
+      id: companyType.id,
+      value: companyType.id,
+      label: companyType.name,
+    }));
+  } catch (error) {
+    console.error("Error getting company type options:", error);
+    return [];
+  }
+};
+
+// Get categories that are available for selected company types
+export const getCategoriesByCompanyTypes = async (companyTypeIds: string[]): Promise<Category[]> => {
+  try {
+    if (companyTypeIds.length === 0) {
+      // If no company types selected, return all categories
+      return await getAllCategories();
+    }
+
+    const { data, error } = await supabase
+      .from('company_type_service_category_mapping')
+      .select(`
+        service_category_id,
+        service_categories (
+          *
+        )
+      `)
+      .in('company_type_id', companyTypeIds);
+
+    if (error) {
+      console.error('Error getting categories by company types:', error);
+      return [];
+    }
+
+    // Extract unique categories
+    const categoryMap = new Map<string, Category>();
+    (data || []).forEach((item: any) => {
+      if (item.service_categories) {
+        categoryMap.set(item.service_categories.id, item.service_categories);
+      }
+    });
+
+    return Array.from(categoryMap.values());
+  } catch (error) {
+    console.error('Error getting categories by company types:', error);
+    return [];
   }
 };
 
@@ -274,7 +391,7 @@ export const getAllServicesByCategory = async (categoryId: string): Promise<Serv
 export const getGlobalCategoriesWithServiceCounts = async (): Promise<Category[]> => {
   try {
     const { data: categories, error: categoriesError } = await supabase
-      .from('global_categories')
+      .from('service_categories')
       .select('*');
 
     if (categoriesError) {
@@ -628,7 +745,7 @@ export const getCategoryWithServices = async (categoryId: string): Promise<Categ
   try {
     // First, get the category
     const { data: categoryData, error: categoryError } = await supabase
-      .from('global_categories')
+      .from('service_categories')
       .select('*')
       .eq('id', categoryId)
       .single();
@@ -928,11 +1045,15 @@ export const getFilteredServices = async (
           id,
           name,
           location_text,
-          address // Assuming address might contain location info
+          address,
+          company_company_types (
+            company_type_id
+          )
         ),
-        category:global_categories (
+        category:service_categories (
           id,
-          name
+          name,
+          parent_category_id
         )
       `)
       .eq('status', 'active');
@@ -961,6 +1082,16 @@ export const getFilteredServices = async (
 
     // Map raw data to Service type with nested company/category
     let services: Service[] = data.map((item: any) => mapToService(item));
+
+    // Client-side filtering for company types
+    if (filters.companyTypeIds && filters.companyTypeIds.length > 0) {
+      services = services.filter(service => {
+        const companyTypes = (service.company as any)?.company_company_types || [];
+        return companyTypes.some((ct: any) => 
+          filters.companyTypeIds.includes(ct.company_type_id)
+        );
+      });
+    }
 
     // Client-side filtering for location (since server-side filtering on joined text is complex)
     if (filters.locations && filters.locations.length > 0) {

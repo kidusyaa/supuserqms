@@ -19,7 +19,7 @@ export const getLocations = async (): Promise<Location[]> => {
 // --- 2. Get Categories (Replaces getCategories from firebase-utils) ---
 export const getCategories = async (): Promise<Category[]> => {
   const { data, error } = await supabase
-    .from('global_categories') // The name of your categories table
+    .from('service_categories') // Updated to use service_categories table
     .select('*');
 
   if (error) {
@@ -293,7 +293,12 @@ export const getAllServices = async (): Promise<Service[]> => {
       .from('services')
       .select(`
         *,
-        companies (*),
+        companies (
+          *,
+          company_company_types (
+            company_type_id
+          )
+        ),
         service_providers (
           providers (*)
         )
@@ -333,7 +338,7 @@ export const getAllServices = async (): Promise<Service[]> => {
 export const getCategoriesWithServiceCounts = async (): Promise<Category[]> => {
   try {
     const { data: categories, error: categoriesError } = await supabase
-      .from('global_categories')
+      .from('service_categories') // Updated to use service_categories table
       .select('*');
 
     if (categoriesError) {

@@ -1,6 +1,6 @@
 // app/services/page.tsx
 import { getAllServices, getCategories, getLocations } from "@/lib/api";
-import { getCompanyOptions } from "@/lib/supabase-utils";
+import { getCompanyOptions, getCompanyTypeOptions } from "@/lib/supabase-utils";
 import ServiceListClient from "./_componet/ServiceListClient";
 import { Location, LocationOption } from "@/type";
 
@@ -26,14 +26,18 @@ export default async function ServicesPage({
   if (resolvedSearchParams.locations) {
     plainSearchParams.locations = resolvedSearchParams.locations;
   }
+  if (resolvedSearchParams.companyTypeIds) {
+    plainSearchParams.companyTypeIds = resolvedSearchParams.companyTypeIds;
+  }
 
   console.log("ServicesPage (Server Component): Converted plainSearchParams:", plainSearchParams);
 
-  const [services, categories, rawLocations, companyOptions] = await Promise.all([
+  const [services, categories, rawLocations, companyOptions, companyTypeOptions] = await Promise.all([
     getAllServices(),
     getCategories(),
     getLocations(),
     getCompanyOptions(),
+    getCompanyTypeOptions(),
   ]);
 
   const formattedLocations: LocationOption[] = rawLocations.map(
@@ -50,6 +54,7 @@ export default async function ServicesPage({
       allCategories={categories}
       allLocationOptions={formattedLocations}
       allCompanyOptions={companyOptions}
+      allCompanyTypeOptions={companyTypeOptions}
       serverSearchParams={plainSearchParams}
     />
   );

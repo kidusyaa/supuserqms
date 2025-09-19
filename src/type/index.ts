@@ -296,9 +296,20 @@ export const ANY_PROVIDER_OPTION: Provider = {
 export type Category = {
   id: string;
   name: string;
-  description: string; 
-  icon: string ; 
+  description: string | null; 
+  icon: string | null; 
+  parent_category_id: string | null;
+  created_at: string;
   services?: number | null; 
+  children?: Category[]; // For hierarchical display
+};
+
+export type CompanyType = {
+  id: string;
+  name: string;
+  description: string | null;
+  icon: string | null;
+  created_at: string;
 };
 
 export interface LocationOption {
@@ -352,4 +363,5 @@ export interface FilterState {
   locations: LocationOption[]; // Array of selected location options
   categoryId: string | null;   // ID of selected category
   companyIds: string[];        // Array of selected company IDs
+  companyTypeIds: string[];    // Array of selected company type IDs
 }

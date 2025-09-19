@@ -14,6 +14,7 @@ const initialFilterState: FilterState = {
   locations: [],
   categoryId: null,
   companyIds: [],
+  companyTypeIds: [],
 };
 
 interface ServiceListClientProps {
@@ -21,6 +22,7 @@ interface ServiceListClientProps {
   allCategories: Category[];
   allLocationOptions: LocationOption[];
   allCompanyOptions: LocationOption[];
+  allCompanyTypeOptions: LocationOption[];
   // This prop will now reliably be a plain object
   serverSearchParams: { [key: string]: string | string[] | undefined };
 }
@@ -30,6 +32,7 @@ export default function ServiceListClient({
   allCategories,
   allLocationOptions,
   allCompanyOptions,
+  allCompanyTypeOptions,
   serverSearchParams,
 }: ServiceListClientProps) {
   const [services, setServices] = useState<Service[]>(initialServices);
@@ -63,6 +66,14 @@ export default function ServiceListClient({
         .map(co => co.value);
     }
 
+    // companyTypeIds
+    if (serverSearchParams.companyTypeIds) { // Now directly accessible
+      const idsFromUrl = (serverSearchParams.companyTypeIds as string).split(',');
+      initialFiltersFromUrl.companyTypeIds = allCompanyTypeOptions
+        .filter(ct => idsFromUrl.includes(ct.value))
+        .map(ct => ct.value);
+    }
+
     // locations
     if (serverSearchParams.locations) { // Now directly accessible
       const locValuesFromUrl = (serverSearchParams.locations as string).split(';');
@@ -85,7 +96,7 @@ export default function ServiceListClient({
       return newFilters;
     });
 
-  }, [serverSearchParams, allCategories, allLocationOptions, allCompanyOptions]);
+  }, [serverSearchParams, allCategories, allLocationOptions, allCompanyOptions, allCompanyTypeOptions]);
 
   // Memoize the filter function for performance
   const filteredServices = useMemo(() => {
@@ -107,6 +118,16 @@ export default function ServiceListClient({
       currentFiltered = currentFiltered.filter((service) =>
         filters.companyIds.includes(service.company_id)
       );
+    }
+
+    if (filters.companyTypeIds.length > 0) {
+      currentFiltered = currentFiltered.filter((service) => {
+        // Check if the service's company has any of the selected company types
+        const companyTypes = (service.company as any)?.company_company_types || [];
+        return companyTypes.some((ct: any) => 
+          filters.companyTypeIds.includes(ct.company_type_id)
+        );
+      });
     }
 
     if (filters.locations.length > 0) {
