@@ -311,6 +311,13 @@ export type CompanyType = {
   icon: string | null;
   created_at: string;
 };
+export type CompanyTypeWithCount = {
+  id: string;
+  name: string;
+  description: string | null;
+  icon: string | null;
+  company_count: number; // Supabase returns bigint as a number in JS
+};
 
 export interface LocationOption {
   id: string;

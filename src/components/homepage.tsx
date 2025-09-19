@@ -11,6 +11,7 @@ import FeaturedServices from './Featuredservice';
 import Footer from './footer';
 import HeroSection from './herosection';
 import RecentJoinSection from './RecentJoinSection';
+import CompanyTypesPage from './company-types';
 
 export default function Homepage() {
   const SERVICES_SECTION_ID = "services-list";
@@ -26,7 +27,7 @@ export default function Homepage() {
        <StatsSection/>
       <FeaturedServices/>
       <RecentJoinSection/>
-      <ServiceCategoriesPage/>
+      <CompanyTypesPage/>
       <Footer/>
     </div>
   );

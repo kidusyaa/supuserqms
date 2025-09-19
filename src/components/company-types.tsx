@@ -3,7 +3,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { CompanyTypeWithCount } from "@/type";
+import {  CompanyTypeWithCount } from "@/type";
 import { getCompanyTypesWithCounts } from "@/lib/supabase-utils"; // Use our new API function
 import DivCenter from "./divCenter";
 

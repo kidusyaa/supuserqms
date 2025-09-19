@@ -15,7 +15,8 @@ import type {
   Location,
   LocationOption,
   GlobalStatsData,
-  FilterState
+  FilterState, 
+  CompanyTypeWithCount
 } from '../type';
 
 
@@ -1130,3 +1131,74 @@ export const getFilteredServices = async (
     return [];
   }
 };
+
+export async function getCompanyDetailsById(companyId: string): Promise<Company | null> {
+  // IMPORTANT: For this query to work, you must have a 'services' table
+  // with a 'company_id' column that is a foreign key to 'companies.id'.
+  const { data, error } = await supabase
+    .from('companies')
+    .select(`
+      *,
+      services (
+        *,
+        service_photos ( url )
+      )
+    `)
+    .eq('id', companyId)
+    .single(); // .single() is perfect for fetching one specific item
+
+  if (error) {
+    console.error(`Error fetching details for company ${companyId}:`, error);
+    // This will help you debug if the relationship is wrong
+    if (error.code === 'PGRST200') {
+        console.error("Hint: The error 'PGRST200' (406 Not Acceptable) often means the relationship between 'companies' and 'services' is not correctly defined in the database.");
+    }
+    return null;
+  }
+
+  return data;
+}
+export async function getCompanyTypeById(typeId: string): Promise<CompanyType | null> {
+  const { data, error } = await supabase
+    .from('company_types')
+    .select('*')
+    .eq('id', typeId)
+    .single(); // .single() expects exactly one row, which is perfect here
+
+  if (error) {
+    console.error(`Error fetching company type ${typeId}:`, error);
+    return null;
+  }
+
+  return data;
+}
+export async function getCompaniesByType(typeId: string): Promise<Company[]> {
+  const { data, error } = await supabase
+    .from('companies')
+    // The query syntax '*, company_company_types!inner(*)' tells Supabase:
+    // 1. Select all columns from the 'companies' table (*).
+    // 2. Do an INNER JOIN on 'company_company_types'. !inner ensures we only get
+    //    companies that actually have a type assigned.
+    .select('*, company_company_types!inner(company_type_id)')
+    // 3. Filter the joined table to only include rows where the type ID matches.
+    .eq('company_company_types.company_type_id', typeId);
+
+  if (error) {
+    console.error(`Error fetching companies for type ${typeId}:`, error);
+    return [];
+  }
+
+  return data || [];
+}
+export async function getCompanyTypesWithCounts(): Promise<CompanyTypeWithCount[]> {
+  // We use .rpc() to call the PostgreSQL function we created
+  const { data, error } = await supabase.rpc('get_company_types_with_company_counts');
+
+  if (error) {
+    console.error("Error fetching company types with counts:", error);
+    return []; // Return an empty array on failure
+  }
+
+  // The 'data' will be an array of objects matching our CompanyTypeWithCount type
+  return data || [];
+}
