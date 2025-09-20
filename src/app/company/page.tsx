@@ -1,36 +1,35 @@
-// Save this code in: src/app/companies/page.tsx
+
 
 import {
   getAllCompanies,
   getCompanyLocationOptions,
   getAllCompanyTypes,
 } from "@/lib/supabase-utils";
-import CompaniesClientPage from "@/components/company-componets/CompaniesClientPage"; // Make sure this path is correct
+import CompaniesClientPage from "@/components/company-componets/CompaniesClientPage"; 
 import React from "react";
 
 export default async function CompaniesPage({
   searchParams,
 }: {
-  searchParams: { [key: string]: string | string[] | undefined };
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   try {
-    // Read the companyTypeId from the URL search parameters
-    const initialCompanyTypeId = searchParams.companyTypeId as string | undefined;
+    // ✅ Await searchParams before accessing
+    const resolvedSearchParams = await searchParams;
+    const initialCompanyTypeId = resolvedSearchParams?.companyTypeId as string | undefined;
 
-    // Fetch all the data needed for the page
     const [allCompanies, allLocationOptions, allCompanyTypes] = await Promise.all([
       getAllCompanies(),
       getCompanyLocationOptions(),
       getAllCompanyTypes(),
     ]);
 
-    // Render the client component and pass the data and initial filter as props
     return (
       <CompaniesClientPage
         initialCompanies={allCompanies}
         initialLocationOptions={allLocationOptions}
         initialCompanyTypes={allCompanyTypes}
-        initialCompanyTypeId={initialCompanyTypeId} 
+        initialCompanyTypeId={initialCompanyTypeId}
       />
     );
   } catch (error) {
