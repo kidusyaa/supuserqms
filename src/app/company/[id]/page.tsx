@@ -58,7 +58,7 @@ export default function CompanyDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-900 text-slate-200 flex items-center justify-center">
+      <div className="min-h-screen bg-white-900 text-slate-200 flex items-center justify-center">
         <div className="text-center">
           {/* ✨ Themed Spinner */}
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500 mx-auto mb-4"></div>
@@ -70,7 +70,7 @@ export default function CompanyDetailPage() {
 
   if (!company) {
     return (
-      <div className="min-h-screen bg-slate-900 text-slate-200 flex items-center justify-center">
+      <div className="min-h-screen bg-white text-slate-200 flex items-center justify-center">
         <div className="text-center p-8">
             <XCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
             <h2 className="text-2xl font-bold mb-2">Company Not Found</h2>

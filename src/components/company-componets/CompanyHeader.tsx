@@ -14,7 +14,7 @@ export default function CompanyHeader({ company }: CompanyHeaderProps) {
   // const bannerImageUrl = company.banner_image || "/default-banner.jpg";
 
   return (
-    <div className="relative w-full h-80 md:min-h-96 border-b ">
+    <div className="relative w-full h-[400px] md:min-h-96 border-b ">
       {/* Background Banner Image */}
       <Image
         src={company.logo || "/placeholder-company.png"}
@@ -28,7 +28,7 @@ export default function CompanyHeader({ company }: CompanyHeaderProps) {
 
       {/* Content */}
       <div className="absolute inset-0 flex items-end p-4 md:p-8">
-        <div className="container mx-auto px-4 py-8">
+        <div className="container md:mx-20 mx-auto px-4 py-8 ">
           <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
             <div className="flex-shrink-0">
               <Image

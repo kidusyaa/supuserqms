@@ -136,7 +136,7 @@ const SearchBox = ({ autoFocus = false, closeSearch }: { autoFocus?: boolean, cl
           {!loading && results.map((svc) => (
             // --- THE FIX: Use snake_case `company_id` to match Supabase data ---
             <Link
-              href={`/services/${svc.id}?companyId=${svc.company_id}`}
+              href={`/booking/${svc.id}?companyId=${svc.company_id}`}
               key={`${svc.company_id}-${svc.id}`} // Also update the key
               className="block px-3 py-2 hover:bg-gray-50"
               onClick={() => {

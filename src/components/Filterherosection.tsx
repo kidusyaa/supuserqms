@@ -2,7 +2,7 @@
 "use client";
 import React from 'react'
 import { useState, useEffect, useMemo } from "react"
-import { Search, MapPin, LayoutGrid, Users, Check } from "lucide-react"
+import { Search, MapPin, LayoutGrid, Users, Check, Building } from "lucide-react" // Added Building icon
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -18,29 +18,22 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-
-import { FilterState, LocationOption, Category, Location as AppLocation } from "@/type";
-import { getCategories, getLocations } from "@/lib/api";
-import { getCompanyOptions } from "@/lib/supabase-utils";
-
-// --- NEW: Import useRouter ---
 import { useRouter } from 'next/navigation';
+import { FilterState, LocationOption, CompanyType, Location as AppLocation } from "@/type";
+import { getLocations } from "@/lib/api"; // getCategories is no longer needed
+import { getCompanyOptions, getAllCompanyTypes } from "@/lib/supabase-utils";
 
+// --- FIX 1: Update FilterState to use companyTypeIds and remove categoryId ---
 const initialFilterState: FilterState = {
   searchTerm: "",
   locations: [],
   categoryId: null,
   companyIds: [],
+  companyTypeIds: [],
 };
 
+
 export default function Filterherosection() {
-  // --- NEW: Initialize useRouter ---
   const router = useRouter();
 
   const [filters, setFilters] = useState<FilterState>(initialFilterState);
@@ -49,10 +42,10 @@ export default function Filterherosection() {
   // Popover open states
   const [locationPopoverOpen, setLocationPopoverOpen] = useState(false);
   const [companyPopoverOpen, setCompanyPopoverOpen] = useState(false);
-  const [categoryPopoverOpen, setCategoryPopoverOpen] = useState(false);
+  const [companyTypePopoverOpen, setCompanyTypePopoverOpen] = useState(false); // Renamed for clarity
 
   // Data states
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [companyTypes, setCompanyTypes] = useState<CompanyType[]>([]); // Renamed for clarity
   const [locationOptions, setLocationOptions] = useState<LocationOption[]>([]);
   const [companyOptions, setCompanyOptions] = useState<LocationOption[]>([]);
 
@@ -61,9 +54,9 @@ export default function Filterherosection() {
     const fetchData = async () => {
       setDataLoading(true);
       try {
-        const [fetchedCategories, fetchedLocations, fetchedCompanyOptions] =
+        const [fetchedCompanyTypes, fetchedLocations, fetchedCompanyOptions] =
           await Promise.all([
-            getCategories(),
+            getAllCompanyTypes(), // Correctly fetching company types
             getLocations(),
             getCompanyOptions(),
           ]);
@@ -76,7 +69,7 @@ export default function Filterherosection() {
           })
         );
 
-        setCategories(fetchedCategories);
+        setCompanyTypes(fetchedCompanyTypes);
         setLocationOptions(formattedLocations);
         setCompanyOptions(fetchedCompanyOptions);
       } catch (error) {
@@ -116,36 +109,48 @@ export default function Filterherosection() {
       }
     });
   };
+   const handleCompanyTypeToggle = (typeId: string) => {
+    setFilters((prev) => {
+      const newTypeIds = prev.companyTypeIds.includes(typeId)
+        ? prev.companyTypeIds.filter((id) => id !== typeId) // Remove if already selected
+        : [...prev.companyTypeIds, typeId]; // Add if not selected
+      return { ...prev, companyTypeIds: newTypeIds };
+    });
+  };
 
   // --- MODIFIED: handleSearch function for navigation ---
-  const handleSearch = () => {
+   const handleSearch = () => {
     const queryParams = new URLSearchParams();
 
     if (filters.searchTerm) {
       queryParams.set('searchTerm', filters.searchTerm);
     }
-    if (filters.categoryId) {
-      queryParams.set('categoryId', filters.categoryId);
+    // --- FIX 3: Correctly handle the companyTypeIds array ---
+    if (filters.companyTypeIds.length > 0) {
+      // Join the array into a comma-separated string for the URL
+      queryParams.set('companyTypeIds', filters.companyTypeIds.join(','));
     }
     if (filters.companyIds.length > 0) {
-      queryParams.set('companyIds', filters.companyIds.join(',')); // Join array with commas
+      queryParams.set('companyIds', filters.companyIds.join(','));
     }
     if (filters.locations.length > 0) {
-      // For locations, join by semicolon as location names might contain commas
       queryParams.set('locations', filters.locations.map(loc => loc.value).join(';'));
     }
 
     // Navigate to the services page with the encoded filters
+    // This will now go to a URL like /services?companyTypeIds=type1,type2
     router.push(`/services?${queryParams.toString()}`);
   };
 
   // Helper to display selected items in buttons if needed
-  const selectedCategoryLabel = useMemo(() => {
-    return (
-      categories.find((c) => c.id === filters.categoryId)?.name ||
-      "Select Category"
-    );
-  }, [filters.categoryId, categories]);
+  const selectedTypeLabel = useMemo(() => {
+    const count = filters.companyTypeIds.length;
+    if (count === 0) return "Select Type";
+    if (count === 1) {
+      return companyTypes.find((c) => c.id === filters.companyTypeIds[0])?.name || "Select Type";
+    }
+    return `${count} Types Selected`;
+  }, [filters.companyTypeIds, companyTypes]);
 
   const selectedLocationCount = filters.locations.length;
   const selectedCompanyCount = filters.companyIds.length;
@@ -180,50 +185,40 @@ export default function Filterherosection() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Popover
-              open={categoryPopoverOpen}
-              onOpenChange={setCategoryPopoverOpen}
+           <Popover
+              open={companyTypePopoverOpen}
+              onOpenChange={setCompanyTypePopoverOpen}
             >
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
-                  className="h-12 flex-shrink-0 w-full justify-start text-base border-border/50 focus:border-accent text-foreground hover:bg-muted"
+                  className="h-12 flex-shrink-0 w-full justify-start text-base"
                   disabled={dataLoading}
                 >
-                  <LayoutGrid className="mr-2 h-5 w-5 text-muted-foreground" />
-                  {selectedCategoryLabel}
+                  <Building className="mr-2 h-5 w-5 text-muted-foreground" />
+                  {selectedTypeLabel}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent
-                className="w-[250px] p-0 bg-popover text-popover-foreground border-border shadow-lg"
-              >
-                <Command className="[&_[cmdk-group]]:px-2 [&_[cmdk-group]_:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-item]_svg]:h-4 [&_[cmdk-item]_svg]:w-4 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-1.5 [&_[cmdk-item]_span]:ml-2 [&_[cmdk-item]_span]:flex-1 [&_[cmdk-item]_span]:text-sm">
-                  <CommandInput placeholder="Search category..." className="h-10 text-base placeholder-muted-foreground" />
+              <PopoverContent className="w-[250px] p-0">
+                <Command>
+                  <CommandInput placeholder="Search type..." />
                   <CommandList>
-                    {dataLoading ? (
-                      <CommandItem className="text-muted-foreground">Loading...</CommandItem>
-                    ) : (
+                    {dataLoading ? ( <CommandItem>Loading...</CommandItem> ) : (
                       <CommandGroup>
-                        {categories.map((cat) => (
+                        {companyTypes.map((type) => (
                           <CommandItem
-                            key={cat.id}
-                            onSelect={() => {
-                              setFilters((prev) => ({
-                                ...prev,
-                                categoryId: cat.id,
-                              }));
-                              setCategoryPopoverOpen(false);
-                            }}
-                            className="hover:bg-muted text-foreground"
+                            key={type.id}
+                            onSelect={() => handleCompanyTypeToggle(type.id)}
                           >
                             <Check
+                              // --- FIX 5: Update checkmark logic for an array ---
                               className={`mr-2 h-4 w-4 ${
-                                filters.categoryId === cat.id
+                                filters.companyTypeIds.includes(type.id)
                                   ? "opacity-100 text-primary"
                                   : "opacity-0"
                               }`}
                             />
-                            {cat.name}
+                            {type.name}
                           </CommandItem>
                         ))}
                       </CommandGroup>

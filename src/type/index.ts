@@ -185,6 +185,7 @@ export type Company = {
     tiktok?: string;
     website?: string;
   } | null;
+  company_types?: CompanyType[];
   services?: Service[];
   providers?: Provider[];
 };
@@ -205,7 +206,9 @@ export type Service = {
   featureEnabled?: boolean; // Changed to boolean, default handled in mapping
   company?: Company;      
   queue_entries?: QueueItem[]; 
-  service_photos?: { url: string }[]; 
+  service_photos?: { url: string }[];
+  discount_type: 'percentage' | 'fixed' | null;
+  discount_value: number | null; 
   
 };
 

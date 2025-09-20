@@ -3,7 +3,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import {  CompanyTypeWithCount } from "@/type";
+import { CompanyTypeWithCount } from "@/type";
 import { getCompanyTypesWithCounts } from "@/lib/supabase-utils"; // Use our new API function
 import DivCenter from "./divCenter";
 
@@ -25,9 +25,10 @@ export default function CompanyTypesPage() {
   }, []);
 
   if (isLoading) {
+    // A slightly improved loading state to match your app's style
     return (
-      <div className="flex justify-center items-center h-64 text-orange-500 font-semibold">
-        Loading company types...
+      <div className="flex justify-center items-center min-h-[60vh]">
+        <p className="text-muted-foreground">Loading business types...</p>
       </div>
     );
   }
@@ -46,10 +47,9 @@ export default function CompanyTypesPage() {
             {companyTypes.map((type) => (
               <Link
                 key={type.id}
-                // CORRECTED LINK:
-                // This now matches your exact folder path: "app/company/by-type/[typeId]"
-                href={`/company/by-type/${type.id}`}
+                href={`/company?companyTypeId=${type.id}`} // MUST start with a "/"
                 passHref
+                // ... other props
               >
                 <div className="group block bg-white rounded-2xl border border-orange-200 shadow-md hover:shadow-xl hover:border-orange-400 transition-all duration-300 cursor-pointer overflow-hidden">
                   {/* Icon + Title */}

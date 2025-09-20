@@ -23,8 +23,8 @@ export default function ServiceDetailsCard({
   return (
     <Card className="mb-8">
       <CardContent className="p-6">
-        <div className="flex flex-col md:flex-row gap-6">
-          <div className="flex-shrink-0">
+        <div className="flex flex-col md:flex-row gap-6 bg-green-500">
+          <div className="flex-shrink-0 ">
             <Image
               src={service.photo || "/placeholder-service.png"}
               alt={service.name}

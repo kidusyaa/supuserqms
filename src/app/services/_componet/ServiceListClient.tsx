@@ -4,6 +4,7 @@
 import { useState, useEffect, useMemo } from "react";
 import FilterNav from "@/components/FilterNav";
 import { Service, FilterState, Category, LocationOption } from "@/type";
+import ServiceCard from "./ServiceCard";
 import Link from "next/link";
 // Removed useSearchParams as it's not strictly needed for initial load,
 // but keep it if you plan to update the URL client-side later.
@@ -169,32 +170,29 @@ export default function ServiceListClient({
         // companyOptions={allCompanyOptions}
       />
 
-      {loadingServices ? (
-        <div className="text-center text-slate-500 mt-10">Loading services...</div>
+        {loadingServices ? (
+        <div className="text-center text-muted-foreground mt-10">Loading services...</div>
       ) : filteredServices.length === 0 ? (
-        <div className="text-center text-slate-500 mt-10 bg-slate-50 p-8 rounded-lg">
-          <h3 className="text-xl font-semibold text-slate-700">No Services Found</h3>
+        <div className="text-center text-muted-foreground mt-10 bg-card p-8 rounded-lg">
+          <h3 className="text-xl font-semibold text-foreground">No Services Found</h3>
           <p>Try adjusting your filters or check back later.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
-          {filteredServices.map(service => (
-            <Link
-              key={service.id}
-              href={`/booking/${service.id}`}
-              className="block bg-white rounded-lg shadow border border-slate-200 p-5 hover:shadow-lg hover:-translate-y-1 transition-all"
-            >
-              <div className="text-xl font-bold text-blue-900 mb-1">{service.name}</div>
-              {service.company && (
-                <div className="text-sm font-medium text-slate-500 mb-2">{service.company.name}</div>
-              )}
-              <p className="text-slate-600 mb-4 text-sm line-clamp-2">{service.description}</p>
-              <div className="flex gap-4 text-sm text-slate-700 border-t pt-3 mt-3">
-                <span><strong className="text-green-600">${service.price}</strong></span>
-                <span className="border-l pl-4">~{service.estimated_wait_time_mins} min</span>
-              </div>
-            </Link>
-          ))}
+        // --- 2. THIS IS THE REPLACEMENT ---
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6 mt-8">
+          {filteredServices.map(service => {
+            // Find the category for this service *before* rendering the card.
+            // This is more efficient than searching inside every card.
+            const category = allCategories.find(cat => cat.id === service.category_id);
+            
+            return (
+              <ServiceCard 
+                key={service.id} 
+                service={service} 
+                category={category}
+              />
+            );
+          })}
         </div>
       )}
     </div>

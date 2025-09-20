@@ -61,6 +61,8 @@ const mapToService = (serviceData: any): Service => ({
     price: serviceData.price ? String(serviceData.price) : null,
     photo: serviceData.photo || null,
     featureEnabled: serviceData.featureEnabled === true, // Ensure it's a boolean, default to false if null/undefined
+    discount_type:serviceData.discount_type,
+    discount_value:serviceData.discount_value
 });
 
 // Helper to convert database rows to our Company type
@@ -487,6 +489,31 @@ export const searchServices = async (searchTerm: string, categoryId?: string): P
 };
 
 // Featured services: status active AND featureEnabled true
+export const getDiscountedServices = async (limit: number = 10): Promise<Service[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('services')
+      .select(`
+        *,
+        company:companies ( name, id ) 
+      `)
+      .eq('status', 'active')
+      .not('discount_type', 'is', null) // Ensure discount_type is not null
+      .gt('discount_value', 0)          // Ensure discount_value is greater than 0
+      .order('created_at', { ascending: false }) // Show newest discounted services first
+      .limit(limit);
+
+    if (error) {
+      console.error("Error fetching discounted services:", error);
+      throw error;
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error("Error in getDiscountedServices function:", error);
+    return [];
+  }
+};
 
 // Global stats for the landing page
 export const getGlobalStats = async (): Promise<GlobalStatsData> => {
@@ -518,18 +545,25 @@ export const getGlobalStats = async (): Promise<GlobalStatsData> => {
 // ===== COMPANIES =====
 export const getAllCompanies = async (): Promise<Company[]> => {
   try {
+    // This query now joins with the company_types table
+    // through your join table (which Supabase handles automatically
+    // if relationships are set up correctly).
     const { data, error } = await supabase
       .from('companies')
-      .select('*');
+      .select(`
+        *,
+        company_types (*)
+      `);
 
     if (error) {
-      console.error('Error getting all companies:', error?.message);
+      console.error('Error getting all companies with types:', error?.message);
       return [];
     }
 
-    return (data || []).map((company: any) => mapToCompany(company));
+    // No mapping needed if the query returns the shape we want
+    return data || []; 
   } catch (error) {
-    console.error('Error getting all companies:', error);
+    console.error('Error in getAllCompanies function:', error);
     return [];
   }
 };
@@ -1043,19 +1077,11 @@ export const getFilteredServices = async (
       .select(`
         *,
         company:companies (
-          id,
-          name,
-          location_text,
-          address,
-          company_company_types (
-            company_type_id
-          )
+          *,
+          company_types (*) 
         ),
-        category:service_categories (
-          id,
-          name,
-          parent_category_id
-        )
+        category:service_categories (*),
+        service_photos ( url )  // <-- THIS IS THE CRUCIAL FIX FOR PHOTOS
       `)
       .eq('status', 'active');
 

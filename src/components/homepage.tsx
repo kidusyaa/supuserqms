@@ -12,7 +12,7 @@ import Footer from './footer';
 import HeroSection from './herosection';
 import RecentJoinSection from './RecentJoinSection';
 import CompanyTypesPage from './company-types';
-
+import DiscountedServices from './discountedServices';
 export default function Homepage() {
   const SERVICES_SECTION_ID = "services-list";
   // State to store the height of the HeroSection
@@ -25,7 +25,9 @@ export default function Homepage() {
       {/* HeroSection will now report its height */}
       <HeroSection />
        <StatsSection/>
+       <DiscountedServices/>
       <FeaturedServices/>
+
       <RecentJoinSection/>
       <CompanyTypesPage/>
       <Footer/>
