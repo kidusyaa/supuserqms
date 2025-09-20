@@ -489,26 +489,35 @@ export const searchServices = async (searchTerm: string, categoryId?: string): P
 };
 
 // Featured services: status active AND featureEnabled true
-export const getDiscountedServices = async (limit: number = 10): Promise<Service[]> => {
+export async function getDiscountedServices(): Promise<Service[]> {
   try {
     const { data, error } = await supabase
       .from('services')
       .select(`
         *,
-        company:companies ( name, id ) 
+        company:companies (
+          name,
+          location_text
+        ),
+        service_category:service_categories (
+          name
+        ),
+        service_photos (
+          url
+        )
       `)
       .eq('status', 'active')
-      .not('discount_type', 'is', null) // Ensure discount_type is not null
-      .gt('discount_value', 0)          // Ensure discount_value is greater than 0
-      .order('created_at', { ascending: false }) // Show newest discounted services first
-      .limit(limit);
+      .not('discount_type', 'is', null) // Ensure there is a discount
+      .not('discount_value', 'is', null);
 
     if (error) {
       console.error("Error fetching discounted services:", error);
       throw error;
     }
-
+    
+    // The query already returns the data in the shape we need.
     return data || [];
+
   } catch (error) {
     console.error("Error in getDiscountedServices function:", error);
     return [];

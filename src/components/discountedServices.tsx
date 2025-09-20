@@ -4,33 +4,26 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Tag, ArrowRight, Percent } from "lucide-react";
+import { ChevronLeft, ChevronRight, Star, Clock, MapPin, Tag } from "lucide-react";
 import { getDiscountedServices } from "@/lib/supabase-utils";
 import type { Service } from "@/type";
-
-import { Carousel, CarouselContent, CarouselItem } from "@/components/ui/carousel";
 import { Button } from "./ui/button";
-import { Badge } from "./ui/badge";
-import DivCenter from "./divCenter";
 
-// Helper function to calculate the new price
+// --- Helper functions for discount logic (re-used from your previous version) ---
 const calculateDiscountedPrice = (service: Service): string | null => {
   const originalPrice = parseFloat(service.price || '0');
   if (!service.discount_type || !service.discount_value || originalPrice === 0) {
     return service.price;
   }
-
   let finalPrice = originalPrice;
   if (service.discount_type === 'percentage') {
     finalPrice = originalPrice * (1 - service.discount_value / 100);
   } else if (service.discount_type === 'fixed') {
     finalPrice = originalPrice - service.discount_value;
   }
-
   return (finalPrice > 0 ? finalPrice : 0).toFixed(2);
 };
 
-// Helper function to format the discount badge
 const formatDiscount = (service: Service): string => {
   if (!service.discount_type || !service.discount_value) return "";
   if (service.discount_type === 'percentage') {
@@ -39,13 +32,12 @@ const formatDiscount = (service: Service): string => {
   return `-$${service.discount_value} OFF`;
 };
 
-
-// Skeleton for loading state
-const ServiceCardSkeleton = () => <div className="h-[110px] bg-white rounded-xl shadow animate-pulse" />;
-
-const DiscountedServices = () => {
+// --- Main Component ---
+export default function DiscountedServices() {
   const [services, setServices] = useState<Service[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isAutoPlaying, setIsAutoPlaying] = useState(true);
 
   useEffect(() => {
     const loadData = async () => {
@@ -61,75 +53,139 @@ const DiscountedServices = () => {
     };
     loadData();
   }, []);
+  
+  // Auto-play functionality from the template
+  useEffect(() => {
+    if (!isAutoPlaying || services.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % services.length);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [isAutoPlaying, services.length]);
 
-  // Don't render the section if there are no discounted services to show
+  const nextSlide = () => {
+    if (services.length === 0) return;
+    setCurrentIndex((prev) => (prev + 1) % services.length);
+    setIsAutoPlaying(false);
+  };
+
+  const prevSlide = () => {
+    if (services.length === 0) return;
+    setCurrentIndex((prev) => (prev - 1 + services.length) % services.length);
+    setIsAutoPlaying(false);
+  };
+
+  const goToSlide = (index: number) => {
+    setCurrentIndex(index);
+    setIsAutoPlaying(false);
+  };
+  
   if (!isLoading && services.length === 0) {
-    return null;
+    return null; // Don't render if there's nothing to show
   }
 
   return (
-    <div className="py-8 sm:py-12 bg-emerald-500/10">
-      <DivCenter>
-        <div className="container">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-              <Tag className="w-6 h-6 text-emerald-600" />
-              Special Offers
-            </h2>
-            <Link href="/services" passHref>
-              <Button variant="secondary">
-                <span className="inline-flex items-center text-sm font-semibold">
-                  See all <ArrowRight className="w-4 h-4 ml-1" />
-                </span>
-              </Button>
-            </Link>
-          </div>
+    <section className="py-12 px-4 bg-background">
+      <div className="max-w-6xl mx-auto">
+        <div className="text-center mb-8">
+          <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Special Offers & Discounts</h2>
+          <p className="text-muted-foreground">Limited-time deals on top-rated services</p>
+        </div>
 
-          <div>
-            <Carousel opts={{ align: "start", loop: services.length > 3 }}>
-              <CarouselContent className="-ml-2 md:-ml-4">
-                {isLoading
-                  ? Array.from({ length: 4 }).map((_, index) => (
-                      <CarouselItem key={index} className="pl-2 md:pl-4 basis-full sm:basis-1/2 lg:basis-1/3">
-                        <ServiceCardSkeleton />
-                      </CarouselItem>
-                    ))
-                  : services.map((service) => (
-                      <CarouselItem
-                        key={service.id}
-                        className="pl-2 md:pl-4 basis-full sm:basis-1/2 lg:basis-1/3"
-                      >
-                        <Link href={`/booking/${service.id}`} passHref className="block h-full">
-                          <div className="h-full flex flex-col justify-between rounded-xl p-4 min-w-[300px] border bg-white/80 backdrop-blur shadow hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-pointer">
-                            <div>
-                              <div className="flex justify-between items-start mb-2">
-                                <h3 className="font-semibold text-gray-900 pr-2">{service.name}</h3>
-                                <Badge variant="destructive" className="bg-emerald-600 hover:bg-emerald-700 text-white">
-                                  <Percent className="w-3 h-3 mr-1" />
-                                  {formatDiscount(service)}
-                                </Badge>
-                              </div>
-                              <p className="text-sm text-gray-600 truncate">{service.company?.name || "—"}</p>
+        <div className="relative">
+          <div className="overflow-hidden rounded-2xl">
+            <div
+              className="flex transition-transform duration-500 ease-in-out"
+              style={{ transform: `translateX(-${currentIndex * 100}%)` }}
+            >
+              {isLoading ? (
+                // Skeleton Loader
+                <div className="w-full flex-shrink-0">
+                   <div className="bg-card rounded-2xl shadow-lg overflow-hidden mx-2 h-80 animate-pulse"></div>
+                </div>
+              ) : (
+                services.map((service) => (
+                  <div key={service.id} className="w-full flex-shrink-0">
+                    <div className="bg-card rounded-2xl shadow-lg overflow-hidden mx-2">
+                      <div className="md:flex">
+                        <div className="md:w-1/2 relative">
+                          <img
+                            src={service.service_photos?.[0]?.url || "/placeholder.svg"}
+                            alt={service.name}
+                            className="w-full h-64 md:h-80 object-cover"
+                          />
+                          <div className="absolute top-4 left-4 bg-primary text-primary-foreground px-3 py-1 rounded-full text-sm font-semibold flex items-center gap-1">
+                            <Tag className="w-4 h-4"/>
+                            {formatDiscount(service)}
+                          </div>
+                          {service.service_category?.name && (
+                            <div className="absolute top-4 right-4 bg-secondary text-secondary-foreground px-3 py-1 rounded-full text-xs">
+                              {service.service_category.name}
                             </div>
-                            <div className="flex items-end justify-between pt-2 border-t mt-3">
-                              <span className="text-sm text-gray-500 line-through">
-                                ${service.price}
-                              </span>
-                              <span className="text-xl font-bold text-emerald-700">
-                                ${calculateDiscountedPrice(service)}
-                              </span>
+                          )}
+                        </div>
+                        <div className="md:w-1/2 p-6 flex flex-col justify-between">
+                          <div>
+                            <h3 className="text-xl font-bold text-foreground mb-2">{service.name}</h3>
+                            <p className="text-muted-foreground mb-4">at {service.company?.name || "Unknown Company"}</p>
+                            
+                            {/* NOTE: Rating/Reviews are not in your data, so they are omitted. */}
+
+                            <div className="space-y-2 mb-6">
+                              <div className="flex items-center gap-2 text-muted-foreground">
+                                <Clock className="w-4 h-4" />
+                                <span className="text-sm">{service.estimated_wait_time_mins} mins</span>
+                              </div>
+                              {service.company?.location_text && (
+                                <div className="flex items-center gap-2 text-muted-foreground">
+                                  <MapPin className="w-4 h-4" />
+                                  <span className="text-sm">{service.company.location_text}</span>
+                                </div>
+                              )}
                             </div>
                           </div>
-                        </Link>
-                      </CarouselItem>
-                    ))}
-              </CarouselContent>
-            </Carousel>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <span className="text-muted-foreground line-through">${service.price}</span>
+                                <span className="text-2xl font-bold text-primary">${calculateDiscountedPrice(service)}</span>
+                            </div>
+                            <Link href={`/booking/${service.id}`}>
+                              <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">Book Now</Button>
+                            </Link>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
-        </div>
-      </DivCenter>
-    </div>
-  );
-};
 
-export default DiscountedServices;
+          {/* Navigation Arrows */}
+          <button onClick={prevSlide} className="absolute left-0 md:left-4 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-background border border-border rounded-full p-2 shadow-lg transition-all duration-200 z-10">
+            <ChevronLeft className="w-5 h-5 text-foreground" />
+          </button>
+          <button onClick={nextSlide} className="absolute right-0 md:right-4 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-background border border-border rounded-full p-2 shadow-lg transition-all duration-200 z-10">
+            <ChevronRight className="w-5 h-5 text-foreground" />
+          </button>
+
+          {/* Dots Indicator */}
+          {!isLoading && services.length > 1 && (
+            <div className="flex justify-center gap-2 mt-6">
+              {services.map((_, index) => (
+                <button
+                  key={index}
+                  onClick={() => goToSlide(index)}
+                  className={`w-3 h-3 rounded-full transition-all duration-200 ${
+                    index === currentIndex ? "bg-primary scale-110" : "bg-muted hover:bg-muted-foreground/50"
+                  }`}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}

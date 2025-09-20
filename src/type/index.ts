@@ -209,6 +209,7 @@ export type Service = {
   service_photos?: { url: string }[];
   discount_type: 'percentage' | 'fixed' | null;
   discount_value: number | null; 
+  service_category?: { name: string }; // Use service_category to avoid conflict with `category_id`
   
 };
 
