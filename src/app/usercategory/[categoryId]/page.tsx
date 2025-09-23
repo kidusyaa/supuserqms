@@ -99,7 +99,7 @@ export default async function CategoryDetailPage({ params }: CategoryPageProps) 
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 text-sm text-gray-500">
                       <Icon icon="material-symbols:schedule" width="16" height="16" />
-                      <span>{service.duration || 'N/A'} min</span>
+                      <span>{service.estimated_wait_time_mins || 'N/A'} min</span>
                     </div>
                     <div className="text-lg font-bold text-amber-600">
                       ${service.price || 'N/A'}
