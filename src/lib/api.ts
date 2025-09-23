@@ -301,7 +301,8 @@ export const getAllServices = async (): Promise<Service[]> => {
         ),
         service_providers (
           providers (*)
-        )
+        ),
+        service_photos ( url )
       `)
       .eq('status', 'active');
 
@@ -310,24 +311,28 @@ export const getAllServices = async (): Promise<Service[]> => {
       return [];
     }
 
-    return (data || []).map((service: any) => ({
-      ...service,
-      company_id: service.company_id,
-      category_id: service.category_id,
-      estimated_wait_time_mins: service.estimated_wait_time,
-      allowWalkIns: service.allow_walk_ins,
-      walkInBuffer: service.walk_in_buffer,
-      maxWalkInsPerHour: service.max_walk_ins_per_hour,
-      featureEnabled: service.feature_enabled,
-      locationLink: service.location_link,
-      createdAt: new Date(service.created_at),
-      company: service.companies,
-      providers: service.service_providers
-        ? service.service_providers
-            .map((sp: any) => sp.providers)
-            .filter(Boolean)
-        : []
-    })) as Service[];
+    return (data || []).map((service: any) => {
+      const photoUrl = service.service_photos?.[0]?.url || service.photo || null;
+      return {
+        ...service,
+        photo: photoUrl,
+        company_id: service.company_id,
+        category_id: service.category_id,
+        estimated_wait_time_mins: service.estimated_wait_time_mins,
+        allowWalkIns: service.allow_walk_ins,
+        walkInBuffer: service.walk_in_buffer,
+        maxWalkInsPerHour: service.max_walk_ins_per_hour,
+        featureEnabled: service.feature_enabled,
+        locationLink: service.location_link,
+        createdAt: new Date(service.created_at),
+        company: service.companies,
+        providers: service.service_providers
+          ? service.service_providers
+              .map((sp: any) => sp.providers)
+              .filter(Boolean)
+          : []
+      } as Service;
+    });
   } catch (error) {
     console.error('Error getting all services:', error);
     return [];

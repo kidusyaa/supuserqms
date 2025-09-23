@@ -65,7 +65,7 @@ const companyTypeIcon = service.company?.company_types?.[0]?.icon;
       <div className="flex flex-col h-full bg-card rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden border hover:border-primary/20">
         {/* 1. Optional Image Section */}
         {showImage && (
-          <div className="relative h-40 bg-muted/50 overflow-hidden">
+          <div className="relative h-44 bg-muted/50 overflow-hidden">
             <Image
               src={service.photo|| "/placeholder.svg"} // A generic placeholder
               alt={service.name}
@@ -112,10 +112,10 @@ const companyTypeIcon = service.company?.company_types?.[0]?.icon;
             
           </div>
           
-          <div className="py-4 border-t">
+          <div className="py-3 border-t">
             {/* 3. Optional Company Info */}
             {showCompanyInfo && (
-              <div className="flex items-center gap-2 mb-3">
+              <div className="flex items-center gap-2 mb-2">
                 {service.company?.logo ? (
                   <Image
                     src={service.company.logo}
@@ -138,7 +138,7 @@ const companyTypeIcon = service.company?.company_types?.[0]?.icon;
               <div className="space-y-1.5 text-sm text-muted-foreground">
                 <div className="flex items-center gap-2">
                   <Clock className="w-4 h-4" />
-                  <span>{service.estimated_wait_time_mins} min</span>
+                  <span>{service.estimated_wait_time_mins != null ? `${service.estimated_wait_time_mins} min` : '—'}</span>
                 </div>
                 {service.company?.location_text && (
                   <div className="flex items-center gap-2">

@@ -108,21 +108,26 @@ const FeaturedServices = () => {
                               <div className="p-2">
                                 <div className="flex  md:flex-row flex-col items-center  md:gap-3 mb-3">
                                   <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden">
-                                    {/* --- FIX APPLIED HERE --- */}
-                                    {service?.company?.logo ? (
-                                        <Image
-                                          src={service.company.logo} // Use the correct property
-                                          alt={service.company.name || "Company logo"}
-                                          width={48}
-                                          height={48}
-                                          className="w-full h-full object-cover"
-                                        />
+                                    {service?.photo ? (
+                                      <Image
+                                        src={service.photo}
+                                        alt={service.name}
+                                        width={48}
+                                        height={48}
+                                        className="w-full h-full object-cover"
+                                      />
+                                    ) : service?.company?.logo ? (
+                                      <Image
+                                        src={service.company.logo}
+                                        alt={service.company.name || "Company logo"}
+                                        width={48}
+                                        height={48}
+                                        className="w-full h-full object-cover"
+                                      />
                                     ) : category?.icon ? (
-                                        // If no company image, display category icon as text
-                                        <span className="text-3xl">{category.icon}</span>
+                                      <span className="text-3xl">{category.icon}</span>
                                     ) : (
-                                        // Fallback to a generic Lucide icon
-                                        <Building className="w-6 h-6 text-gray-400" />
+                                      <Building className="w-6 h-6 text-gray-400" />
                                     )}
                                   </div>
                                   <div className="flex-1 overflow-hidden">

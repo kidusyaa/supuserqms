@@ -311,7 +311,8 @@ export const getAllServices = async (): Promise<Service[]> => {
           ),
           service_providers (
             providers ( * )
-          )
+          ),
+          service_photos ( url )
         `)
         .eq('status', 'active');
   
@@ -332,11 +333,16 @@ export const getAllServices = async (): Promise<Service[]> => {
           ? service.service_providers.map((sp: any) => sp.providers).filter(Boolean)
           : [];
         
+        // Map first service photo url to photo field for uniform consumption
+        const photoUrl = service.service_photos?.[0]?.url || service.photo || null;
+
         // We can delete the temporary join table data if we want a clean object
         delete service.service_providers;
+        if (service.service_photos) delete service.service_photos;
   
         return {
           ...service,
+          photo: photoUrl,
           providers: providers,
         };
       });
@@ -766,7 +772,8 @@ export const createQueueEntry = async (payload: CreateQueuePayload): Promise<Que
         .from('services')
         .select(`
           *,
-          company:companies ( name, id ) 
+        company:companies ( name, id ),
+        service_photos ( url ) 
         `)
         .eq('status', 'active')
         .eq('featureEnabled', true); // Assumes column name is `featureEnabled`
@@ -776,7 +783,14 @@ export const createQueueEntry = async (payload: CreateQueuePayload): Promise<Que
         throw error;
       }
   
-      return data || [];
+    // Normalize photo field
+    const normalized = (data || []).map((svc: any) => ({
+      ...svc,
+      photo: svc.service_photos?.[0]?.url || svc.photo || null,
+      service_photos: undefined,
+    }));
+
+    return normalized as Service[];
     } catch (error) {
       console.error("Error in getFeaturedServices function:", error);
       return [];
