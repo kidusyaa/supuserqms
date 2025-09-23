@@ -1,9 +1,8 @@
-// components/book/_componet/BookServiceDialog.tsx
 "use client"
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { format } from "date-fns" // Added isToday for clearer display (if not already there)
+import { format } from "date-fns"
 import {
   Dialog,
   DialogContent,
@@ -39,20 +38,18 @@ export default function BookServiceDialog({
 }: BookServiceDialogProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const [userName, setUserName] = useState(""); // <-- Changed
-  const [phoneNumber, setPhoneNumber] = useState(""); // <-- Changed
+  const [userName, setUserName] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [notes, setNotes] = useState("");
-
 
   const handleBookingConfirm = async () => {
     setIsLoading(true);
     try {
-      if (!userName.trim()) { // <-- Changed
+      if (!userName.trim()) {
         toast.error("Please provide your name to book this service.");
         setIsLoading(false);
         return;
       }
-      // phone_number is optional based on your DB/type schema.
 
       if (!selectedSlot) {
         toast.error("No time slot selected.");
@@ -60,10 +57,10 @@ export default function BookServiceDialog({
         return;
       }
 
-      const newBooking = {
+      const newBookingData = { // Renamed for clarity before passing to createBooking
         user_id: null,
-        user_name: userName.trim(), // <-- Changed
-        phone_number: phoneNumber.trim() || null, // <-- Changed
+        user_name: userName.trim(),
+        phone_number: phoneNumber.trim() || null,
         service_id: service.id,
         company_id: company.id,
         provider_id: selectedProvider.id,
@@ -73,11 +70,19 @@ export default function BookServiceDialog({
         notes: notes.trim() || null,
       };
 
-      await createBooking(newBooking);
+      // createBooking should return the newly created booking, including its ID
+      const createdBooking = await createBooking(newBookingData);
+
+      if (!createdBooking || !createdBooking.id) {
+        throw new Error("Booking created but no ID returned.");
+      }
 
       toast.success("Service booked successfully!");
-      onOpenChange(false);
-      router.push('/booking/confirmation');
+      onOpenChange(false); // Close the dialog
+      
+      // Navigate to the confirmation page, passing the booking ID
+      router.push(`/booking/confirmation/${createdBooking.id}`); // Using path segment for cleaner URLs
+      
     } catch (error) {
       console.error("Error creating booking:", error);
       toast.error("Failed to book service. Please try again.");
@@ -121,9 +126,8 @@ export default function BookServiceDialog({
             <p className="text-red-500">No time slot selected.</p>
           )}
 
-          {/* Always show name and phone inputs for booking */}
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="userName" className="text-right">Your Name</Label> {/* <-- Changed */}
+            <Label htmlFor="userName" className="text-right">Your Name</Label>
             <Input
               id="userName"
               value={userName}
@@ -133,7 +137,7 @@ export default function BookServiceDialog({
             />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="phoneNumber" className="text-right">Your Phone</Label> {/* <-- Changed */}
+            <Label htmlFor="phoneNumber" className="text-right">Your Phone</Label>
             <Input
               id="phoneNumber"
               value={phoneNumber}

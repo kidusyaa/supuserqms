@@ -1,9 +1,8 @@
-// components/book/_componet/JoinQueueDialog.tsx
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { format, isToday } from "date-fns"
+import { useRouter } from "next/navigation" // Keep router for potential redirects, though not used in new flow
+import { format, isToday, addMinutes } from "date-fns"
 
 import {
   Dialog,
@@ -30,6 +29,8 @@ interface JoinQueueDialogProps {
   selectedProvider: Provider;
   currentQueueCount: number;
   estimatedQueueStartTime: Date | null;
+  // NEW: Callback for successful queue join
+  onQueueJoined: (queueEntry: QueueItem, estimatedStartTime: Date | null) => void;
 }
 
 export function JoinQueueDialog({
@@ -40,14 +41,24 @@ export function JoinQueueDialog({
   selectedProvider,
   currentQueueCount,
   estimatedQueueStartTime,
+  onQueueJoined, // NEW
 }: JoinQueueDialogProps) {
-  const router = useRouter();
+  const router = useRouter(); // router still useful if you want to allow a "Go to queue status page"
   const [isLoading, setIsLoading] = useState(false);
-  const [userName, setUserName] = useState(""); // <-- Changed
-  const [phoneNumber, setPhoneNumber] = useState(""); // <-- Changed
+  const [userName, setUserName] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [notes, setNotes] = useState("");
 
- const handleJoinQueue = async () => {
+  // Reset form when dialog opens
+  useEffect(() => {
+    if (open) {
+      setUserName('');
+      setPhoneNumber('');
+      setNotes('');
+    }
+  }, [open]);
+
+  const handleJoinQueue = async () => {
     setIsLoading(true);
     try {
       if (!userName.trim()) {
@@ -56,18 +67,28 @@ export function JoinQueueDialog({
         return;
       }
       const queueEntryData: Omit<QueueItem, "id" | "joined_at" | "status" | "position"> & { status?: QueueEntryStatus; position?: number | null; user_id: string | null; } = {
-            user_id: null, // Ensure this matches your DB column name (user_id vs user_uid)
+            user_id: null,
             service_id: service.id,
             provider_id: selectedProvider.id,
             user_name: userName.trim(),
             phone_number: phoneNumber.trim() || null,
             notes: notes.trim() || null,
-            position: currentQueueCount + 1,
-            queue_type: 'walk-in' as QueueTypeStatus, // <--- CHANGE THIS LINE!
+            position: currentQueueCount + 1, // This is an estimate, backend will assign actual position
+            queue_type: 'walk-in' as QueueTypeStatus,
         };
-      await joinQueue(queueEntryData); // This function call should now be type-safe
+
+      const createdQueueEntry = await joinQueue(queueEntryData);
+
+      if (!createdQueueEntry || !createdQueueEntry.id) {
+        throw new Error("Queue entry created but no ID returned.");
+      }
+
       toast.success("You have successfully joined the queue!");
-      onOpenChange(false);
+      onOpenChange(false); // Close this dialog
+
+      // Call the callback to open the new confirmation dialog
+      onQueueJoined(createdQueueEntry, estimatedQueueStartTime); // Pass the current estimate
+
     } catch (error) {
       console.error("Failed to join queue:", error);
       toast.error("Failed to join queue. Please try again.");
@@ -75,6 +96,7 @@ export function JoinQueueDialog({
       setIsLoading(false);
     }
   };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
@@ -98,9 +120,9 @@ export function JoinQueueDialog({
               <p className="text-sm text-muted-foreground">{company.name}</p>
             </div>
           </div>
-          {/* Always show name and phone inputs */}
+          
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="userName" className="text-right">Name</Label> {/* <-- Changed */}
+            <Label htmlFor="userName" className="text-right">Name</Label>
             <Input
               id="userName"
               value={userName}
@@ -110,7 +132,7 @@ export function JoinQueueDialog({
             />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="phoneNumber" className="text-right">Phone</Label> {/* <-- Changed */}
+            <Label htmlFor="phoneNumber" className="text-right">Phone</Label>
             <Input
               id="phoneNumber"
               value={phoneNumber}
@@ -133,7 +155,7 @@ export function JoinQueueDialog({
 
           <div className="space-y-2 text-sm mt-4">
             <p><strong>Provider:</strong> {selectedProvider.name}</p>
-            <p><strong>Current Queue:</strong> {currentQueueCount} people ahead of you</p>
+            <p><strong>Your estimated position:</strong> {currentQueueCount + 1} (Final position confirmed after joining)</p>
             {estimatedQueueStartTime ? (
               <p className="text-orange-600">
                 <strong>Est. Start Time:</strong> {format(estimatedQueueStartTime, 'h:mm a')} {isToday(estimatedQueueStartTime) ? 'Today' : format(estimatedQueueStartTime, 'MMM do')}
@@ -143,6 +165,9 @@ export function JoinQueueDialog({
                 <strong>Est. Start Time:</strong> Unavailable (Provider may be closed or fully booked.)
               </p>
             )}
+            <p className="mt-2 text-primary font-semibold">
+                Please arrive at least 30 minutes before your estimated start time.
+            </p>
           </div>
         </div>
         <DialogFooter>

@@ -1,164 +1,3 @@
-// export type UserRole = "company" | "user"
-// import { ANY_PROVIDER_ID } from "@/lib/constants";
-// import { Timestamp } from "firebase/firestore";
-// export type Company = {
-//   id: string;
-//   name: string;
-//   phone: string;
-//   email: string;
-//   address: string;
-//   working_hours: string;
-//   logo?: string;
-//   location_text: string;
-//   location_link: string;
-//   owner_uid: string; // The UID of the user who owns this company
-//   createdAt?: Timestamp | Date;
-//   socials?: {
-//     facebook?: string;
-//     instagram?: string;
-//     tiktok?: string;
-//     website?: string;
-//   } 
-//   services?: Service[];  // An array of Service objects
-//   providers?: Provider[];
-// };
-// export type Service = {
-//   id: string;
-//   company_id: string;
-//   name: string;
-//   category_id: string; // Category for this specific service
-//   description: string;
-//   estimated_wait_time_mins: number; // in minutes
-//   status: "active" | "inactive";
-//   code: string;
-//   createdAt: Date;
-//   providers: Provider[];
-//   price: string;
-//   photo?: string;
-//   featureEnabled: true;
-//     // An array of Provider objects linked via service_providers
-//   company?: Company;      // The nested company object
-
-import { Qahiri } from "next/font/google";
-
-  
-//   queue_entries?: QueueItem[]; 
-// };
-
-// // src/type.ts
-
-// export type QueueItem = {
-//   id: string;
-//   service_id: string;
-//   provider_id: string | null; // Provider can be null
-//   user_uid: string | null;    // user_uid can be null
-//   user_name: string;
-//   phone_number: string;
-//   status: "waiting" | "served" | "no-show" | "cancelled";
-//   position: number;
-//   queue_type: "walk-in" | "booking";
-//   notes?: string;
-//   appointment_time?: Date | string;
-//   // --- THE FIX: Change `created_at` to `joined_at` ---
-//   joined_at: Date | string; 
-// };
-
-// // Your CreateQueuePayload does not need to be changed.
-// // It's correct because we don't send the timestamp from the client.
-// export type ServiceWithDetails = Service & {
-//   company?: Company; // The company object, can be optional
-//   queueCount: number; // The calculated number of people in the queue
-// };
-// export type User = {
-//   id: string
-//   phoneNumber: string
-//   name?: string
-//   activeQueues: string[] // queue item IDs
-// }
-// export type Provider = {
-//   id: string;
-//   name: string;
-//   specialization: string;
-//  is_active: boolean; // <-- CHANGED to snake_case
-  
-//   createdAt: Date;
-//   isAny?: boolean; // This flag is very useful!
-// };
-// export const ANY_PROVIDER_OPTION: Provider = {
-//   id: ANY_PROVIDER_ID, // Use the constant here
-//   name: 'Any Provider',
-//   specialization: 'General',
-//   is_active: true,// <-- CHANGED to snake_case
-//   createdAt: new Date(),
-//   isAny: true, // The special flag to easily identify this option
-// };
-
-
-// export type Category = {
-//   id: string;
-//   name: string;
-//   description: string;
-//   icon: string;
-
-//   services: number;
-//    // make optional to match mock
-// };
-// // types/filters.ts
-// export interface LocationOption {
-//   id: string;
-//   value: string;
-//   label: string;
-// }
-// export interface Location {
-//   id: string;
-//   city: string;
-//   place: string;
-// }
-// export interface FilterState {
-//   searchTerm: string;
-//   locations: LocationOption[]; 
-//   categoryId: string | null; 
-//   companyIds: string[]; 
-
-//   // For a potential "My Favorites" filter
-// }
-// export type MessageTemplate = {
-//   id: string
-//   name: string
-//   content: string
-//   type: "delay" | "ready" | "custom"| "interruption" | "resumption" | "cancellation"
-// }
-// // Add a virtual provider object to represent the "Any Provider" queue.
-// // This allows us to treat it uniformly in our UI.
-
-// // in src/type.ts (or a similar file)
-
-// // This represents the data collected from the new Add/Edit Service Form
-// export interface ServiceRegistrationData {
-//   serviceName: string;
-//   categoryId: string;
-//   description: string;
-//   cost: string;
-//   offers: string;
-//   estimatedTime: string;
-//   serviceProviders: Array<{ name: string; specialization: string }>;
-//   photos: File[];
-//   allowWalkIns: boolean;
-//   walkInBuffer: number;
-//   maxWalkInsPerHour: number;
-// }
-// export interface LocationOption {
-//   id: string;
-//   value: string;
-//   label: string;
-// }
-// export interface GlobalStatsData {
-//   companiesCount: number;
-//   activeServicesCount: number;
-//   servicesCompletedCount: number;
-//   usersCount: number;
-// }
-// src/type.ts
 
 export type UserRole = "company" | "user";
 export type BookingStatus = "pending" | "confirmed" | "completed" | "cancelled";
@@ -225,6 +64,10 @@ export type QueueItem = {
   position: number | null; // Use position as per DB, and allow null as it might be set by trigger
   queue_type: QueueTypeStatus; // <-- Use the defined union type here
   notes: string | null;
+  service?: Service;
+  company?: Company;
+  provider?: Provider;
+  estimated_start_time?: string | null;
   // company_id: string; // Removed this earlier, ensure it's not here
 };
 
@@ -241,6 +84,9 @@ export interface Booking {
   status: BookingStatus;
   created_at: string;
   notes: string | null;
+  service?: Service;
+  company?: Company;
+  provider?: Provider;
 }
 export interface DailyWorkingHours {
   start: Date; // Time component only (e.g., 9:00 AM on a dummy date)

@@ -9,6 +9,8 @@ import { getServiceDetails, getConfirmedBookingsForProvider, getCurrentQueueCoun
 import { generateAvailableSlots, getDayRange, calculateEstimatedQueueStartTime } from "@/lib/booking-utils";
 import BookServiceDialog from "@/components/book/_componet/BookServiceDialog";
 import { JoinQueueDialog } from "@/components/book/_componet/JoinQueueDialog";
+// NEW: Import the new QueueConfirmationDialog
+import { QueueConfirmationDialog } from "@/components/book/_componet/QueueConfirmationDialog"; // We'll create this next
 import { startOfDay } from "date-fns";
 import { toast } from "sonner";
 
@@ -17,7 +19,14 @@ import BookingBreadcrumb from "../_componets/BookingBreadcrumb";
 import ServiceDetailsCard from "../_componets/ServiceDetailsCard";
 import ProviderSelector from "../_componets/ProviderSelector";
 import AppointmentScheduler from "../_componets/AppointmentScheduler";
-import ActionButtons from "../_componets/ActionButtons";
+
+// Define UI modes for conditional rendering
+type UiMode = 'initial' | 'scheduleAppointment';
+
+// Extend QueueItem to include the estimatedStartTime which might not be persisted directly
+interface ConfirmedQueueItem extends QueueItem {
+    estimatedServiceStartTime?: Date | null; // This will hold the calculated estimate
+}
 
 export default function BookingPage() {
   const params = useParams();
@@ -32,12 +41,19 @@ export default function BookingPage() {
   const [selectedSlot, setSelectedSlot] = useState<AvailableSlot | null>(null);
   const [joinQueueDialogOpen, setJoinQueueDialogOpen] = useState(false);
   const [bookServiceDialogOpen, setBookServiceDialogOpen] = useState(false);
+  // NEW: State for the queue confirmation dialog
+  const [queueConfirmationDialogOpen, setQueueConfirmationDialogOpen] = useState(false);
+  const [confirmedQueueEntry, setConfirmedQueueEntry] = useState<ConfirmedQueueItem | null>(null);
+
+  // State to control the display mode
+  const [uiMode, setUiMode] = useState<UiMode>('initial');
+
 
   // State for data derived from selections
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [availableSlots, setAvailableSlots] = useState<AvailableSlot[]>([]);
   const [queueCount, setQueueCount] = useState<number>(0);
-  const [estimatedQueueStartTime, setEstimatedQueueStartTime] = useState<Date | null>(null);
+  const [estimatedQueueStartTime, setEstimatedQueueStartTime] = useState<Date | null>(null); // This is the estimate *for the next person*
 
   const serviceId = params.serviceId as string;
 
@@ -70,6 +86,11 @@ export default function BookingPage() {
 
   // Effect 2: Fetch slots when dependencies change
   useEffect(() => {
+    // Reset uiMode to initial if provider changes or service/company becomes null
+    if (!selectedProvider) {
+        setUiMode('initial');
+    }
+
     if (!service || !company || !selectedDate || !selectedProvider) {
       setAvailableSlots([]);
       return;
@@ -88,8 +109,13 @@ export default function BookingPage() {
         setSlotsLoading(false);
       }
     };
-    fetchSlots();
-  }, [service, company, selectedDate, selectedProvider]);
+    if (uiMode === 'scheduleAppointment') {
+        fetchSlots();
+    } else {
+        setAvailableSlots([]); // Clear slots if not in schedule mode
+    }
+
+  }, [service, company, selectedDate, selectedProvider, uiMode]);
 
   // Effect 3: Fetch queue data and estimate start time (with polling)
   useEffect(() => {
@@ -118,6 +144,32 @@ export default function BookingPage() {
     setSelectedSlot(slot);
     setBookServiceDialogOpen(true);
   };
+
+  const handleJoinQueueClick = () => {
+    if (!selectedProvider) {
+        toast.error("Please select a provider first.");
+        return;
+    }
+    setJoinQueueDialogOpen(true);
+  };
+
+  const handleScheduleAppointmentClick = () => {
+    if (!selectedProvider) {
+        toast.error("Please select a provider first.");
+        return;
+    }
+    setUiMode('scheduleAppointment');
+  };
+
+  // NEW: Callback function for when queue is successfully joined
+  const handleQueueJoined = (queueEntry: QueueItem, estimatedStartTime: Date | null) => {
+    setConfirmedQueueEntry({
+        ...queueEntry,
+        estimatedServiceStartTime: estimatedStartTime // Augment with the calculated estimate
+    });
+    setQueueConfirmationDialogOpen(true);
+  };
+
 
   if (loading) {
     return (
@@ -149,63 +201,115 @@ export default function BookingPage() {
             service={service}
             company={company}
             queueCount={queueCount}
-            estimatedQueueStartTime={estimatedQueueStartTime}
+            estimatedQueueStartTime={estimatedQueueStartTime} // This is the estimate for the *next* person
           />
 
-          <Card>
+          <Card className="mt-6">
             <CardHeader>
-              <CardTitle>Book Your Service</CardTitle>
-              <CardDescription>Choose your preferred provider and available slot</CardDescription>
+              <CardTitle>Select a Provider & Action</CardTitle>
+              <CardDescription>First, choose your preferred provider, then decide to schedule or join the queue.</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-6">
                 <ProviderSelector
                   providers={service.providers || []}
                   selectedProviderId={selectedProviderId}
-                  onSelectProvider={setSelectedProviderId}
+                  onSelectProvider={(id) => {
+                    setSelectedProviderId(id);
+                    setUiMode('initial');
+                    setSelectedSlot(null);
+                  }}
                 />
-                <AppointmentScheduler
-                  company={company}
-                  selectedDate={selectedDate}
-                  onDateSelect={setSelectedDate}
-                  slotsLoading={slotsLoading}
-                  availableSlots={availableSlots}
-                  onSlotClick={handleSlotClick}
-                  isProviderSelected={!!selectedProvider}
-                />
-                <ActionButtons
-                  onJoinQueue={() => setJoinQueueDialogOpen(true)}
-                  isJoinQueueDisabled={!selectedProvider}
-                  queueCount={queueCount}
-                />
+
+                {!selectedProvider ? (
+                    <p className="text-center text-muted-foreground mt-4">
+                        Please select a provider to see booking options.
+                    </p>
+                ) : (
+                    <>
+                        {uiMode === 'initial' && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+                                <Button
+                                    size="lg"
+                                    onClick={handleScheduleAppointmentClick}
+                                    disabled={!selectedProvider}
+                                >
+                                    Schedule an Appointment
+                                </Button>
+                                <Button
+                                    size="lg"
+                                    variant="outline"
+                                    onClick={handleJoinQueueClick}
+                                    disabled={!selectedProvider}
+                                >
+                                    Join Queue ({queueCount} in line)
+                                </Button>
+                            </div>
+                        )}
+
+                        {uiMode === 'scheduleAppointment' && (
+                            <>
+                                <AppointmentScheduler
+                                    company={company}
+                                    selectedDate={selectedDate}
+                                    onDateSelect={setSelectedDate}
+                                    slotsLoading={slotsLoading}
+                                    availableSlots={availableSlots}
+                                    onSlotClick={handleSlotClick}
+                                    isProviderSelected={!!selectedProvider}
+                                />
+                                <div className="mt-6 text-center">
+                                    <Button variant="outline" onClick={() => setUiMode('initial')}>
+                                        &larr; Back to Options
+                                    </Button>
+                                </div>
+                            </>
+                        )}
+                    </>
+                )}
               </div>
             </CardContent>
           </Card>
         </div>
       </div>
 
-      {/* Dialogs remain controlled by the main page state */}
+      {/* Booking Dialog */}
       {selectedProvider && (
-        <>
-          <JoinQueueDialog
-            open={joinQueueDialogOpen}
-            onOpenChange={setJoinQueueDialogOpen}
-            service={service}
+        <BookServiceDialog
+          open={bookServiceDialogOpen}
+          onOpenChange={setBookServiceDialogOpen}
+          service={service}
+          company={company}
+          selectedProvider={selectedProvider}
+          selectedSlot={selectedSlot}
+        />
+      )}
+
+      {/* Join Queue Dialog */}
+      {selectedProvider && (
+        <JoinQueueDialog
+          open={joinQueueDialogOpen}
+          onOpenChange={setJoinQueueDialogOpen}
+          service={service}
+          company={company}
+          selectedProvider={selectedProvider}
+          currentQueueCount={queueCount}
+          estimatedQueueStartTime={estimatedQueueStartTime} // This is the estimate for the *next* person
+          onQueueJoined={handleQueueJoined} // NEW: Pass the callback
+        />
+      )}
+
+      {/* NEW: Queue Confirmation Dialog */}
+      {selectedProvider && confirmedQueueEntry && (
+        <QueueConfirmationDialog
+            open={queueConfirmationDialogOpen}
+            onOpenChange={setQueueConfirmationDialogOpen}
+            queueEntry={confirmedQueueEntry}
+            service={service} // Pass service, company, provider for robust display
             company={company}
             selectedProvider={selectedProvider}
-            currentQueueCount={queueCount}
-            estimatedQueueStartTime={estimatedQueueStartTime}
-          />
-          <BookServiceDialog
-            open={bookServiceDialogOpen}
-            onOpenChange={setBookServiceDialogOpen}
-            service={service}
-            company={company}
-            selectedProvider={selectedProvider}
-            selectedSlot={selectedSlot}
-          />
-        </>
+        />
       )}
     </div>
-  );  
+  );
 }

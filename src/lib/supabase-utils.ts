@@ -1014,6 +1014,45 @@ export async function getConfirmedBookingsForProvider(
   return data || [];
 }
 
+export async function getBookingDetails(bookingId: string): Promise<Booking | null> {
+    const { data, error } = await supabase
+        .from('bookings')
+        .select(`
+            *,
+            service:services(*),
+            company:companies(*),
+            provider:providers(*)
+        `)
+        .eq('id', bookingId)
+        .single();
+
+    if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found
+        console.error('Error fetching booking details:', error.message);
+        throw new Error('Failed to fetch booking details.');
+    }
+
+    return data;
+}
+export async function getQueueEntryDetails(queueId: string): Promise<QueueItem | null> {
+    const { data, error } = await supabase
+        .from('queue_entries') // Assuming your table name is 'queue_entries'
+        .select(`
+            *,
+            service:services(*),
+            company:companies(*),
+            provider:providers(*)
+        `)
+        .eq('id', queueId)
+        .single();
+
+    if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found
+        console.error('Error fetching queue entry details:', error.message);
+        throw new Error('Failed to fetch queue entry details.');
+    }
+
+    return data;
+}
+
 export async function getActiveQueueEntriesForProvider(serviceId: string, providerId: string): Promise<QueueItem[]> {
   const { data, error } = await supabase
     .from('queue_entries')
