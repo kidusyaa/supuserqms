@@ -28,7 +28,7 @@ export default function Homepage() {
        <DiscountedServices/>
       <FeaturedServices/>
 
-      <RecentJoinSection/>
+      {/* <RecentJoinSection/> */}
       <CompanyTypesPage/>
       <Footer/>
     </div>

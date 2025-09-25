@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Clock, MapPin, Phone, Users } from "lucide-react";
+import { Clock, MapPin, Phone, Users, Tag } from "lucide-react"; // Added Tag icon for discount badge
 import type { Service, Company } from "@/type";
 import { format, isToday } from "date-fns";
 
@@ -14,17 +14,58 @@ interface ServiceDetailsCardProps {
   estimatedQueueStartTime: Date | null;
 }
 
+// --- Helper functions for discount logic (copied from ServiceCard.tsx) ---
+const calculateDiscountedPrice = (service: Service): string | null => {
+  const originalPrice = parseFloat(service.price || '0');
+  if (!service.discount_type || service.discount_value === null || originalPrice === 0) {
+    return service.price; // Return original price if no valid discount type or value
+  }
+  let finalPrice = originalPrice;
+  if (service.discount_type === 'percentage') {
+    finalPrice = originalPrice * (1 - service.discount_value / 100);
+  } else if (service.discount_type === 'fixed') {
+    finalPrice = originalPrice - service.discount_value;
+  }
+  return (finalPrice > 0 ? finalPrice : 0).toFixed(2);
+};
+
+const formatDiscount = (service: Service): string => {
+  if (!service.discount_type || service.discount_value === null) return "";
+  if (service.discount_type === 'percentage') {
+    return `${service.discount_value}% OFF`;
+  }
+  if (service.discount_type === 'fixed') {
+    return `Save $${service.discount_value}`;
+  }
+  return "";
+};
+// --- End of Helper functions ---
+
+
 export default function ServiceDetailsCard({
   service,
   company,
   queueCount,
   estimatedQueueStartTime,
 }: ServiceDetailsCardProps) {
+
+  // --- Discount calculations for the card ---
+  const hasDiscount = service.discount_type && service.discount_value !== null && parseFloat(service.price || '0') > 0;
+  
+  const originalPriceValue = parseFloat(service.price || '0');
+  const formattedOriginalPrice = originalPriceValue > 0 ? `$${originalPriceValue.toFixed(2)}` : null;
+  
+  const discountedPriceValue = hasDiscount ? parseFloat(calculateDiscountedPrice(service) || '0') : originalPriceValue;
+  const formattedDiscountedPrice = discountedPriceValue > 0 ? `$${discountedPriceValue.toFixed(2)}` : null;
+
+  const discountLabel = hasDiscount ? formatDiscount(service) : null;
+  // --- End of Discount calculations ---
+
   return (
     <Card className="mb-8">
       <CardContent className="p-6">
         <div className="flex flex-col md:flex-row gap-6 ">
-          <div className="flex-shrink-0 ">
+          <div className="flex-shrink-0 relative"> {/* Added relative for absolute positioning of badges */}
             <Image
               src={service.photo || "/placeholder-service.png"}
               alt={service.name}
@@ -32,6 +73,12 @@ export default function ServiceDetailsCard({
               height={200}
               className="rounded-lg object-cover aspect-[3/2]"
             />
+             {/* Discount Badge - Top Left */}
+            {hasDiscount && discountLabel && (
+              <Badge className="absolute top-3 left-3 bg-red-600/80 backdrop-blur-sm border border-red-400 text-white text-sm py-1 px-3 flex items-center gap-1 z-10">
+                <Tag className="h-3 w-3" /> {discountLabel}
+              </Badge>
+            )}
           </div>
           <div className="flex-1">
             <div className="flex items-start justify-between mb-4">
@@ -39,9 +86,12 @@ export default function ServiceDetailsCard({
                 <h1 className="text-3xl font-bold text-foreground mb-2">{service.name}</h1>
                 <p className="text-muted-foreground mb-4">{service.description}</p>
               </div>
-              {service.price && (
-                <Badge variant="secondary" className="text-lg px-3 py-1">
-                  {service.price}
+              
+              {/* Updated Price Badge to show discount */}
+              {formattedOriginalPrice && (
+                <Badge variant="secondary" className="text-lg px-3 py-1 flex items-baseline gap-2">
+                  {hasDiscount && <span className="line-through text-base text-gray-400">{formattedOriginalPrice}</span>}
+                  <span className={`${hasDiscount ? 'font-bold' : ''}`}>{formattedDiscountedPrice}</span>
                 </Badge>
               )}
             </div>

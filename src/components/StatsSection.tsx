@@ -76,9 +76,9 @@ const StatsSection = () => {
 
         {/* Bottom Tagline */}
         <div className="mt-10 text-center">
-          <p className="mt-2 text-gray-600 max-w-2xl mx-auto">
+          {/* <p className="mt-2 text-gray-600 max-w-2xl mx-auto">
             Join our network of businesses and users who rely on us for seamless service booking and reliable professionals.
-          </p>
+          </p> */}
         </div>
       </div>
     </div>

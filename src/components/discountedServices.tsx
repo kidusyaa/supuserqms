@@ -4,7 +4,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Star, Clock, MapPin, Tag } from "lucide-react";
+import { ChevronLeft, ChevronRight, Star, Clock, MapPin, Tag, HandCoins } from "lucide-react";
 import { getDiscountedServices } from "@/lib/supabase-utils";
 import type { Service } from "@/type";
 import { Button } from "./ui/button";
@@ -85,13 +85,15 @@ export default function DiscountedServices() {
   }
 
   return (
-    <section className="py-12 px-4 bg-background">
+    <section className="py-12 px-4 bg-gray-50 shadow-xl ">
       <div className="max-w-6xl mx-auto">
-        <div className="text-center mb-8">
-          <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-2">Special Offers & Discounts</h2>
-          <p className="text-muted-foreground">Limited-time deals on top-rated services</p>
-        </div>
-
+        <div className="flex items-center justify-between md:mb-10 mb-4">
+            {/* --- MODIFIED: Added animation classes here --- */}
+            <h2 className="text-2xl font-bold text-tertiary flex items-center gap-2 animate-special-offer">
+              <HandCoins className="w-6 h-6 text-orange-500 animate-icon-pulse" /> {/* Added icon animation */}
+              SPECIAL OFFER
+            </h2>
+          </div> 
         <div className="relative">
           <div className="overflow-hidden rounded-2xl">
             <div
@@ -106,7 +108,7 @@ export default function DiscountedServices() {
               ) : (
                 services.map((service) => (
                   <div key={service.id} className="w-full flex-shrink-0">
-                    <div className="bg-card rounded-2xl shadow-lg overflow-hidden mx-2">
+                    <div className="bg-gray-100 rounded-2xl shadow-lg overflow-hidden mx-2">
                       <div className="md:flex">
                         <div className="md:w-1/2 relative">
                           <img
@@ -163,12 +165,17 @@ export default function DiscountedServices() {
           </div>
 
           {/* Navigation Arrows */}
-          <button onClick={prevSlide} className="absolute left-0 md:left-4 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-background border border-border rounded-full p-2 shadow-lg transition-all duration-200 z-10">
-            <ChevronLeft className="w-5 h-5 text-foreground" />
-          </button>
-          <button onClick={nextSlide} className="absolute right-0 md:right-4 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-background border border-border rounded-full p-2 shadow-lg transition-all duration-200 z-10">
-            <ChevronRight className="w-5 h-5 text-foreground" />
-          </button>
+          {/* Re-added navigation arrows, commented out in your code, but usually useful for carousels */}
+          {/* {services.length > 1 && ( // Only show if there's more than one service
+            <>
+              <button onClick={prevSlide} className="absolute left-0 md:left-4 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-background border border-border rounded-full p-2 shadow-lg transition-all duration-200 z-10">
+                <ChevronLeft className="w-5 h-5 text-foreground" />
+              </button>
+              <button onClick={nextSlide} className="absolute right-0 md:right-4 top-1/2 -translate-y-1/2 bg-background/80 hover:bg-background border border-border rounded-full p-2 shadow-lg transition-all duration-200 z-10">
+                <ChevronRight className="w-5 h-5 text-foreground" />
+              </button>
+            </>
+          )} */}
 
           {/* Dots Indicator */}
           {!isLoading && services.length > 1 && (

@@ -3,6 +3,34 @@
 
 @custom-variant dark (&:is(.dark *));
 
+@keyframes special-offer-glow {
+  0%, 100% {
+ 
+    transform: scale(1); /* No scale on text */
+  }
+  50% {
+   
+    transform: scale(1.05); /* Subtle scale for emphasis */
+  }
+}
+
+@keyframes icon-pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+}
+
+.animate-special-offer {
+  animation: special-offer-glow 2.5s ease-in-out infinite;
+}
+
+.animate-icon-pulse {
+  animation: icon-pulse 2.5s ease-in-out infinite;
+}
+
 :root {
   /* Define your core palette colors using OKLCH */
   --color-dark-base: oklch(26.17% 0.0569 229.56); /* #1B3A47 */

@@ -70,7 +70,7 @@ const FeaturedServices = () => {
   }
 
   return (
-    <div className=" my-10 py-20 bg-tertiary">
+    <div className=" mb-10 py-20 bg-tertiary">
       <DivCenter>
         <div className="container ">
           <div className="flex items-center justify-between md:mb-10 mb-4">
