@@ -23,6 +23,7 @@ import { addMinutes, isAfter, max, min, startOfDay, endOfDay, isBefore, format, 
 export type CategoryWithServices = Category & {
   services: Service[];
 };
+import { parseWorkingHours, getDayRange, generateAvailableSlots } from './booking-utils';
 
 const SERVICE_IMAGES_BUCKET = 'service-images';
 
@@ -965,59 +966,39 @@ export type NewQueueEntryData = Omit<QueueItem, 'id' | 'joined_at' | 'status' | 
 
 // in src/lib/supabase-utils.ts
 
-export const getCompanyWorkingHours = (company: Company, date: Date): { start: Date; end: Date } | null => {
-  console.log("DEBUG: getCompanyWorkingHours called for date:", date);
-  console.log("DEBUG: Company ID:", company.id, "Company Name:", company.name);
-  console.log("DEBUG: Company working_hours raw:", company.working_hours);
+// src/lib/supabase-utils.ts
+// ... (imports)
 
+export function getCompanyWorkingHours(
+  company: Company,
+  date: Date
+): { start: Date; end: Date } | null {
   if (!company.working_hours) {
-    console.log("DEBUG: Reason for null: company.working_hours is null/undefined.");
     return null;
   }
-
-  const dayOfWeek = getDay(date); // This returns a number (0-6)
-  console.log("DEBUG: Day of Week (0=Sun, 6=Sat):", dayOfWeek);
-
-  const workingHoursJson = company.working_hours as any; // Cast to any for dynamic access
   
-  // Convert dayOfWeek to string if your JSONB keys are strings (e.g., "0", "1")
-  const dayKey = String(dayOfWeek); 
-  console.log("DEBUG: Attempting to access working_hours for key:", dayKey);
-  console.log("DEBUG: workingHoursJson[dayKey]:", workingHoursJson[dayKey]);
+  // 1. Use the robust, already-fixed parser from booking-utils.ts
+  const parsedWorkingHours = parseWorkingHours(company.working_hours);
+  const dayOfWeek = getDay(date);
 
+  // 2. Get the array of time ranges for today
+  const dailyHoursRanges = parsedWorkingHours[dayOfWeek];
 
-  if (!workingHoursJson || !workingHoursJson[dayKey]) { // <--- USE dayKey (string) here
-    console.log("DEBUG: Reason for null: workingHoursJson is null/undefined, or specific day key is missing.");
-    return null;
+  // 3. Check if there are any hours defined for today
+  if (!dailyHoursRanges || dailyHoursRanges.length === 0) {
+    return null; // Company is closed on this day
   }
 
-  const dayScheduleArray = workingHoursJson[dayKey]; // This should be an array of shifts
-  if (!Array.isArray(dayScheduleArray) || dayScheduleArray.length === 0) {
-      console.log("DEBUG: Reason for null: dayScheduleArray is not an array or is empty.");
-      return null;
-  }
+  // 4. For our purpose, we'll consider the first operational shift of the day.
+  // The 'start' and 'end' properties here are already Date objects from the parser.
+  const firstRange = dailyHoursRanges[0];
 
-  const daySchedule = dayScheduleArray[0]; // Assuming first shift if multiple
-  if (!daySchedule || !daySchedule.is_open || !daySchedule.open_time || !daySchedule.close_time) {
-    console.log("DEBUG: Reason for null: daySchedule is undefined/null, or missing is_open/open_time/close_time.");
-    return null;
-  }
-
-  console.log("DEBUG: Shift details - is_open:", daySchedule.is_open, "open_time:", daySchedule.open_time, "close_time:", daySchedule.close_time);
-
-  // ... (rest of the function remains the same for parsing hours and minutes)
-  const dayStart = startOfDay(date);
-  const openTimeParts = daySchedule.open_time.split(':').map(Number);
-  const closeTimeParts = daySchedule.close_time.split(':').map(Number);
-
-  const startTime = setMilliseconds(setSeconds(setMinutes(setHours(dayStart, openTimeParts[0]), openTimeParts[1]), 0), 0);
-  const endTime = setMilliseconds(setSeconds(setMinutes(setHours(dayStart, closeTimeParts[0]), closeTimeParts[1]), 0), 0);
+  // 5. Set the correct date component onto the parsed time components.
+  const start = setMilliseconds(setSeconds(setMinutes(setHours(date, firstRange.start.getHours()), firstRange.start.getMinutes()), 0), 0);
+  const end = setMilliseconds(setSeconds(setMinutes(setHours(date, firstRange.end.getHours()), firstRange.end.getMinutes()), 0), 0);
   
-  console.log("DEBUG: Calculated working hours start:", format(startTime, 'PPP HH:mm:ss'));
-  console.log("DEBUG: Calculated working hours end:", format(endTime, 'PPP HH:mm:ss'));
-
-  return { start: startTime, end: endTime };
-};
+  return { start, end };
+}
 
 /**
  * Fetches all occupied slots for a given provider within a date range,
@@ -1047,60 +1028,38 @@ export async function getProviderOccupiedSlots(
  * Accounts for current time and company working hours.
  */
 export async function getLatestAvailableTimeForProvider(
-    company: Company,
-    providerId: string,
-    serviceId: string // Needed to get estimated_wait_time_mins if no slots exist
+  company: Company,
+  providerId: string,
+  serviceId: string
 ): Promise<Date | null> {
     const now = new Date();
-    const todayStart = startOfDay(now);
-    const todayEnd = endOfDay(now);
+    const { start: dayStart, end: dayEnd } = getDayRange(now);
 
+    const occupiedSlots = await getProviderOccupiedSlots(providerId, dayStart, dayEnd);
+    
+    // Find the latest end time among all reservations today
+    const latestReservationEnd = occupiedSlots.reduce((latest, slot) => {
+        const slotEnd = new Date(slot.end_time);
+        return isAfter(slotEnd, latest) ? slotEnd : latest;
+    }, new Date(0)); // Start with a very early date
+
+    // Determine the company's opening time for today
     const workingHours = getCompanyWorkingHours(company, now);
-    if (!workingHours) return null; // Company is closed today
-
-    let earliestAvailable = max([workingHours.start, now]); // Start with the later of opening time or now
-
-    const reservations = await getProviderOccupiedSlots(providerId, todayStart, todayEnd);
-
-    if (reservations && reservations.length > 0) {
-        const latestReservationEnd = reservations.reduce((latest, current) => {
-            const currentEnd = new Date(current.end_time);
-            return isAfter(currentEnd, latest) ? currentEnd : latest;
-        }, earliestAvailable); 
-        earliestAvailable = latestReservationEnd;
+    if (!workingHours) {
+        return null; // Company is closed
     }
 
-    // Ensure the earliest available time is within working hours
-    // And if it's currently past closing, then no slots today.
-    if (isBefore(earliestAvailable, workingHours.start)) {
-        earliestAvailable = workingHours.start;
-    }
-    if (isAfter(earliestAvailable, workingHours.end)) { // If current available time is already past closing
-        return null;
-    }
-
-    // Round earliestAvailable up to the nearest service interval for better slot alignment
-    const service = await getServiceDetails(serviceId);
-    const serviceDuration = service?.estimated_wait_time_mins || 30; // Fallback duration
-
-    let alignedEarliestAvailable = new Date(earliestAvailable);
-    const minutesIntoInterval = alignedEarliestAvailable.getMinutes() % serviceDuration;
-    if (minutesIntoInterval !== 0) {
-        alignedEarliestAvailable = addMinutes(alignedEarliestAvailable, serviceDuration - minutesIntoInterval);
-    }
-    alignedEarliestAvailable = setMilliseconds(setSeconds(alignedEarliestAvailable, 0), 0); // Clean seconds/milliseconds
-
-    // Make sure the aligned time is not past working hours
-    if (isAfter(alignedEarliestAvailable, workingHours.end)) {
-        return null;
-    }
-
-
-    return alignedEarliestAvailable;
+    // The provider is available at the latest of:
+    // 1. The current time ('now')
+    // 2. The company's opening time today
+    // 3. The end time of their last reservation
+    const availableFrom = max([now, workingHours.start, latestReservationEnd]);
+    
+    return availableFrom;
 }
 
-  export async function joinQueue(payload: CreateQueuePayload): Promise<AugmentedQueueItem> {
-    const { service_id, provider_id, user_name, phone_number, notes, queue_type } = payload; // Added user_id to destructure
+export async function joinQueue(payload: CreateQueuePayload): Promise<AugmentedQueueItem> {
+    const { service_id, provider_id, user_name, phone_number, notes, queue_type } = payload;
 
     if (!service_id || !provider_id || !user_name) {
       throw new Error("Missing required data to join queue (service, provider, or name).");
@@ -1120,19 +1079,33 @@ export async function getLatestAvailableTimeForProvider(
       const latestAvailable = await getLatestAvailableTimeForProvider(company, provider_id, service_id);
       const companyWorkingHours = getCompanyWorkingHours(company, latestAvailable || new Date());
 
-      if (!companyWorkingHours) {
+      if (!companyWorkingHours || !latestAvailable) {
           throw new Error("Company is closed today or working hours are not defined.");
       }
 
-      let currentPossibleStart = latestAvailable || max([companyWorkingHours.start, new Date()]);
+      // --- START OF THE ROBUST FIX ---
       
-      // Ensure the currentPossibleStart is aligned to service duration intervals
-      let alignedPossibleStart = new Date(currentPossibleStart);
+      // 1. Start with the latest available time from the last reservation.
+      let alignedPossibleStart = new Date(latestAvailable);
+      
+      // 2. Align this time to the next service interval boundary.
+      //    For example, if duration is 30 mins and time is 16:01, it becomes 16:30.
       const minutesIntoInterval = alignedPossibleStart.getMinutes() % estimatedServiceDuration;
       if (minutesIntoInterval !== 0) {
           alignedPossibleStart = addMinutes(alignedPossibleStart, estimatedServiceDuration - minutesIntoInterval);
       }
-      alignedPossibleStart = setMilliseconds(setSeconds(alignedPossibleStart, 0), 0); // Clean seconds/milliseconds
+
+      // 3. Clean the time by removing seconds and milliseconds.
+      alignedPossibleStart = setMilliseconds(setSeconds(alignedPossibleStart, 0), 0);
+
+      // 4. CRITICAL CHECK: If our aligned time is still at or before the last slot's end time,
+      //    it means we have a "touching" conflict (e.g., last slot ended at 16:00, new one starts at 16:00).
+      //    We must push it forward by one full service duration to prevent the overlap.
+      if (alignedPossibleStart.getTime() <= latestAvailable.getTime()) {
+          alignedPossibleStart = addMinutes(alignedPossibleStart, estimatedServiceDuration);
+      }
+
+      // --- END OF THE ROBUST FIX ---
 
       projectedStartTime = alignedPossibleStart;
       projectedEndTime = addMinutes(projectedStartTime, estimatedServiceDuration);
@@ -1142,78 +1115,49 @@ export async function getLatestAvailableTimeForProvider(
       }
 
     } catch (calcError: any) {
-        console.error("Failed to calculate precise queue slot:", calcError.message); // Changed warn to error
-        throw new Error(`Failed to determine an available queue slot: ${calcError.message}`); // Re-throw with a specific message
+        console.error("Failed to calculate precise queue slot:", calcError.message);
+        throw new Error(`Failed to determine an available queue slot: ${calcError.message}`);
     }
 
     const currentQueueCount = await getCurrentQueueCount(service_id);
     const estimatedPosition = currentQueueCount + 1;
-
-
-    let createdQueueEntryResult: QueueItem | null = null; // Changed name to avoid conflict with `createdQueueEntry` in return type
+    let createdQueueEntryResult: QueueItem | null = null;
 
     try {
-        // STEP 4: Insert into queue_entries table
-        const { data: queueResult, error: queueError } = await supabase
-          .from('queue_entries')
-          .insert({
-              service_id: service_id,
-              provider_id: provider_id,
-              user_name: user_name,
-              phone_number: phone_number,
-              queue_type: queue_type,
-              status: 'waiting',
-              notes: notes, // <-- ADD THIS BACK
-              projected_start_time: projectedStartTime!.toISOString(),
-              projected_end_time: projectedEndTime!.toISOString(),
-              position: estimatedPosition,
-          })
-          .select()
-          .single();
-
-        if (queueError || !queueResult) {
-            console.error('Supabase queue insert error:', queueError);
-            throw new Error(`Failed to join queue: ${queueError?.message || 'Unknown error'}`);
-        }
-        
-        createdQueueEntryResult = queueResult as QueueItem;// Assign to the new variable
-
-        // STEP 5: Insert into provider_reservations table
-          const { data: reservationResult, error: reservationError } = await supabase
-          .from('provider_reservations')
-          .insert({
-              provider_id: provider_id,
-              service_id: service_id,
-              start_time: projectedStartTime!.toISOString(),
-              end_time: projectedEndTime!.toISOString(),
-              source_type: 'queue',
-              source_row_id: createdQueueEntryResult?.id, // Use id from the successfully created queue entry
-          })
-          .select()
-          .single();
-
-        if (reservationError || !reservationResult) {
-            console.error('Supabase reservation insert error:', reservationError);
-            throw new Error(`Failed to create provider reservation for queue: ${reservationError?.message || 'Unknown error'}`);
-        }
-
-        // Return the created queue entry along with its projected times
-        return {
-            ...createdQueueEntryResult,
+        // Insert into queue_entries
+        const { data: queueResult, error: queueError } = await supabase.from('queue_entries').insert({
+            service_id, provider_id, user_name, phone_number, queue_type, status: 'waiting', notes,
+            projected_start_time: projectedStartTime!.toISOString(),
+            projected_end_time: projectedEndTime!.toISOString(),
             position: estimatedPosition,
-            estimatedServiceStartTime: projectedStartTime,
-            estimatedServiceEndTime: projectedEndTime,
-        };
+        }).select().single();
+
+        if (queueError || !queueResult) throw new Error(`Failed to join queue: ${queueError?.message || 'Unknown DB error'}`);
+        createdQueueEntryResult = queueResult as QueueItem;
+        
+        // Insert into provider_reservations
+        const { error: reservationError } = await supabase.from('provider_reservations').insert({
+            provider_id, service_id,
+            start_time: projectedStartTime!.toISOString(),
+            end_time: projectedEndTime!.toISOString(),
+            source_type: 'queue',
+            source_row_id: createdQueueEntryResult.id,
+        });
+
+        if (reservationError) throw new Error(`Failed to create provider reservation for queue: ${reservationError.message}`);
+        
+        return { ...createdQueueEntryResult, position: estimatedPosition, estimatedServiceStartTime: projectedStartTime, estimatedServiceEndTime: projectedEndTime };
 
     } catch (error: any) {
-        if (createdQueueEntryResult?.id) { // Use the new variable for rollback
-            console.warn(`Attempting to delete partially created queue entry ${createdQueueEntryResult.id} due to reservation failure.`);
+        if (createdQueueEntryResult?.id) {
+            console.warn(`Attempting to delete partially created queue entry ${createdQueueEntryResult.id} due to a subsequent error.`);
             await supabase.from('queue_entries').delete().eq('id', createdQueueEntryResult.id);
         }
         console.error('Transaction failed for queue entry:', error);
         throw error;
     }
-  }
+}
+
 
 export async function createBooking(
   bookingData: Omit<Booking, 'id' | 'created_at' | 'status'> & { status?: BookingStatus }
