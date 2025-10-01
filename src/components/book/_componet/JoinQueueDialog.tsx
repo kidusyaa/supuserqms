@@ -1,8 +1,8 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation" // Keep router for potential redirects, though not used in new flow
-import { format, isToday, addMinutes } from "date-fns"
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { format, isToday } from "date-fns"; // Make sure 'isToday' is imported
 
 import {
   Dialog,
@@ -11,16 +11,18 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Button } from "@/components/ui/button"
-import Image from "next/image"
-import { toast } from "sonner"
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import Image from "next/image";
+import { toast } from "sonner";
 
-import { joinQueue } from "@/lib/supabase-utils"
-import type { Company, Service, Provider, QueueItem, QueueTypeStatus, QueueEntryStatus } from "@/type"
+import { joinQueue, CreateQueuePayload } from "@/lib/supabase-utils"; // Make sure this is the *updated* joinQueue
+import type { Company, Service, Provider, QueueItem, QueueTypeStatus, AugmentedQueueItem } from "@/type"; // Ensure QueueItem has projected_start/end_time
 
+// --- UPDATED INTERFACE ---
+// The callback now expects the backend-calculated estimated start AND end times.
 interface JoinQueueDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -28,9 +30,9 @@ interface JoinQueueDialogProps {
   company: Company;
   selectedProvider: Provider;
   currentQueueCount: number;
-  estimatedQueueStartTime: Date | null;
-  // NEW: Callback for successful queue join
-  onQueueJoined: (queueEntry: QueueItem, estimatedStartTime: Date | null) => void;
+  estimatedQueueStartTime: Date | null; // This is the PRE-JOIN client-side estimate
+  // Callback now includes estimatedEndTime from the backend
+  onQueueJoined: (queueEntry: QueueItem, estimatedStartTime: Date | null, estimatedEndTime: Date | null) => void;
 }
 
 export function JoinQueueDialog({
@@ -41,15 +43,14 @@ export function JoinQueueDialog({
   selectedProvider,
   currentQueueCount,
   estimatedQueueStartTime,
-  onQueueJoined, // NEW
+  onQueueJoined,
 }: JoinQueueDialogProps) {
-  const router = useRouter(); // router still useful if you want to allow a "Go to queue status page"
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [userName, setUserName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [notes, setNotes] = useState("");
 
-  // Reset form when dialog opens
   useEffect(() => {
     if (open) {
       setUserName('');
@@ -66,32 +67,35 @@ export function JoinQueueDialog({
         setIsLoading(false);
         return;
       }
-      const queueEntryData: Omit<QueueItem, "id" | "joined_at" | "status" | "position"> & { status?: QueueEntryStatus; position?: number | null; user_id: string | null; } = {
-            user_id: null,
-            service_id: service.id,
-            provider_id: selectedProvider.id,
-            user_name: userName.trim(),
-            phone_number: phoneNumber.trim() || null,
-            notes: notes.trim() || null,
-            position: currentQueueCount + 1, // This is an estimate, backend will assign actual position
-            queue_type: 'walk-in' as QueueTypeStatus,
-        };
 
-      const createdQueueEntry = await joinQueue(queueEntryData);
+      // --- Use the new CreateQueuePayload type ---
+      const queueEntryPayload: CreateQueuePayload = { // <--- Explicitly type with CreateQueuePayload
+          service_id: service.id,
+          provider_id: selectedProvider.id,
+          user_name: userName.trim(),
+          phone_number: phoneNumber.trim() ,
+          notes: notes.trim() || null,
+          queue_type: 'walk-in',
+      };
+
+      const createdQueueEntry: AugmentedQueueItem = await joinQueue(queueEntryPayload);
 
       if (!createdQueueEntry || !createdQueueEntry.id) {
-        throw new Error("Queue entry created but no ID returned.");
+        throw new Error("Queue entry created but no ID returned from the server.");
       }
 
       toast.success("You have successfully joined the queue!");
-      onOpenChange(false); // Close this dialog
+      onOpenChange(false);
 
-      // Call the callback to open the new confirmation dialog
-      onQueueJoined(createdQueueEntry, estimatedQueueStartTime); // Pass the current estimate
+      onQueueJoined(
+          createdQueueEntry,
+          createdQueueEntry.estimatedServiceStartTime || null,
+          createdQueueEntry.estimatedServiceEndTime || null
+      );
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to join queue:", error);
-      toast.error("Failed to join queue. Please try again.");
+      toast.error(error.message || "Failed to join queue. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -120,7 +124,7 @@ export function JoinQueueDialog({
               <p className="text-sm text-muted-foreground">{company.name}</p>
             </div>
           </div>
-          
+
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="userName" className="text-right">Name</Label>
             <Input
@@ -156,6 +160,7 @@ export function JoinQueueDialog({
           <div className="space-y-2 text-sm mt-4">
             <p><strong>Provider:</strong> {selectedProvider.name}</p>
             <p><strong>Your estimated position:</strong> {currentQueueCount + 1} (Final position confirmed after joining)</p>
+
             {estimatedQueueStartTime ? (
               <p className="text-orange-600">
                 <strong>Est. Start Time:</strong> {format(estimatedQueueStartTime, 'h:mm a')} {isToday(estimatedQueueStartTime) ? 'Today' : format(estimatedQueueStartTime, 'MMM do')}

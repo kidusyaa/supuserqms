@@ -59,6 +59,7 @@ export default function BookingConfirmationPage() {
         <div>
           <h1 className="text-2xl font-bold text-red-600 mb-2">Error</h1>
           <p className="text-muted-foreground mb-4">{error || "Could not find your booking."}</p>
+          {/* If there's an error and we can't get companyId, defaulting to home is acceptable */}
           <Button onClick={() => router.push('/')}>Go to Home</Button>
         </div>
       </div>
@@ -67,6 +68,9 @@ export default function BookingConfirmationPage() {
 
   const startDate = parseISO(booking.start_time);
   const endDate = parseISO(booking.end_time);
+
+  // Extract companyId from the booking object for navigation
+  const companyId = booking.company_id;
 
   return (
     <div className="min-h-screen bg-background py-12">
@@ -149,9 +153,16 @@ export default function BookingConfirmationPage() {
             )}
 
             <div className="text-center mt-8 space-x-4">
-              <Button onClick={() => router.push('/')}>
-                Back to Home
-              </Button>
+              {/* Conditional rendering for the "Back to Company" button */}
+              {companyId ? (
+                <Button onClick={() => router.push(`/company/${companyId}`)}>
+                  Back to {booking.company?.name || 'Company'} Page
+                </Button>
+              ) : (
+                <Button onClick={() => router.push('/')}>
+                  Back to Home
+                </Button>
+              )}
               {/* You might add a button here to view all bookings for a user if authenticated */}
               {/* <Button variant="outline" onClick={() => router.push('/my-bookings')}>
                 View My Bookings

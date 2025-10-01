@@ -52,25 +52,30 @@ export type Service = {
   
 };
 
+// In your type.ts file:
 export type QueueItem = {
-  id: string;
-  user_id: string | null; // As per your DB schema
-  user_name: string;
-  phone_number: string | null;
+  id: number; // bigint from DB
   service_id: string;
   provider_id: string | null;
-  joined_at: string; // ISO string
-  status: QueueEntryStatus; // Use the defined union type
-  position: number | null; // Use position as per DB, and allow null as it might be set by trigger
-  queue_type: QueueTypeStatus; // <-- Use the defined union type here
+  user_name: string;
+  phone_number: string | null;
+  status: 'waiting' | 'serving' | 'served' | 'cancelled'; // or your USER-DEFINED enum
+  position: number | null;
+  queue_type: 'walk-in' | 'booking' | null; // or your USER-DEFINED enum
   notes: string | null;
-  service?: Service;
-  company?: Company;
-  provider?: Provider;
-  estimated_start_time?: string | null;
-  // company_id: string; // Removed this earlier, ensure it's not here
+  joined_at: string; // ISO string from DB
+  served_at: string | null;
+  user_id: string | null; // uuid from DB, can be null
+  projected_start_time?: string | null; // NEW: ISO string
+  projected_end_time?: string | null;   // NEW: ISO string
 };
 
+export interface AugmentedQueueItem extends QueueItem {
+    // These are the calculated Date objects returned by the `joinQueue` function,
+    // which are not directly persisted in the `queue_entries` table.
+    estimatedServiceStartTime?: Date | null;
+    estimatedServiceEndTime?: Date | null;
+}
 export interface Booking {
   id: string;
   user_id: string | null;
@@ -107,7 +112,9 @@ export interface WorkingHoursJsonb {
 export interface AvailableSlot {
   start: Date; // Full date-time for the slot
   end: Date;   // Full date-time for the slot
-  formattedTime: string; // e.g., "9:00 AM"
+  formattedTime: string;
+  isBooked: boolean; 
+  // e.g., "9:00 AM"
 }
 export type ServiceWithDetails = Service & {
   company?: Company; 

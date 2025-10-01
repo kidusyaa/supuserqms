@@ -16,10 +16,10 @@ import type {
   LocationOption,
   GlobalStatsData,
   FilterState, 
-  CompanyTypeWithCount
+  CompanyTypeWithCount,
+  AugmentedQueueItem
 } from '../type';
-
-
+import { addMinutes, isAfter, max, min, startOfDay, endOfDay, isBefore, format, getDay, setHours, setMinutes, setSeconds, setMilliseconds } from 'date-fns';
 export type CategoryWithServices = Category & {
   services: Service[];
 };
@@ -755,6 +755,7 @@ export const createQueueEntry = async (payload: CreateQueuePayload): Promise<Que
         queue_type: data.queue_type,
         notes: data.notes || null,
         joined_at: data.created_at,
+        served_at:data.served_at,
         position:data.position, // Use created_at from Supabase for joined_at
     };
 
@@ -962,49 +963,337 @@ export type NewQueueEntryData = Omit<QueueItem, 'id' | 'joined_at' | 'status' | 
                              // The DB often handles position with a default or trigger.
 }
 
-export async function joinQueue(
-  queueEntryData: NewQueueEntryData // Use the new, explicit type here
-): Promise<QueueItem> {
+// in src/lib/supabase-utils.ts
+
+export const getCompanyWorkingHours = (company: Company, date: Date): { start: Date; end: Date } | null => {
+  console.log("DEBUG: getCompanyWorkingHours called for date:", date);
+  console.log("DEBUG: Company ID:", company.id, "Company Name:", company.name);
+  console.log("DEBUG: Company working_hours raw:", company.working_hours);
+
+  if (!company.working_hours) {
+    console.log("DEBUG: Reason for null: company.working_hours is null/undefined.");
+    return null;
+  }
+
+  const dayOfWeek = getDay(date); // This returns a number (0-6)
+  console.log("DEBUG: Day of Week (0=Sun, 6=Sat):", dayOfWeek);
+
+  const workingHoursJson = company.working_hours as any; // Cast to any for dynamic access
+  
+  // Convert dayOfWeek to string if your JSONB keys are strings (e.g., "0", "1")
+  const dayKey = String(dayOfWeek); 
+  console.log("DEBUG: Attempting to access working_hours for key:", dayKey);
+  console.log("DEBUG: workingHoursJson[dayKey]:", workingHoursJson[dayKey]);
+
+
+  if (!workingHoursJson || !workingHoursJson[dayKey]) { // <--- USE dayKey (string) here
+    console.log("DEBUG: Reason for null: workingHoursJson is null/undefined, or specific day key is missing.");
+    return null;
+  }
+
+  const dayScheduleArray = workingHoursJson[dayKey]; // This should be an array of shifts
+  if (!Array.isArray(dayScheduleArray) || dayScheduleArray.length === 0) {
+      console.log("DEBUG: Reason for null: dayScheduleArray is not an array or is empty.");
+      return null;
+  }
+
+  const daySchedule = dayScheduleArray[0]; // Assuming first shift if multiple
+  if (!daySchedule || !daySchedule.is_open || !daySchedule.open_time || !daySchedule.close_time) {
+    console.log("DEBUG: Reason for null: daySchedule is undefined/null, or missing is_open/open_time/close_time.");
+    return null;
+  }
+
+  console.log("DEBUG: Shift details - is_open:", daySchedule.is_open, "open_time:", daySchedule.open_time, "close_time:", daySchedule.close_time);
+
+  // ... (rest of the function remains the same for parsing hours and minutes)
+  const dayStart = startOfDay(date);
+  const openTimeParts = daySchedule.open_time.split(':').map(Number);
+  const closeTimeParts = daySchedule.close_time.split(':').map(Number);
+
+  const startTime = setMilliseconds(setSeconds(setMinutes(setHours(dayStart, openTimeParts[0]), openTimeParts[1]), 0), 0);
+  const endTime = setMilliseconds(setSeconds(setMinutes(setHours(dayStart, closeTimeParts[0]), closeTimeParts[1]), 0), 0);
+  
+  console.log("DEBUG: Calculated working hours start:", format(startTime, 'PPP HH:mm:ss'));
+  console.log("DEBUG: Calculated working hours end:", format(endTime, 'PPP HH:mm:ss'));
+
+  return { start: startTime, end: endTime };
+};
+
+/**
+ * Fetches all occupied slots for a given provider within a date range,
+ * including both 'booking' and 'queue' reservations.
+ */
+export async function getProviderOccupiedSlots(
+  providerId: string,
+  startDate: Date,
+  endDate: Date
+): Promise<{ start_time: string; end_time: string }[]> {
   const { data, error } = await supabase
-    .from('queue_entries')
-    .insert({
-      ...queueEntryData,
-      status: queueEntryData.status || 'waiting', // Default status if not provided
-      // No need to explicitly set position here if DB handles it,
-      // or set to null if DB expects it and allows null.
-      // If position is NOT set by DB, you might calculate it here:
-      // position: queueEntryData.position ?? null, // Default to null if undefined
-    })
-    .select()
-    .single();
+    .from('provider_reservations')
+    .select('start_time, end_time')
+    .eq('provider_id', providerId)
+    .gte('start_time', startDate.toISOString())
+    .lt('end_time', endDate.toISOString())
+    .order('start_time', { ascending: true });
 
   if (error) {
-    console.error('Error joining queue:', error);
+    console.error('Error fetching provider occupied slots:', error);
     throw error;
   }
-  return data;
+  return data || [];
+}
+/**
+ * Finds the latest end time for a provider's reservations today.
+ * Accounts for current time and company working hours.
+ */
+export async function getLatestAvailableTimeForProvider(
+    company: Company,
+    providerId: string,
+    serviceId: string // Needed to get estimated_wait_time_mins if no slots exist
+): Promise<Date | null> {
+    const now = new Date();
+    const todayStart = startOfDay(now);
+    const todayEnd = endOfDay(now);
+
+    const workingHours = getCompanyWorkingHours(company, now);
+    if (!workingHours) return null; // Company is closed today
+
+    let earliestAvailable = max([workingHours.start, now]); // Start with the later of opening time or now
+
+    const reservations = await getProviderOccupiedSlots(providerId, todayStart, todayEnd);
+
+    if (reservations && reservations.length > 0) {
+        const latestReservationEnd = reservations.reduce((latest, current) => {
+            const currentEnd = new Date(current.end_time);
+            return isAfter(currentEnd, latest) ? currentEnd : latest;
+        }, earliestAvailable); 
+        earliestAvailable = latestReservationEnd;
+    }
+
+    // Ensure the earliest available time is within working hours
+    // And if it's currently past closing, then no slots today.
+    if (isBefore(earliestAvailable, workingHours.start)) {
+        earliestAvailable = workingHours.start;
+    }
+    if (isAfter(earliestAvailable, workingHours.end)) { // If current available time is already past closing
+        return null;
+    }
+
+    // Round earliestAvailable up to the nearest service interval for better slot alignment
+    const service = await getServiceDetails(serviceId);
+    const serviceDuration = service?.estimated_wait_time_mins || 30; // Fallback duration
+
+    let alignedEarliestAvailable = new Date(earliestAvailable);
+    const minutesIntoInterval = alignedEarliestAvailable.getMinutes() % serviceDuration;
+    if (minutesIntoInterval !== 0) {
+        alignedEarliestAvailable = addMinutes(alignedEarliestAvailable, serviceDuration - minutesIntoInterval);
+    }
+    alignedEarliestAvailable = setMilliseconds(setSeconds(alignedEarliestAvailable, 0), 0); // Clean seconds/milliseconds
+
+    // Make sure the aligned time is not past working hours
+    if (isAfter(alignedEarliestAvailable, workingHours.end)) {
+        return null;
+    }
+
+
+    return alignedEarliestAvailable;
 }
 
+  export async function joinQueue(payload: CreateQueuePayload): Promise<AugmentedQueueItem> {
+    const { service_id, provider_id, user_name, phone_number, notes, queue_type } = payload; // Added user_id to destructure
+
+    if (!service_id || !provider_id || !user_name) {
+      throw new Error("Missing required data to join queue (service, provider, or name).");
+    }
+
+    const service = await getServiceDetails(service_id);
+    if (!service || !service.company || !service.estimated_wait_time_mins) {
+      throw new Error("Service details, company, or estimated wait time not found.");
+    }
+    const company = service.company;
+    const estimatedServiceDuration = service.estimated_wait_time_mins;
+
+    let projectedStartTime: Date | null = null;
+    let projectedEndTime: Date | null = null;
+
+    try {
+      const latestAvailable = await getLatestAvailableTimeForProvider(company, provider_id, service_id);
+      const companyWorkingHours = getCompanyWorkingHours(company, latestAvailable || new Date());
+
+      if (!companyWorkingHours) {
+          throw new Error("Company is closed today or working hours are not defined.");
+      }
+
+      let currentPossibleStart = latestAvailable || max([companyWorkingHours.start, new Date()]);
+      
+      // Ensure the currentPossibleStart is aligned to service duration intervals
+      let alignedPossibleStart = new Date(currentPossibleStart);
+      const minutesIntoInterval = alignedPossibleStart.getMinutes() % estimatedServiceDuration;
+      if (minutesIntoInterval !== 0) {
+          alignedPossibleStart = addMinutes(alignedPossibleStart, estimatedServiceDuration - minutesIntoInterval);
+      }
+      alignedPossibleStart = setMilliseconds(setSeconds(alignedPossibleStart, 0), 0); // Clean seconds/milliseconds
+
+      projectedStartTime = alignedPossibleStart;
+      projectedEndTime = addMinutes(projectedStartTime, estimatedServiceDuration);
+
+      if (isAfter(projectedEndTime, companyWorkingHours.end)) {
+          throw new Error("Joining the queue now would mean service extends past closing hours. Please try again tomorrow or book an appointment.");
+      }
+
+    } catch (calcError: any) {
+        console.error("Failed to calculate precise queue slot:", calcError.message); // Changed warn to error
+        throw new Error(`Failed to determine an available queue slot: ${calcError.message}`); // Re-throw with a specific message
+    }
+
+    const currentQueueCount = await getCurrentQueueCount(service_id);
+    const estimatedPosition = currentQueueCount + 1;
+
+
+    let createdQueueEntryResult: QueueItem | null = null; // Changed name to avoid conflict with `createdQueueEntry` in return type
+
+    try {
+        // STEP 4: Insert into queue_entries table
+        const { data: queueResult, error: queueError } = await supabase
+          .from('queue_entries')
+          .insert({
+              service_id: service_id,
+              provider_id: provider_id,
+              user_name: user_name,
+              phone_number: phone_number,
+              queue_type: queue_type,
+              status: 'waiting',
+              notes: notes, // <-- ADD THIS BACK
+              projected_start_time: projectedStartTime!.toISOString(),
+              projected_end_time: projectedEndTime!.toISOString(),
+              position: estimatedPosition,
+          })
+          .select()
+          .single();
+
+        if (queueError || !queueResult) {
+            console.error('Supabase queue insert error:', queueError);
+            throw new Error(`Failed to join queue: ${queueError?.message || 'Unknown error'}`);
+        }
+        
+        createdQueueEntryResult = queueResult as QueueItem;// Assign to the new variable
+
+        // STEP 5: Insert into provider_reservations table
+          const { data: reservationResult, error: reservationError } = await supabase
+          .from('provider_reservations')
+          .insert({
+              provider_id: provider_id,
+              service_id: service_id,
+              start_time: projectedStartTime!.toISOString(),
+              end_time: projectedEndTime!.toISOString(),
+              source_type: 'queue',
+              source_row_id: createdQueueEntryResult?.id, // Use id from the successfully created queue entry
+          })
+          .select()
+          .single();
+
+        if (reservationError || !reservationResult) {
+            console.error('Supabase reservation insert error:', reservationError);
+            throw new Error(`Failed to create provider reservation for queue: ${reservationError?.message || 'Unknown error'}`);
+        }
+
+        // Return the created queue entry along with its projected times
+        return {
+            ...createdQueueEntryResult,
+            position: estimatedPosition,
+            estimatedServiceStartTime: projectedStartTime,
+            estimatedServiceEndTime: projectedEndTime,
+        };
+
+    } catch (error: any) {
+        if (createdQueueEntryResult?.id) { // Use the new variable for rollback
+            console.warn(`Attempting to delete partially created queue entry ${createdQueueEntryResult.id} due to reservation failure.`);
+            await supabase.from('queue_entries').delete().eq('id', createdQueueEntryResult.id);
+        }
+        console.error('Transaction failed for queue entry:', error);
+        throw error;
+    }
+  }
+
 export async function createBooking(
-  // Update Omit to reflect the new field names in Booking.
-  // We're omitting 'id', 'created_at', and 'status' (as status can be overridden).
-  // The rest of the properties in Booking are expected directly.
   bookingData: Omit<Booking, 'id' | 'created_at' | 'status'> & { status?: BookingStatus }
 ): Promise<Booking> {
-  const { data, error } = await supabase
-    .from('bookings')
-    .insert({
-      ...bookingData,
-      status: bookingData.status || 'pending',
-    })
-    .select()
-    .single();
+  const { provider_id, service_id, start_time, end_time, user_id } = bookingData;
 
-  if (error) {
-    console.error('Error creating booking:', error);
-    throw error;
+  if (!provider_id || !service_id || !start_time || !end_time) {
+      throw new Error("Missing required booking data for reservation.");
   }
-  return data;
+
+  const bookingStartTime = new Date(start_time);
+  const bookingEndTime = new Date(end_time);
+
+  // Check for overlaps using provider_reservations (our single source of truth)
+  const existingReservations = await getProviderOccupiedSlots(
+      provider_id,
+      startOfDay(bookingStartTime),
+      endOfDay(bookingEndTime)
+  );
+
+  const newBookingRange = { start: bookingStartTime, end: bookingEndTime };
+
+  const hasOverlap = existingReservations.some(reservation => {
+      const existingStart = new Date(reservation.start_time);
+      const existingEnd = new Date(reservation.end_time);
+      return (newBookingRange.start < existingEnd) && (newBookingRange.end > existingStart);
+  });
+
+  if (hasOverlap) {
+      throw new Error("The selected time slot is no longer available. Please choose another time.");
+  }
+
+  let createdBooking: Booking | null = null;
+  try {
+      const { data: bookingResult, error: bookingError } = await supabase
+          .from('bookings')
+          .insert({
+              ...bookingData,
+              status: bookingData.status || 'pending',
+          })
+          .select()
+          .single();
+
+      if (bookingError || !bookingResult) {
+          console.error('Supabase booking insert error:', bookingError);
+          throw new Error(`Failed to create booking: ${bookingError?.message || 'Unknown error'}`);
+      }
+      createdBooking = bookingResult;
+
+      const { data: reservationResult, error: reservationError } = await supabase
+          .from('provider_reservations')
+          .insert({
+              provider_id: provider_id,
+             // Ensure user_id can be null
+              service_id: service_id,
+              start_time: start_time,
+              end_time: end_time,
+              source_type: 'booking',
+              source_row_id: createdBooking?.id,
+          })
+          .select()
+          .single();
+
+      if (reservationError || !reservationResult) {
+          console.error('Supabase reservation insert error:', reservationError);
+          throw new Error(`Failed to create provider reservation: ${reservationError?.message || 'Unknown error'}`);
+      }
+      if (!createdBooking) {
+        throw new Error('Booking creation failed: result is null.');
+      }
+      return createdBooking;
+
+  } catch (error: any) {
+      if (createdBooking?.id) {
+          console.warn(`Attempting to delete partially created booking ${createdBooking.id} due to reservation failure.`);
+          await supabase.from('bookings').delete().eq('id', createdBooking.id);
+      }
+      console.error('Transaction failed for booking:', error);
+      throw error;
+  }
 }
 
 export async function getConfirmedBookingsForProvider(
@@ -1290,3 +1579,6 @@ export async function getCompanyTypesWithCounts(): Promise<CompanyTypeWithCount[
   // The 'data' will be an array of objects matching our CompanyTypeWithCount type
   return data || [];
 }
+
+
+//fix the issue overla the join queue and other
