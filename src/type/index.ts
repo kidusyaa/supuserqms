@@ -1,4 +1,3 @@
-
 export type UserRole = "company" | "user";
 export type BookingStatus = "pending" | "confirmed" | "completed" | "cancelled";
 
@@ -9,6 +8,7 @@ export type QueueEntryStatus = 'waiting' | 'serving' | 'completed' | 'cancelled'
 export type Company = {
   id: string;
   name: string;
+  slug?: string;
   phone: string | null;
   email: string | null;
   address: string | null;
@@ -27,6 +27,7 @@ export type Company = {
   company_types?: CompanyType[];
   services?: Service[];
   providers?: Provider[];
+  
 };
 
 export type Service = {

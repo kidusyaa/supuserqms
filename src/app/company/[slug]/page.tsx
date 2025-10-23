@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { ArrowLeft, ChevronRight, Home, XCircle } from "lucide-react"
 import Link from "next/link"
 import { Company } from "@/type"
-import { getCompanyWithServices } from "@/lib/supabase-utils"
+import { getCompanyBySlugWithServices } from "@/lib/supabase-utils"
 import { toast } from "sonner"
 import DivCenter from "@/components/divCenter"
 // Import the redesigned components
@@ -21,19 +21,20 @@ export default function CompanyDetailPage() {
   const [company, setCompany] = useState<Company | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const companyId = params.id as string
+   const companySlug = params.slug as string
 
   useEffect(() => {
-    // ... (your existing data fetching logic remains the same)
     const fetchCompanyData = async () => {
       try {
         setLoading(true);
-        if (!companyId) {
-          toast.error("Company ID is missing from URL.");
+        // ✨ UPDATE LOGIC TO USE slug ✨
+        if (!companySlug) {
+          toast.error("Company identifier is missing from URL.");
           router.push('/');
           return;
         }
-        const companyData = await getCompanyWithServices(companyId);
+        // ✨ CALL THE NEW FUNCTION ✨
+        const companyData = await getCompanyBySlugWithServices(companySlug);
 
         if (!companyData) {
           toast.error("Company not found");
@@ -51,10 +52,11 @@ export default function CompanyDetailPage() {
       }
     };
 
-    if (companyId) {
+    // ✨ UPDATE DEPENDENCY ✨
+    if (companySlug) {
       fetchCompanyData();
     }
-  }, [companyId, router])
+  }, [companySlug, router])
 
   if (loading) {
     return (

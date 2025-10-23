@@ -774,7 +774,7 @@ export const createQueueEntry = async (payload: CreateQueuePayload): Promise<Que
         .from('services')
         .select(`
           *,
-        company:companies ( name, id ),
+        company:companies ( name, id , slug),
         service_photos ( url ) 
         `)
         .eq('status', 'active')
@@ -921,6 +921,23 @@ export async function getCompanyWithServices(companyId: string): Promise<Company
     ...companyData,
     services: servicesWithPhotoUrls,
   };
+}
+
+export async function getCompanyBySlugWithServices(companySlug: string): Promise<Company | null> {
+  const { data, error } = await supabase
+    .from('companies')
+    .select(`
+      *,
+      services ( * )
+    `)
+    .eq('slug', companySlug) // The only change is here: 'slug' instead of 'id'
+    .single();
+
+  if (error) {
+    console.error('Error fetching company by slug:', error);
+    return null;
+  }
+  return data as Company;
 }
 
 export async function getCompanyLocationOptions(): Promise<LocationOption[]> {
@@ -1318,36 +1335,52 @@ export async function getActiveQueueEntriesForProvider(serviceId: string, provid
 
 
 // This is the function your public page at app/company/[slug]/page.tsx will use
-export const getCompanyBySlug = async (slug: string): Promise<Company | null> => {
-  try {
-    const { data, error } = await supabase
-      .from('companies')
-      .select(`
-        *,
-        services (
-          *,
-          service_photos ( url )
-        )
-      `)
-      .eq('slug', slug) // <-- The key change: query by slug
-      .single();
+// export const getCompanyBySlug = async (slug: string): Promise<Company | null> => {
+//   try {
+//     const { data, error } = await supabase
+//       .from('companies')
+//       .select(`
+//         *,
+//         services (
+//           *,
+//           service_photos ( url )
+//         )
+//       `)
+//       .eq('slug', slug) // <-- The key change: query by slug
+//       .single();
 
-    if (error) throw error;
-    if (!data) return null;
+//     if (error) throw error;
+//     if (!data) return null;
 
-    // Process photo URLs for services (like we did before)
-    const processedServices = data.services?.map((service: any) => {
-      const photoUrl = service.service_photos?.[0]?.url || null;
-      return { ...service, photo: photoUrl };
-    });
+//     // Process photo URLs for services (like we did before)
+//     const processedServices = data.services?.map((service: any) => {
+//       const photoUrl = service.service_photos?.[0]?.url || null;
+//       return { ...service, photo: photoUrl };
+//     });
 
-    return { ...data, services: processedServices } as Company;
+//     return { ...data, services: processedServices } as Company;
 
-  } catch (error) {
-    console.error('Error fetching company by slug:', error);
-    return null;
-  }
-};
+//   } catch (error) {
+//     console.error('Error fetching company by slug:', error);
+//     return null;
+//   }
+// };
+
+// lib/utils.ts
+export function generateSlug(name: string): string {
+  const a = 'àáâäæãåāăąçćčđďèéêëēėęěğǵḧîïíīįìłḿñńǹňôöòóœøōõőṕŕřßśšşșťțûüùúūǘůűųẃẍÿýžźż·/_,:;'
+  const b = 'aaaaaaaaaacccddeeeeeeeegghiiiiiilmnnnnoooooooooprrsssssttuuuuuuuuuwxyyzzz------'
+  const p = new RegExp(a.split('').join('|'), 'g')
+
+  return name.toString().toLowerCase()
+    .replace(/\s+/g, '-') // Replace spaces with -
+    .replace(p, c => b.charAt(a.indexOf(c))) // Replace special characters
+    .replace(/&/g, '-and-') // Replace & with 'and'
+    .replace(/[^\w\-]+/g, '') // Remove all non-word chars
+    .replace(/\-\-+/g, '-') // Replace multiple - with single -
+    .replace(/^-+/, '') // Trim - from start of text
+    .replace(/-+$/, '') // Trim - from end of text
+}
 
 export async function getRecentCompanies(limit: number = 8): Promise<Company[]> {
   const { data, error } = await supabase
