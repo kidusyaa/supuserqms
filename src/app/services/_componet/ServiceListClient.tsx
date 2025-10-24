@@ -6,6 +6,8 @@ import FilterNav from "@/components/FilterNav";
 import { Service, FilterState, Category, LocationOption } from "@/type";
 import ServiceCard from "./ServiceCard";
 import Link from "next/link";
+import { Binoculars } from "lucide-react";
+import DivCenter from "@/components/divCenter";
 // Removed useSearchParams as it's not strictly needed for initial load,
 // but keep it if you plan to update the URL client-side later.
 // import { useSearchParams } from 'next/navigation';
@@ -153,10 +155,18 @@ export default function ServiceListClient({
 
   return (
     <div className="max-w-6xl mx-auto p-4 md:p-6">
-      <div className="mb-6">
-        <h1 className="text-3xl md:text-4xl font-bold text-slate-800">Find a Service</h1>
-        <p className="text-slate-500 mt-1">Discover and book services from top companies near you.</p>
+     
+      <div className="mb-6 items-center justify-center ">
+      <div className="flex items-center justify-between  mb-4">
+            <h2 className="text-3xl font-bold text-tertiary flex items-center gap-4">
+              <Binoculars className="w-8 h-8 text-orange-500" />
+             Find a Service
+            </h2>
+            
+        </div>
+        <p className="text-slate-500 mt-1  ">Discover and book services from top companies near you.</p> 
       </div>
+    
 
       <FilterNav
         filters={filters}

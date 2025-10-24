@@ -27,7 +27,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Search, MapPin, LayoutGrid, Users, Building2, X, Check } from "lucide-react";
+import { Search, MapPin, LayoutGrid, ScrollText, House, X, Check , LayoutDashboard, Binoculars} from "lucide-react";
 
 interface FilterNavProps {
   // Now receives the current filters state as a prop
@@ -232,51 +232,54 @@ export default function FilterNav({
       <div className="bg-white p-3 rounded-lg shadow-sm border">
         <div className="flex flex-col md:flex-row gap-2 items-center">
           {/* ... (Popover for Category) */}
-          <Popover
-            open={!isCategoryLocked && categoryPopoverOpen}
-            onOpenChange={setCategoryPopoverOpen}
-          >
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className="h-11 flex-shrink-0 w-full md:w-auto data-[disabled]:cursor-not-allowed data-[disabled]:opacity-70"
-                disabled={isCategoryLocked || dataLoading || categoriesLoading}
-              >
-                <LayoutGrid className="mr-2 h-4 w-4" />
-                {categories.find((c) => c.id === filters.categoryId)?.name ||
-                  "Select Category"}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-[250px] p-0">
-              <Command>
-                <CommandInput placeholder="Search category..." />
-                <CommandList>
-                  {dataLoading || categoriesLoading ? (
-                    <CommandItem>Loading...</CommandItem>
-                  ) : (
-                    <CommandGroup>
-                      {categories.map((cat) => (
-                        <CommandItem
-                          key={cat.id}
-                          onSelect={() => {
-                            onFilterChange({
-                              ...filters,
-                              categoryId: cat.id,
-                            });
-                            setCategoryPopoverOpen(false);
-                          }}
-                        >
-                          {/* Corrected template literal for className: */}
-                          <Check className={`mr-2 h-4 w-4 ${filters.categoryId === cat.id ? "opacity-100" : "opacity-0"}`} />
-                          {cat.name}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  )}
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
+          
+           <Popover
+                    open={companyTypePopoverOpen}
+                    onOpenChange={setCompanyTypePopoverOpen}
+                  >
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="h-11 flex-shrink-0 "
+                        disabled={dataLoading}
+                      >
+                        <LayoutDashboard className="mr-2 h-4 w-4" />
+                         Category{" "}
+                        {filters.companyTypeIds.length > 0 &&
+                          `(${filters.companyTypeIds.length})`}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[250px] p-0">
+                      <Command>
+                        <CommandInput placeholder="Search business type..." />
+                        <CommandList>
+                          {dataLoading ? (
+                            <CommandItem>Loading...</CommandItem>
+                          ) : (
+                            <CommandGroup>
+                              {companyTypeOptions.map((companyType) => (
+                                <CommandItem
+                                  key={companyType.value}
+                                  onSelect={() =>
+                                    handleCompanyTypeToggle(companyType.value)
+                                  }
+                                >
+                                  <Check
+                                    className={`mr-2 h-4 w-4 ${
+                                      filters.companyTypeIds.includes(companyType.value)
+                                        ? "opacity-100"
+                                        : "opacity-0"
+                                    }`}
+                                  />
+                                  {companyType.label}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          )}
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
 
           <div className="relative  w-full  ">
             <Tooltip>
@@ -315,7 +318,7 @@ export default function FilterNav({
                         disabled={dataLoading}
                       >
                         <MapPin className="mr-2 h-4 w-4" />
-                        Location{" "}
+                        <span className="md:block hidden">Location </span>{" "}
                         {filters.locations.length > 0 &&
                           `(${filters.locations.length})`}
                       </Button>
@@ -369,8 +372,8 @@ export default function FilterNav({
                         className="h-11 flex-shrink-0 w-full"
                         disabled={dataLoading}
                       >
-                        <Users className="mr-2 h-4 w-4" />
-                        Company{" "}
+                        <House className="mr-2 h-4 w-4" />
+                        <span className="md:block hidden">Company </span>{" "}
                         {filters.companyIds.length > 0 &&
                           `(${filters.companyIds.length})`}
                       </Button>
@@ -413,53 +416,51 @@ export default function FilterNav({
             <Tooltip>
               <TooltipTrigger asChild>
                 <div className=" w-full  ">
-                  <Popover
-                    open={companyTypePopoverOpen}
-                    onOpenChange={setCompanyTypePopoverOpen}
-                  >
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="h-11 flex-shrink-0 w-full"
-                        disabled={dataLoading}
-                      >
-                        <Building2 className="mr-2 h-4 w-4" />
-                        Business Type{" "}
-                        {filters.companyTypeIds.length > 0 &&
-                          `(${filters.companyTypeIds.length})`}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[250px] p-0">
-                      <Command>
-                        <CommandInput placeholder="Search business type..." />
-                        <CommandList>
-                          {dataLoading ? (
-                            <CommandItem>Loading...</CommandItem>
-                          ) : (
-                            <CommandGroup>
-                              {companyTypeOptions.map((companyType) => (
-                                <CommandItem
-                                  key={companyType.value}
-                                  onSelect={() =>
-                                    handleCompanyTypeToggle(companyType.value)
-                                  }
-                                >
-                                  <Check
-                                    className={`mr-2 h-4 w-4 ${
-                                      filters.companyTypeIds.includes(companyType.value)
-                                        ? "opacity-100"
-                                        : "opacity-0"
-                                    }`}
-                                  />
-                                  {companyType.label}
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          )}
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
+                 <Popover
+            open={!isCategoryLocked && categoryPopoverOpen}
+            onOpenChange={setCategoryPopoverOpen}
+          >
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className="h-11 flex-shrink-0 w-full md:w-auto data-[disabled]:cursor-not-allowed data-[disabled]:opacity-70"
+                disabled={isCategoryLocked || dataLoading || categoriesLoading}
+              >
+                <ScrollText className="mr-2 h-4 w-4" />
+               <span className="md:block hidden"> {categories.find((c) => c.id === filters.categoryId)?.name ||
+                  "Service Type"}</span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[250px] p-0">
+              <Command>
+                <CommandInput placeholder="Search category..." />
+                <CommandList>
+                  {dataLoading || categoriesLoading ? (
+                    <CommandItem>Loading...</CommandItem>
+                  ) : (
+                    <CommandGroup>
+                      {categories.map((cat) => (
+                        <CommandItem
+                          key={cat.id}
+                          onSelect={() => {
+                            onFilterChange({
+                              ...filters,
+                              categoryId: cat.id,
+                            });
+                            setCategoryPopoverOpen(false);
+                          }}
+                        >
+                          {/* Corrected template literal for className: */}
+                          <Check className={`mr-2 h-4 w-4 ${filters.categoryId === cat.id ? "opacity-100" : "opacity-0"}`} />
+                          {cat.name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  )}
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
                 </div>
               </TooltipTrigger>
             </Tooltip>

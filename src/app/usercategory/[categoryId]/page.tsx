@@ -2,9 +2,44 @@ import { getCategoryWithServices } from "@/lib/supabase-utils";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Icon } from '@iconify/react';
+import type { Metadata } from "next";
 
 interface CategoryPageProps {
   params: Promise<{ categoryId: string }>;
+}
+
+export async function generateMetadata(
+  { params }: CategoryPageProps
+): Promise<Metadata> {
+  const { categoryId } = await params;
+  const data = await getCategoryWithServices(categoryId);
+  if (!data) return {};
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://example.com";
+  const title = `${data.name} services: book ${data.name.toLowerCase()} near you`;
+  const description = data.description || `Browse and book ${data.name.toLowerCase()} services near you on GizeBook.`;
+  return {
+    title,
+    description,
+    keywords: [
+      data.name,
+      "booking",
+      "beauty",
+      "barbershop",
+      "haircut",
+      "massage",
+      "spa",
+      "salon",
+      "wellness",
+      "services",
+    ],
+    alternates: { canonical: `/usercategory/${categoryId}` },
+    openGraph: {
+      title,
+      description,
+      url: `${siteUrl}/usercategory/${categoryId}`,
+      type: "website",
+    },
+  };
 }
 
 export default async function CategoryDetailPage({ params }: CategoryPageProps) {
@@ -20,6 +55,27 @@ export default async function CategoryDetailPage({ params }: CategoryPageProps) 
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto px-4 py-8">
+        {/* JSON-LD: CollectionPage with services */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              '@context': 'https://schema.org',
+              '@type': 'CollectionPage',
+              name: `${category.name} services`,
+              description: category.description || `${category.name} services on GizeBook`,
+              url: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://example.com'}/usercategory/${category.id}`,
+              hasPart: services.map((s) => ({
+                '@type': 'Service',
+                name: s.name,
+                description: s.description || undefined,
+                provider: s.company?.name ? { '@type': 'Organization', name: s.company.name } : undefined,
+                areaServed: 'Local',
+                offers: s.price ? { '@type': 'Offer', price: s.price, priceCurrency: 'USD' } : undefined,
+              })),
+            }),
+          }}
+        />
         {/* Category Header */}
         <div className="bg-white rounded-lg shadow-md p-8 mb-8">
           <div className="flex items-center gap-4 mb-4">

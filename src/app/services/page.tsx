@@ -3,6 +3,26 @@ import { getAllServices, getCategories, getLocations } from "@/lib/api";
 import { getCompanyOptions, getCompanyTypeOptions } from "@/lib/supabase-utils";
 import ServiceListClient from "./_componet/ServiceListClient";
 import { Location, LocationOption } from "@/type";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Browse and book services: beauty, barbershop, haircut, massage, spa",
+  description:
+    "Explore services across salons, barbershops, massage and wellness. Filter by category, company and location, then book instantly.",
+  keywords: [
+    "booking",
+    "services",
+    "beauty",
+    "beauty products",
+    "barbershop",
+    "haircut",
+    "massage",
+    "spa",
+    "wellness",
+    "salon",
+  ],
+  alternates: { canonical: "/services" },
+};
 
 export default async function ServicesPage({
   searchParams,

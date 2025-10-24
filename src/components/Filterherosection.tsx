@@ -2,7 +2,7 @@
 "use client";
 import React from 'react'
 import { useState, useEffect, useMemo } from "react"
-import { Search, MapPin, LayoutGrid, Users, Check, Building } from "lucide-react" // Added Building icon
+import { Search, MapPin, LayoutGrid, Users, Check, Building, House, LayoutDashboard } from "lucide-react" // Added Building icon
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -154,6 +154,7 @@ export default function Filterherosection() {
 
   const selectedLocationCount = filters.locations.length;
   const selectedCompanyCount = filters.companyIds.length;
+  const selectedCompanyTypeCount = filters.companyTypeIds.length;
 
   return (
     <div>
@@ -164,7 +165,7 @@ export default function Filterherosection() {
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
            <Input
   placeholder="Search services or companies..."
-  className="w-full pl-12 h-12 text-base border-border/50 focus:border-accent text-foreground hover:bg-muted"
+  className="w-full pl-12 h-12 text-base border-border/50 focus:border-accent text-foreground hover:bg-muted bg-white"
   value={filters.searchTerm}
   onChange={(e) =>
     setFilters((prev) => ({
@@ -184,7 +185,7 @@ export default function Filterherosection() {
 />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-3 gap-4">
            <Popover
               open={companyTypePopoverOpen}
               onOpenChange={setCompanyTypePopoverOpen}
@@ -192,11 +193,12 @@ export default function Filterherosection() {
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
-                  className="h-12 flex-shrink-0 w-full justify-start text-base"
+                  className="h-12 flex-shrink-0 w-full justify-center md:justify-start text-base border-border/50 focus:border-accent text-foreground hover:bg-muted"
                   disabled={dataLoading}
                 >
-                  <Building className="mr-2 h-5 w-5 text-muted-foreground" />
-                  {selectedTypeLabel}
+                  <LayoutDashboard className="mr-2 h-5 w-5 text-muted-foreground" />
+                  <span className='md:block hidden'>Company Type</span>{" "}
+                  {selectedCompanyTypeCount > 0 && `(${selectedCompanyTypeCount})`}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-[250px] p-0">
@@ -235,11 +237,11 @@ export default function Filterherosection() {
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
-                  className="h-12 flex-shrink-0 w-full justify-start text-base border-border/50 focus:border-accent text-foreground hover:bg-muted"
+                  className="h-12 flex-shrink-0 w-full justify-center md:justify-start text-base border-border/50 focus:border-accent text-foreground hover:bg-muted"
                   disabled={dataLoading}
                 >
                   <MapPin className="mr-2 h-5 w-5 text-muted-foreground" />
-                  Location{" "}
+                  <span className='md:block hidden'>Location</span>{" "}
                   {selectedLocationCount > 0 && `(${selectedLocationCount})`}
                 </Button>
               </PopoverTrigger>
@@ -286,11 +288,11 @@ export default function Filterherosection() {
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
-                  className="h-12 flex-shrink-0 w-full justify-start text-base border-border/50 focus:border-accent text-foreground hover:bg-muted"
+                  className="h-12 flex-shrink-0 w-full justify-center md:justify-start text-base border-border/50 focus:border-accent text-foreground hover:bg-muted"
                   disabled={dataLoading}
                 >
-                  <Users className="mr-2 h-5 w-5 text-muted-foreground" />
-                  Company{" "}
+                  <House className="mr-2 h-5 w-5 text-muted-foreground" />
+                  <span className='md:block hidden'>Company</span>{" "}
                   {selectedCompanyCount > 0 && `(${selectedCompanyCount})`}
                 </Button>
               </PopoverTrigger>

@@ -3,88 +3,101 @@
 "use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { CompanyTypeWithCount } from "@/type";
-import { getCompanyTypesWithCounts } from "@/lib/supabase-utils"; // Use our new API function
+import { getCompanyTypesWithCounts } from "@/lib/supabase-utils";
+import {  LayoutDashboard } from "lucide-react"
 import DivCenter from "./divCenter";
-import { LayoutDashboardIcon } from "lucide-react";
+// --- Image mapping remains the same ---
+const categoryImages: { [key: string]: string } = {
+  'ctyp_barbershop': '/images/category/barbershop.png',
+  'ctyp_beauty_salon': '/images/category/hiresalone.png',
+  'ctyp_massage_parlor': '/images/category/bodymassage.png',
+};
 
 export default function CompanyTypesPage() {
-  // 1. Update state variable name and type
   const [companyTypes, setCompanyTypes] = useState<CompanyTypeWithCount[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetchCompanyTypes = async () => {
       setIsLoading(true);
-      // 2. Call the new API function
-      const data = await getCompanyTypesWithCounts();
-      setCompanyTypes(data);
-      setIsLoading(false);
+      try {
+        const data = await getCompanyTypesWithCounts();
+        setCompanyTypes(data);
+      } catch (error) {
+        console.error("Failed to fetch company types:", error);
+      } finally {
+        setIsLoading(false);
+      }
     };
-
     fetchCompanyTypes();
   }, []);
-
-  if (isLoading) {
-    // A slightly improved loading state to match your app's style
-    return (
-      <div className="flex justify-center items-center min-h-[60vh]">
-        <p className="text-muted-foreground">Loading business types...</p>
-      </div>
-    );
-  }
+  
+  // +++ NEW: A skeleton loader that matches the new circular design +++
+  const ItemSkeleton = () => (
+    <div className="flex flex-col items-center gap-4 animate-pulse">
+      <div className="h-32 w-32 rounded-full bg-gray-200 md:h-40 md:w-40"></div>
+      <div className="h-5 w-28 rounded bg-gray-200"></div>
+    </div>
+  );
 
   return (
-    <div className=" min-h-screen py-12">
-    <div className="flex flex-col items-center  w-full  px-[0%] sm:px-[6%] lg:px-[100px]  xl:px-[100px]">
-        <div className="conainer mx-auto px-4">
-          {/* 3. Update Header */}
-
-          <div className="flex items-center justify-between md:mb-10 mb-4">
-            <h2 className="text-2xl font-bold text-tertiary flex items-center gap-2">
-              <LayoutDashboardIcon className="w-6 h-6 text-orange-500 " />
-             Business Types
-            </h2>
-           
+    <div className=" ">
+    <DivCenter>
+     
+    <div className=" mx-auto ">
+      <div className="container mx-auto px-4">
+        {isLoading ? (
+          <div className="grid  gap-x-6 gap-y-12 grid-cols-3 ">
+            <ItemSkeleton />
+            <ItemSkeleton />
+            <ItemSkeleton />
           </div>
-
-          {/* 4. Update Grid and Mapping logic */}
-          <div className="grid grid-cols-2 lg:grid-cols-3 md:gap-8 gap-2  ">
+        ) : (
+          <div className="grid  gap-x-6 gap-y-12 grid-cols-3">
             {companyTypes.map((type) => (
+              // +++ THE NEW "PLANE" DESIGN +++
               <Link
                 key={type.id}
-                href={`/company?companyTypeId=${type.id}`} // MUST start with a "/"
-                passHref
-                // ... other props
+                href={`/company?companyTypeId=${type.id}`}
+                // The 'group' is essential for hover effects on child elements
+                className="group flex flex-col items-center gap-4 text-center"
               >
-                <div className="group block h-full  rounded-2xl border border-orange-200 shadow-md hover:shadow-xl hover:border-orange-400 transition-all duration-300 cursor-pointer overflow-hidden">
-                  {/* Icon + Title */}
-                  <div className="p-6 flex  md:flex-row flex-col  items-center gap-4">
-                    <div className="flex-shrink-0 w-16 h-16 flex items-center justify-center rounded-full bg-orange-100 text-4xl group-hover:bg-orange-200 transition-colors duration-300">
-                      {type.icon}
-                    </div>
-                    <div>
-                      <h5 className=" md:text-xl text-lg  md:font-bold font-semibold text-gray-900 group-hover:text-orange-600 transition-colors duration-300">
-                        {type.name}
-                      </h5>
-                      {/* <p className="text-gray-600 text-sm">
-                            {type.description}
-                        </p> */}
-                    </div>
-                  </div>
+                {/* 1. Circular Image Container */}
+                <div className="relative  overflow-hidden rounded-full ring-2 ring-gray-200 transition-all duration-300 group-hover:ring-4 group-hover:ring-primary h-20 w-20">
+                  <Image
+                    src={categoryImages[type.id] || '/placeholder.svg'}
+                    alt={type.name}
+                    fill
+                    className="object-contain transition-transform duration-500 group-hover:scale-110 p-2"
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                  />
+                </div>
 
-                  {/* 5. Update Footer with company count */}
-                  <div className="bg-tertiary  bottom-0 sticky px-6 py-4 text-sm font-semibold text-white group-hover:bg-tertiary/80 transition-colors duration-300">
+                {/* 2. Centered Text Below */}
+                <div>
+                  <h3 className="md:text-lg text-sm font-bold text-gray-800 transition-colors group-hover:text-primary">
+                    {type.name}
+                  </h3>
+                  <p className="text-xs text-gray-500">
                     {type.company_count}{" "}
-                    {type.company_count === 1 ? "company" : "companies"}{" "}
-                    available
-                  </div>
+                    {type.company_count === 1 ? "provider" : "providers"}
+                  </p>
                 </div>
               </Link>
             ))}
           </div>
+        )}
+      </div> 
+    </div>
+     <div className="flex items-center justify-between md:mb-10 mb-4 pt-5 ">
+            <h2 className="text-2xl font-bold text-tertiary flex items-center gap-2">
+              <LayoutDashboard className="w-6 h-6 text-orange-500" />
+              Business Categories
+            </h2>
         </div>
-     </div>
+    </DivCenter>
     </div>
   );
 }

@@ -10,6 +10,10 @@ const nextConfig = {
       },
     ],
   },
+  
 };
+const withPWA = require('next-pwa')({
+  dest: 'public', // output folder for service worker
+});
 
 export default nextConfig;

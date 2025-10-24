@@ -24,12 +24,13 @@ export default function Homepage() {
       {/* Pass the heroSectionHeight to NavSection */}
       {/* HeroSection will now report its height */}
       <HeroSection />
-       <StatsSection/>
-       <DiscountedServices/>
+      <DiscountedServices/>
+      <CompanyTypesPage/>
+      
       <FeaturedServices/>
 
       {/* <RecentJoinSection/> */}
-      <CompanyTypesPage/>
+       <StatsSection/>
       <Footer/>
     </div>
   );
