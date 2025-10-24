@@ -49,7 +49,7 @@ const NavSection = ({ servicesSectionId }: NavSectionProps) => {
           </button>
 
           {/* Book Now */}
-          <Link href={'https://dashbordqms.vercel.app/dashboard' } target='_black'>
+          <Link href={'https://app.gizebook.com/registration/company' } target='_black'>
             <button className="rounded-md bg-amber-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-amber-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 transition-colors duration-200">
               Register Services
             </button>
