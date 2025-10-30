@@ -43,10 +43,10 @@ export default function CompanyTypesPage() {
   );
 
   return (
-    <div className=" ">
+    <div className=" my-10  ">
     <DivCenter>
      
-    <div className=" mx-auto ">
+    <div className=" mx-auto  ">
       <div className="container mx-auto px-4">
         {isLoading ? (
           <div className="grid  gap-x-6 gap-y-12 grid-cols-3 ">

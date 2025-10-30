@@ -9,6 +9,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { Icon } from '@iconify/react/dist/iconify.js';
 import {
   Facebook,
   Instagram,
@@ -58,14 +59,14 @@ const Footer = () => {
   return (
     <footer className="bg-gray-900 text-gray-400 py-8 md:py-12">
       <DivCenter> {/* Use DivCenter for consistent content width */}
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between ">
           {/* Main Footer Content */}
           <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-8 md:gap-12 pb-8 md:pb-12 border-b border-gray-700">
             {/* Brand/Logo Section */}
             <div className="col-span-1 md:col-span-2 lg:col-span-2">
               <Link href="/" className="flex items-center space-x-2 text-white text-2xl font-bold mb-4">
                 {/* Replace with your actual logo if you have one */}
-                {/* <Image src="/path/to/your/logo.png" alt="GizeBook Logo" width={40} height={40} /> */}
+                <Image src="/images/logopro.svg" alt="GizeBook Logo" width={40} height={40} />
                 <span>GizeBook</span>
               </Link>
               <p className="text-sm leading-relaxed mb-4">
@@ -74,22 +75,24 @@ const Footer = () => {
               </p>
               {/* Contact Information (always visible) */}
               <div className="space-y-2 text-sm">
-                <p className="flex items-center gap-2">
-                  <MapPin size={18} className="text-primary" />
-                  <span>123 Main St, Addis Ababa, Ethiopia</span>
+                <a href="https://maps.app.goo.gl/p1MYLcXZYW25wTHB8" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors gap-2 ">
+                <p className="flex items-center ">
+                  <MapPin size={18} className="text-primary my-6" />
+                  <span>Lideta Mall | ልደታ መርካቶ, Addis Ababa, Ethiopia</span>
                 </p>
+                </a>
                 <p className="flex items-center gap-2">
                   <Mail size={18} className="text-primary" />
                   <a href="mailto:info@gizebook.com" className="hover:text-white transition-colors">
                     info@gizebook.com
                   </a>
                 </p>
-                <p className="flex items-center gap-2">
+                {/* <p className="flex items-center gap-2">
                   <Phone size={18} className="text-primary" />
                   <a href="tel:+251912345678" className="hover:text-white transition-colors">
                     +251 912 345 678
                   </a>
-                </p>
+                </p> */}
               </div>
             </div>
 
@@ -140,19 +143,19 @@ const Footer = () => {
           </div>
 
           {/* Bottom Section: Social Media & Copyright */}
-          <div className="flex flex-col md:flex-row items-center justify-between pt-8 gap-4">
+          <div className="w-full  gap-4 flex flex-col items-center">
             {/* Social Media Links */}
-            <div className="flex space-x-4">
-              <a href="#" className="text-gray-400 hover:text-white transition-colors" aria-label="Facebook">
+            <div className="flex space-x-4 my-5">
+              <a href="https://web.facebook.com/people/Gize-Book/61583089950694/" className="text-gray-400 hover:text-white transition-colors" aria-label="Facebook">
                 <Facebook size={24} />
               </a>
-              <a href="#" className="text-gray-400 hover:text-white transition-colors" aria-label="Instagram">
+              <a href="https://www.instagram.com/gizebook?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==" className="text-gray-400 hover:text-white transition-colors" aria-label="Instagram">
                 <Instagram size={24} />
               </a>
-              <a href="#" className="text-gray-400 hover:text-white transition-colors" aria-label="Twitter">
-                <Twitter size={24} />
+              <a href="https://www.tiktok.com/@gizebookingplatform?is_from_webapp=1&sender_device=pc" className="text-gray-400 hover:text-white transition-colors" aria-label="Twitter">
+               <Icon icon="proicons:tiktok" width="24" height="24" />
               </a>
-              <a href="#" className="text-gray-400 hover:text-white transition-colors" aria-label="LinkedIn">
+              <a href="https://www.linkedin.com/company/gize-book/" className="text-gray-400 hover:text-white transition-colors" aria-label="LinkedIn">
                 <Linkedin size={24} />
               </a>
             </div>
