@@ -29,7 +29,10 @@ export type Company = {
   providers?: Provider[];
   
 };
-
+  
+interface ServicePhoto {
+  url: string;
+}
 export type Service = {
   id: string;
   company_id: string;
@@ -46,7 +49,7 @@ export type Service = {
   featureEnabled?: boolean; // Changed to boolean, default handled in mapping
   company?: Company;      
   queue_entries?: QueueItem[]; 
-  service_photos?: { url: string }[];
+  service_photos?: ServicePhoto[];
   discount_type: 'percentage' | 'fixed' | null;
   discount_value: number | null; 
   service_category?: { name: string }; // Use service_category to avoid conflict with `category_id`

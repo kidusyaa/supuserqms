@@ -928,7 +928,12 @@ export async function getCompanyBySlugWithServices(companySlug: string): Promise
     .from('companies')
     .select(`
       *,
-      services ( * )
+      services (
+        *,
+        service_photos (
+          url
+        )
+      )
     `)
     .eq('slug', companySlug) // The only change is here: 'slug' instead of 'id'
     .single();
