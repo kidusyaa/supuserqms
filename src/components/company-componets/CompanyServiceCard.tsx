@@ -36,7 +36,7 @@ const formatDiscount = (service: Service): string => {
   return "";
 };
 
-export default function ServiceCard({ service }: ServiceCardProps) {
+export default function CompanyServiceCard({ service }: ServiceCardProps) {
   const isAvailable = service.status === 'active';
 
   // Resolve primary photo from service.photo or first service_photos url

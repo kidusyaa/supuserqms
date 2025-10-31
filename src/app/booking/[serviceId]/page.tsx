@@ -265,7 +265,7 @@ export default function BookingPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <BookingBreadcrumb company={company} serviceName={service.name} />
+      <BookingBreadcrumb company={company} serviceName={service.name} slug={company.slug} />
 
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">

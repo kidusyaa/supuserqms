@@ -11,8 +11,8 @@ import DivCenter from "./divCenter";
 // --- Image mapping remains the same ---
 const categoryImages: { [key: string]: string } = {
   'ctyp_barbershop': '/images/category/barbershop.png',
-  'ctyp_beauty_salon': '/images/category/hiresalone.png',
-  'ctyp_massage_parlor': '/images/category/hotstone.png',
+  'ctyp_beauty_salon': '/images/category/beautysalon.png',
+  'ctyp_massage_parlor': '/images/category/massage.png',
 };
 
 export default function CompanyTypesPage() {
