@@ -15,6 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Image from "next/image";
 import { toast } from "sonner";
 
@@ -48,13 +49,17 @@ export function JoinQueueDialog({
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [userName, setUserName] = useState("");
-  const [phoneNumber, setPhoneNumber] = useState("");
+  const [countryCode, setCountryCode] = useState("+251");
+  const [phoneLocal, setPhoneLocal] = useState("");
   const [notes, setNotes] = useState("");
+  const isValidName = userName.trim().length > 0;
+  const isValidLocal = phoneLocal.trim().length >= 7;
 
   useEffect(() => {
     if (open) {
       setUserName('');
-      setPhoneNumber('');
+      setCountryCode('+251');
+      setPhoneLocal('');
       setNotes('');
     }
   }, [open]);
@@ -62,18 +67,26 @@ export function JoinQueueDialog({
   const handleJoinQueue = async () => {
     setIsLoading(true);
     try {
-      if (!userName.trim()) {
+      if (!isValidName) {
         toast.error("Please provide your name to join the queue.");
         setIsLoading(false);
         return;
       }
+      if (!isValidLocal) {
+        toast.error("Please enter a valid phone number.");
+        setIsLoading(false);
+        return;
+      }
+
+      const sanitizedLocal = phoneLocal.replace(/[^\d]/g, '');
+      const fullPhone = `${countryCode}${sanitizedLocal}`;
 
       // --- Use the new CreateQueuePayload type ---
       const queueEntryPayload: CreateQueuePayload = { // <--- Explicitly type with CreateQueuePayload
           service_id: service.id,
           provider_id: selectedProvider.id,
           user_name: userName.trim(),
-          phone_number: phoneNumber.trim() ,
+          phone_number: fullPhone ,
           notes: notes.trim() || null,
           queue_type: 'walk-in',
       };
@@ -136,14 +149,30 @@ export function JoinQueueDialog({
             />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="phoneNumber" className="text-right">Phone</Label>
-            <Input
-              id="phoneNumber"
-              value={phoneNumber}
-              onChange={(e) => setPhoneNumber(e.target.value)}
-              className="col-span-3"
-              placeholder="Optional"
-            />
+            <Label htmlFor="phoneLocal" className="text-right">Phone</Label>
+            <div className="col-span-3 flex gap-2">
+              <Select value={countryCode} onValueChange={setCountryCode}>
+                <SelectTrigger className="w-[120px]">
+                  <SelectValue placeholder="Code" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="+251">🇪🇹 +251</SelectItem>
+                  <SelectItem value="+1">🇺🇸 +1</SelectItem>
+                  <SelectItem value="+44">🇬🇧 +44</SelectItem>
+                  <SelectItem value="+91">🇮🇳 +91</SelectItem>
+                </SelectContent>
+              </Select>
+              <Input
+                id="phoneLocal"
+                value={phoneLocal}
+                onChange={(e) => setPhoneLocal(e.target.value.replace(/[^\d]/g, ''))}
+                placeholder="912345678"
+                type="tel"
+                inputMode="tel"
+                required
+                className="flex-1"
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-4 items-center gap-4">
@@ -179,7 +208,7 @@ export function JoinQueueDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
             Cancel
           </Button>
-          <Button onClick={handleJoinQueue} disabled={isLoading || !userName.trim()}>
+          <Button onClick={handleJoinQueue} disabled={isLoading || !isValidName || !isValidLocal}>
             {isLoading ? "Joining..." : "Join Queue"}
           </Button>
         </DialogFooter>

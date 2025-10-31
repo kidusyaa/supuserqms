@@ -70,6 +70,7 @@ const mapToService = (serviceData: any): Service => ({
 const mapToCompany = (companyData: any): Company => ({
     id: companyData.id,
     name: companyData.name,
+    slug: companyData.slug,
     phone: companyData.phone || null,
     email: companyData.email || null,
     address: companyData.address || null,
@@ -81,7 +82,6 @@ const mapToCompany = (companyData: any): Company => ({
     created_at: companyData.created_at || null, 
     socials: companyData.socials || null,
 });
-
 
 // ===== LOCATIONS =====
 export const getLocations = async (): Promise<Location[]> => {

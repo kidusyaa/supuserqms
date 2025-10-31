@@ -1,7 +1,7 @@
 // components/company-componets/CompanyServicesList.tsx
 import { Service } from "@/type"
 import ServiceCard from "./ServiceCard"
-
+import CompanyServiceCard from "./CompanyServiceCard";
 interface CompanyServicesListProps {
   services: Service[] | undefined;
 }
@@ -16,7 +16,7 @@ export default function CompanyServicesList({ services }: CompanyServicesListPro
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {services && services.length > 0 ? (
           services.map((service) => (
-            <ServiceCard key={service.id} service={service} />
+            <CompanyServiceCard key={service.id} service={service} />
           ))
         ) : (
           <div className="col-span-full text-center py-12 bg-slate-800 rounded-lg border border-slate-700">

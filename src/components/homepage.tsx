@@ -3,14 +3,11 @@ import React, { useEffect,useState } from 'react'; // Import useState
 import Link from 'next/link';
 import DivCenter from './divCenter';
 import { Button } from './ui/button';
-
-import ServiceCategoriesPage from './ServiceCategoriesPage';
 import NavSection from './navsection';
-import StatsSection from './StatsSection';
 import FeaturedServices from './Featuredservice';
 import Footer from './footer';
 import HeroSection from './herosection';
-import RecentJoinSection from './RecentJoinSection';
+import StatsSection from './StatsSection';
 import CompanyTypesPage from './company-types';
 import DiscountedServices from './discountedServices';
 export default function Homepage() {
@@ -30,8 +27,8 @@ export default function Homepage() {
       <FeaturedServices/>
 
       {/* <RecentJoinSection/> */}
-       <StatsSection/>
-      <Footer/>
+      <StatsSection/>
+     
     </div>
   );
 }

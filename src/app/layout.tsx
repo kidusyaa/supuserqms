@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import NavSection from "@/components/navsection";
 import MobileBottomNav from "@/components/MobileBottomNav";
+import Footer from "@/components/footer";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -66,17 +67,20 @@ export default function RootLayout({
   const SERVICES_SECTION_ID = "services-list";
   return (
     <html lang="en">
-       <link rel="manifest" href="/manifest.json" />
-       <link rel="icon" href="/images/logopro.png" />
-     <NavSection servicesSectionId={SERVICES_SECTION_ID}/>
+      <head>
+        <link rel="manifest" href="/manifest.json" />
+        <link rel="icon" href="/images/logopro.png" />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <NavSection servicesSectionId={SERVICES_SECTION_ID} />
 
         {children}
         {/* Spacer to prevent content from being hidden behind mobile bottom nav */}
         <div className="h-14 md:hidden" />
         {/* Mobile Bottom Navigation */}
+        <Footer/>
         <MobileBottomNav />
         {/* JSON-LD: Organization and WebSite */}
         <script

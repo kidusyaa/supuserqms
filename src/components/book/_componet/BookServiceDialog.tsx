@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 import { createBooking } from "@/lib/supabase-utils"
 import type { Company, Service, Provider, AvailableSlot } from "@/type"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface BookServiceDialogProps {
   open: boolean;
@@ -39,14 +40,22 @@ export default function BookServiceDialog({
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [userName, setUserName] = useState("");
-  const [phoneNumber, setPhoneNumber] = useState("");
+  const [countryCode, setCountryCode] = useState("+251");
+  const [phoneLocal, setPhoneLocal] = useState("");
   const [notes, setNotes] = useState("");
+  const isValidName = userName.trim().length > 0;
+  const isValidLocal = phoneLocal.trim().length >= 7;
 
   const handleBookingConfirm = async () => {
     setIsLoading(true);
     try {
-      if (!userName.trim()) {
+      if (!isValidName) {
         toast.error("Please provide your name to book this service.");
+        setIsLoading(false);
+        return;
+      }
+      if (!isValidLocal) {
+        toast.error("Please enter a valid phone number.");
         setIsLoading(false);
         return;
       }
@@ -57,10 +66,13 @@ export default function BookServiceDialog({
         return;
       }
 
-      const newBookingData = { // Renamed for clarity before passing to createBooking
+      const sanitizedLocal = phoneLocal.replace(/[^\d]/g, '');
+      const fullPhone = `${countryCode}${sanitizedLocal}`;
+
+      const newBookingData = { 
         user_id: null,
         user_name: userName.trim(),
-        phone_number: phoneNumber.trim() || null,
+        phone_number: fullPhone,
         service_id: service.id,
         company_id: company.id,
         provider_id: selectedProvider.id,
@@ -70,7 +82,6 @@ export default function BookServiceDialog({
         notes: notes.trim() || null,
       };
 
-      // createBooking should return the newly created booking, including its ID
       const createdBooking = await createBooking(newBookingData);
 
       if (!createdBooking || !createdBooking.id) {
@@ -78,10 +89,9 @@ export default function BookServiceDialog({
       }
 
       toast.success("Service booked successfully!");
-      onOpenChange(false); // Close the dialog
+      onOpenChange(false); 
       
-      // Navigate to the confirmation page, passing the booking ID
-      router.push(`/booking/confirmation/${createdBooking.id}`); // Using path segment for cleaner URLs
+      router.push(`/booking/confirmation/${createdBooking.id}`); 
       
     } catch (error) {
       console.error("Error creating booking:", error);
@@ -137,14 +147,30 @@ export default function BookServiceDialog({
             />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="phoneNumber" className="text-right">Your Phone</Label>
-            <Input
-              id="phoneNumber"
-              value={phoneNumber}
-              onChange={(e) => setPhoneNumber(e.target.value)}
-              className="col-span-3"
-              placeholder="Optional"
-            />
+            <Label htmlFor="phoneLocal" className="text-right">Your Phone</Label>
+            <div className="col-span-3 flex gap-2">
+              <Select value={countryCode} onValueChange={setCountryCode}>
+                <SelectTrigger className="w-[120px]">
+                  <SelectValue placeholder="Code" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="+251">🇪🇹 +251</SelectItem>
+                  <SelectItem value="+1">🇺🇸 +1</SelectItem>
+                  <SelectItem value="+44">🇬🇧 +44</SelectItem>
+                  <SelectItem value="+91">🇮🇳 +91</SelectItem>
+                </SelectContent>
+              </Select>
+              <Input
+                id="phoneLocal"
+                value={phoneLocal}
+                onChange={(e) => setPhoneLocal(e.target.value.replace(/[^\d]/g, ''))}
+                placeholder="912345678"
+                type="tel"
+                inputMode="tel"
+                required
+                className="flex-1"
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-4 items-center gap-4">
@@ -162,7 +188,7 @@ export default function BookServiceDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
             Cancel
           </Button>
-          <Button onClick={handleBookingConfirm} disabled={isLoading || !selectedSlot || !userName.trim()}>
+          <Button onClick={handleBookingConfirm} disabled={isLoading || !selectedSlot || !isValidName || !isValidLocal}>
             {isLoading ? "Booking..." : "Confirm Booking"}
           </Button>
         </DialogFooter>

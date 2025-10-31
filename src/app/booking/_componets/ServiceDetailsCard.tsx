@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Clock, MapPin, Phone, Users, Tag } from "lucide-react"; // Added Tag icon for discount badge
+import { Clock, MapPin, Phone, Users, Tag, CodeSquare } from "lucide-react"; // Added Tag icon for discount badge
 import type { Service, Company } from "@/type";
 import { format, isToday } from "date-fns";
 
@@ -64,14 +64,14 @@ export default function ServiceDetailsCard({
   return (
     <Card className="mb-8">
       <CardContent className="p-6">
-        <div className="flex flex-col md:flex-row gap-6 ">
+        <div className="flex flex-col md:flex-row gap-6  ">
           <div className="flex-shrink-0 relative"> {/* Added relative for absolute positioning of badges */}
             <Image
               src={service.photo || "/placeholder-service.png"}
               alt={service.name}
               width={300}
               height={200}
-              className="rounded-lg object-cover aspect-[3/2]"
+              className="rounded-lg object-cover aspect-[4/3]"
             />
              {/* Discount Badge - Top Left */}
             {hasDiscount && discountLabel && (
@@ -81,7 +81,7 @@ export default function ServiceDetailsCard({
             )}
           </div>
           <div className="flex-1">
-            <div className="flex items-start justify-between mb-4">
+            <div className="flex md:flex-row flex-col-reverse items-start justify-between mb-4">
               <div>
                 <h1 className="text-3xl font-bold text-foreground mb-2">{service.name}</h1>
                 <p className="text-muted-foreground mb-4">{service.description}</p>
@@ -95,44 +95,46 @@ export default function ServiceDetailsCard({
                 </Badge>
               )}
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            </div>
+            </div>
+            <div className="">
+            <div className="grid md:grid-cols-4 gap-4   mt-5">
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Clock className="h-4 w-4" />
-                <span>Base time: {service.estimated_wait_time_mins} minutes</span>
+                <span>Est. time: {service.estimated_wait_time_mins} min</span>
               </div>
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Users className="h-4 w-4" />
-                <span>Current queue: {queueCount} people</span>
+                <span>Current queue: {queueCount} </span>
               </div>
               {estimatedQueueStartTime ? (
                 <div className="flex items-center gap-2 text-orange-600 col-span-2">
                   <Clock className="h-4 w-4" />
                   <span>
-                    Est. Queue Start: {format(estimatedQueueStartTime, "h:mm a")}{" "}
-                    {isToday(estimatedQueueStartTime) ? "Today" : format(estimatedQueueStartTime, "MMM do")}
+                    Queue Start: {format(estimatedQueueStartTime, "h:mm a")}{" "}
+                    {isToday(estimatedQueueStartTime) }
                   </span>
                 </div>
               ) : (
                 <div className="flex items-center gap-2 text-red-500 col-span-2">
                   <Clock className="h-4 w-4" />
-                  <span>Est. Queue Start: Unavailable</span>
+                  <span> Start: Unavailable</span>
                 </div>
               )}
               <div className="flex items-center gap-2 text-muted-foreground">
                 <MapPin className="h-4 w-4" />
-                <span>{company.name}</span>
+                <span>{company.location_text}</span>
               </div>
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Phone className="h-4 w-4" />
                 <span>{company.phone}</span>
               </div>
               <div className="flex items-center gap-2 text-muted-foreground">
-                <Users className="h-4 w-4" />
-                <span>Code: {service.code}</span>
+                <CodeSquare className="h-4 w-4" />
+                <span>S-Code: {service.code}</span>
               </div>
             </div>
           </div>
-        </div>
       </CardContent>
     </Card>
   );

@@ -33,7 +33,7 @@
 
 :root {
   /* Define your core palette colors using OKLCH */
-  --color-dark-base: oklch(26.17% 0.0569 229.56); /* #1B3A47 */
+  --color-dark-base: oklch(31.021% 0.05876 232.702); /* #1B3A47 */
   --color-second-dark-base: oklch(53.25% 0.0631 70.07); /* #806B4D */
   --color-logo-button-base: oklch(66.57% 0.1758 65.34); /* #EB842B */
   --color-second-light-shade-base: oklch(46.33% 0.1329 60.18); /* #B26C19 */
@@ -175,6 +175,30 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
    --color-tertiary: var(--color-dark-base)
+}
+
+.bg-pattern {
+  background-color: #f8fafc; /* light mode fallback */
+  background-image: radial-gradient(circle at 1px 1px, #d1d5db 1px, transparent 0);
+  background-size: 24px 24px;
+}
+
+.dark .bg-pattern {
+  background-color: #020617; /* dark mode fallback */
+  background-image: radial-gradient(circle at 1px 1px, #1e293b 1px, transparent 0);
+  background-size: 24px 24px;
+}
+
+/* 2. Custom Styles for the Sticky Privacy Sidebar Navigation */
+.privacy-nav-link {
+  @apply flex items-center gap-3 rounded-md px-3 py-2 text-slate-600 transition-all duration-150;
+  @apply hover:bg-slate-200 hover:text-slate-900;
+  @apply dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white;
+}
+
+.privacy-nav-link.active {
+  @apply bg-amber-100 font-semibold text-amber-700;
+  @apply dark:bg-amber-500/10 dark:text-amber-400;
 }
 
 @layer base {
