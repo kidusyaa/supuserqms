@@ -34,7 +34,7 @@ export default function Home() {
           '@context': 'https://schema.org',
           '@type': 'WebPage',
           name: 'GizeBook – Book beauty, barbershop, haircut, massage & spa',
-          url: process.env.NEXT_PUBLIC_SITE_URL || 'https://example.com',
+          url: process.env.NEXT_PUBLIC_SITE_URL || 'https://www.gizebook.com/,
           description:
             'Find and book salons, barbershops, haircuts, massage and wellness services near you.',
         }),
