@@ -12,7 +12,7 @@ import DivCenter from "./divCenter";
 const categoryImages: { [key: string]: string } = {
   'ctyp_barbershop': '/images/category/barbershop.png',
   'ctyp_beauty_salon': '/images/category/beautysalon.png',
-  'ctyp_massage_parlor': '/images/category/massage.png',
+  'ctyp_massage_parlor': '/images/category/bodymassage.png',
 };
 
 export default function CompanyTypesPage() {
