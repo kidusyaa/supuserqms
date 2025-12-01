@@ -21,11 +21,8 @@ export default function Homepage() {
       {/* Pass the heroSectionHeight to NavSection */}
       {/* HeroSection will now report its height */}
       <HeroSection />
-      <DiscountedServices/>
-      <CompanyTypesPage/>
-      
+      <DiscountedServices/>    
       <FeaturedServices/>
-
       {/* <RecentJoinSection/> */}
       <StatsSection/>
      

@@ -60,7 +60,7 @@ export default function CompanyServiceCard({ service }: ServiceCardProps) {
   const discountLabel = hasDiscount ? formatDiscount(service) : null;
 
   return (
-    <div className="bg-card border text-card-foreground rounded-lg overflow-hidden transition-all duration-300 hover:border-primary/50 hover:shadow-lg group flex flex-col h-full">
+    <div className="bg-card border text-card-foreground rounded-lg overflow-hidden transition-all duration-300 hover:border-primary/50 hover:shadow-lg group flex flex-col h-full w-full">
       <div className="aspect-video relative overflow-hidden">
         <Image
           src={photoSrc}

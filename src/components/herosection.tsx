@@ -1,6 +1,7 @@
 // src/components/Herosection.tsx
 import React from 'react';
 import Filterherosection from './Filterherosection';
+import CompanyTypesPage from './company-types';
 
 export default function Herosection() {
   
@@ -11,9 +12,11 @@ export default function Herosection() {
       // On medium/large screens, the filter section is shorter horizontally, so less padding is needed.
       className="relative pb-[100px] md:pb-[180px] lg:pb-[200px] flex flex-col justify-start "
     >
-      <div className='bg-tertiary h-[300px] lg:h-[400px] md:rounded-b-[200px] rounded-b-lg'> {/* Corrected rounded-b-4xl to rounded-b-2xl assuming it was a typo for common tailwind sizes */}
+      {/* This div controls the background color and shape */}
+      <div className='bg-tertiary h-[400px] lg:h-[500px] md:rounded-b-[200px] rounded-b-md'>
         <div className='container mx-auto px-4 pt-10'>
           <div className="text-center mb-12">
+            {/* These text colors are already white and amber-500 */}
             <h1 className="text-2xl md:text-6xl font-extrabold text-white mb-6 text-balance leading-tight">
               Find & Book Trusted Services
               <span className="text-amber-500 block">Effortlessly</span>
@@ -25,7 +28,11 @@ export default function Herosection() {
         </div>
       </div>
       
+      {/* The Filterherosection is absolutely positioned over the bottom of the hero background */}
       <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full max-w-4xl px-4 z-10 ">
+      <div className=''>
+      <CompanyTypesPage/>
+      </div>
         <Filterherosection/>
       </div>
     </div>

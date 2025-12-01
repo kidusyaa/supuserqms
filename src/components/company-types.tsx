@@ -43,7 +43,7 @@ export default function CompanyTypesPage() {
   );
 
   return (
-    <div className=" my-10  ">
+    <div className="mb-4 ">
     <DivCenter>
      
     <div className=" mx-auto  ">
@@ -62,10 +62,10 @@ export default function CompanyTypesPage() {
                 key={type.id}
                 href={`/company?companyTypeId=${type.id}`}
                 // The 'group' is essential for hover effects on child elements
-                className="group flex flex-col items-center gap-4 text-center"
+                className="group flex flex-col items-center gap-4 text-center "
               >
                 {/* 1. Circular Image Container */}
-                <div className="relative  overflow-hidden rounded-full ring-2 ring-gray-200 transition-all duration-300 group-hover:ring-4 group-hover:ring-primary h-20 w-20">
+                <div className="relative  overflow-hidden rounded-full ring-2 ring-gray-200 transition-all duration-300 group-hover:ring-4 group-hover:ring-primary h-16 w-16 bg-white">
                   <Image
                     src={categoryImages[type.id] || '/placeholder.svg'}
                     alt={type.name}
@@ -77,7 +77,7 @@ export default function CompanyTypesPage() {
 
                 {/* 2. Centered Text Below */}
                 <div>
-                  <h3 className="md:text-lg text-sm font-bold text-gray-800 transition-colors group-hover:text-primary">
+                  <h3 className="md:text-lg text-sm font-bold text-white/50 transition-colors group-hover:text-primary ">
                     {type.name}
                   </h3>
                   <p className="text-xs text-gray-500">
@@ -91,12 +91,12 @@ export default function CompanyTypesPage() {
         )}
       </div> 
     </div>
-     <div className="flex items-center justify-between md:mb-10 mb-4 pt-5 ">
+     {/* <div className="flex items-center justify-between md:mb-10 mb-4 pt-5 ">
             <h2 className="text-2xl font-bold text-tertiary flex items-center gap-2">
               <LayoutDashboard className="w-6 h-6 text-orange-500" />
               Business Categories
             </h2>
-        </div>
+        </div> */}
     </DivCenter>
     </div>
   );

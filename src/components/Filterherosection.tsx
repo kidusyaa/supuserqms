@@ -159,7 +159,7 @@ export default function Filterherosection() {
   return (
     <div>
       <div className="max-w-4xl mx-auto">
-        <div className="bg-card backdrop-blur-sm rounded-2xl shadow-xl border border-border p-6 md:p-8">
+        <div className="bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/20 rounded-2xl shadow-xl border border-border p-6 md:p-8">
           {/* --- NEW: Search input field outside the grid, for a full-width appearance --- */}
           <div className="relative mb-6">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
