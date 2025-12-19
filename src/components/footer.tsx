@@ -3,12 +3,6 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
 import { Icon } from '@iconify/react/dist/iconify.js';
 import {
   Facebook,
@@ -78,7 +72,7 @@ const Footer = () => {
                 <a href="https://maps.app.goo.gl/p1MYLcXZYW25wTHB8" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors gap-2 ">
                 <p className="flex items-center ">
                   <MapPin size={18} className="text-primary my-6" />
-                  <span>Lideta Mall | ልደታ መርካቶ, Addis Ababa, Ethiopia</span>
+                  <span>Addis Ababa, Ethiopia</span>
                 </p>
                 </a>
                 <p className="flex items-center gap-2">
