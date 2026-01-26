@@ -150,7 +150,11 @@ export default function CompaniesClientPage({
           {filteredCompanies.length > 0 ? (
             <div className="grid xl:grid-cols-4  lg:grid-cols-3 grid-cols-1  gap-4">
               {filteredCompanies.map((company) => (
-                <Link key={company.id} href={`/company/${company.slug}`} passHref>
+                <Link
+                  key={company.id}
+                  href={`/company/${company.slug ? encodeURIComponent(company.slug.replace(/^\/+|\/+$/g, "")) : company.id}`}
+                  passHref
+                >
                   <Card className="hover:shadow-lg transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] border-none shadow-md h-full">
                     <CardContent className="p-4">
                       <div className="flex gap-4 items-start">

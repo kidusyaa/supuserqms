@@ -209,3 +209,46 @@
     @apply bg-background text-foreground;
   }
 }
+/* For the continuous scrolling partners carousel */
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.marquee {
+  overflow: hidden;
+}
+
+.marquee-track {
+  display: flex;
+  width: max-content;
+  animation: marquee var(--scroll-speed) linear infinite;
+  will-change: transform;
+}
+
+.marquee:hover .marquee-track {
+  animation-play-state: paused;
+}
+
+/* Logo card */
+.logo-card {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  margin-right: 1.5rem;
+  border-radius: 9999px;
+  overflow: hidden;
+  background: hsl(var(--card));
+  border: 4px solid gainsboro;
+}
+
+@media (min-width: 768px) {
+  .logo-card {
+    width: 100px;
+    height: 100px;
+  }
+}

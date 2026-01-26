@@ -10,7 +10,7 @@ export default function Herosection() {
       // --- UPDATED: Adjusted padding-bottom for responsiveness ---
       // On small screens, ensure enough space for the stacked filter section
       // On medium/large screens, the filter section is shorter horizontally, so less padding is needed.
-      className="relative pb-[100px] md:pb-[180px] lg:pb-[200px] flex flex-col justify-start "
+      className="relative  flex flex-col justify-start "
     >
       {/* This div controls the background color and shape */}
       <div className='bg-tertiary h-[400px] lg:h-[500px] md:rounded-b-[200px] rounded-b-md'>
@@ -25,16 +25,11 @@ export default function Herosection() {
               From home repairs to personal wellness, connect with top-rated professionals in your area.
             </p>
           </div>
+           <Filterherosection/>
         </div>
+        
       </div>
       
-      {/* The Filterherosection is absolutely positioned over the bottom of the hero background */}
-      <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full max-w-4xl px-4 z-10 ">
-      <div className=''>
-      <CompanyTypesPage/>
-      </div>
-        <Filterherosection/>
-      </div>
     </div>
   );
 }

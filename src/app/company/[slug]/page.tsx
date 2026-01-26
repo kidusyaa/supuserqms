@@ -21,7 +21,15 @@ export default function CompanyDetailPage() {
   const [company, setCompany] = useState<Company | null>(null)
   const [loading, setLoading] = useState(true)
 
-   const companySlug = params.slug as string
+  const companySlug = (() => {
+    const raw = String((params as any)?.slug ?? "");
+    const trimmed = raw.trim().replace(/^\/+|\/+$/g, "");
+    try {
+      return decodeURIComponent(trimmed);
+    } catch {
+      return trimmed;
+    }
+  })();
 
   useEffect(() => {
     const fetchCompanyData = async () => {

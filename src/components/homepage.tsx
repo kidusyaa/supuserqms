@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect,useState } from 'react'; // Import useState
+import React, { useEffect, useState } from 'react'; // Import useState
 import Link from 'next/link';
 import DivCenter from './divCenter';
 import { Button } from './ui/button';
@@ -10,6 +10,8 @@ import HeroSection from './herosection';
 import StatsSection from './StatsSection';
 import CompanyTypesPage from './company-types';
 import DiscountedServices from './discountedServices';
+import PartnersCarousel from './PartnersCarousel';
+import RecentlyJoinedCompanies from './RecentlyJoinedCompanies';
 export default function Homepage() {
   const SERVICES_SECTION_ID = "services-list";
   // State to store the height of the HeroSection
@@ -17,15 +19,14 @@ export default function Homepage() {
 
   return (
     <div>
-      {/* NavSection should be rendered here, outside of HeroSection */}
-      {/* Pass the heroSectionHeight to NavSection */}
-      {/* HeroSection will now report its height */}
+
       <HeroSection />
-      <DiscountedServices/>    
-      <FeaturedServices/>
-      {/* <RecentJoinSection/> */}
-      <StatsSection/>
-     
+      <DiscountedServices />
+      <PartnersCarousel />
+      <RecentlyJoinedCompanies />
+      <StatsSection />
+
+
     </div>
   );
 }

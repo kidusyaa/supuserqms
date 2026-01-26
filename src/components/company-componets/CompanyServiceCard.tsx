@@ -88,16 +88,23 @@ export default function CompanyServiceCard({ service }: ServiceCardProps) {
         {/* ... the rest of your component remains the same ... */}
         <div className="flex flex-row items-start justify-between">
           <CardTitle className="text-lg font-bold group-hover:text-primary transition-colors">{service.name}</CardTitle>
-          
-          {formattedOriginalPrice && (
-            <div className="flex flex-col items-end flex-shrink-0 ml-2">
-              <span className="text-xl font-semibold text-foreground">{formattedDiscountedPrice}</span>
-              {hasDiscount && (
-                <span className="line-through text-sm text-muted-foreground -mt-1">{formattedOriginalPrice}</span>
-              )}
-            </div>
-          )}
-        </div>
+        {formattedOriginalPrice ? (
+    <div className="flex flex-col items-end flex-shrink-0 ml-2">
+      <span className="text-xl font-semibold text-foreground">
+        {formattedDiscountedPrice}
+      </span>
+      {hasDiscount && (
+        <span className="line-through text-sm text-muted-foreground -mt-1">
+          {formattedOriginalPrice}
+        </span>
+      )}
+    </div>
+  ) : (
+    <div className="text-sm text-muted-foreground italic">
+      Call for prices
+    </div>
+  )}
+</div>
 
         {service.description && (
           <CardDescription className="line-clamp-2 text-muted-foreground">{service.description}</CardDescription>

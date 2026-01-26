@@ -667,6 +667,7 @@ export const getCompanyOptions = async (): Promise<LocationOption[]> => {
     const service: Service = {
       ...mapToService(rawServiceData), // Map the base service properties
       photo: publicPhotoUrl,           // Add the processed photo URL
+      service_photos: rawServiceData.service_photos || [], // Keep all photos for carousels/galleries
       providers: providers,            // Add the mapped providers
       company: company,                // Add the mapped company
     };
@@ -924,6 +925,17 @@ export async function getCompanyWithServices(companyId: string): Promise<Company
 }
 
 export async function getCompanyBySlugWithServices(companySlug: string): Promise<Company | null> {
+  const cleanSlug = (() => {
+    const trimmed = (companySlug ?? "").trim().replace(/^\/+|\/+$/g, "");
+    try {
+      return decodeURIComponent(trimmed);
+    } catch {
+      return trimmed;
+    }
+  })();
+
+  if (!cleanSlug) return null;
+
   const { data, error } = await supabase
     .from('companies')
     .select(`
@@ -935,8 +947,9 @@ export async function getCompanyBySlugWithServices(companySlug: string): Promise
         )
       )
     `)
-    .eq('slug', companySlug) // The only change is here: 'slug' instead of 'id'
-    .single();
+    .eq('slug', cleanSlug)
+    // Avoids 406 when the slug doesn't match any row.
+    .maybeSingle();
 
   if (error) {
     console.error('Error fetching company by slug:', error);
@@ -1390,7 +1403,8 @@ export function generateSlug(name: string): string {
 export async function getRecentCompanies(limit: number = 8): Promise<Company[]> {
   const { data, error } = await supabase
     .from('companies')
-    .select('id, name, logo, location_text, created_at') // Select only necessary fields for display
+    // Include `slug` so UI links can route to /company/<slug>
+    .select('id, slug, name, logo, location_text, created_at') // Select only necessary fields for display
     .order('created_at', { ascending: false }) // Order by creation date, newest first
     .limit(limit); // Limit the number of companies returned
 

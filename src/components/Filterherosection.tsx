@@ -109,7 +109,7 @@ export default function Filterherosection() {
       }
     });
   };
-   const handleCompanyTypeToggle = (typeId: string) => {
+  const handleCompanyTypeToggle = (typeId: string) => {
     setFilters((prev) => {
       const newTypeIds = prev.companyTypeIds.includes(typeId)
         ? prev.companyTypeIds.filter((id) => id !== typeId) // Remove if already selected
@@ -119,7 +119,7 @@ export default function Filterherosection() {
   };
 
   // --- MODIFIED: handleSearch function for navigation ---
-   const handleSearch = () => {
+  const handleSearch = () => {
     const queryParams = new URLSearchParams();
 
     if (filters.searchTerm) {
@@ -159,77 +159,33 @@ export default function Filterherosection() {
   return (
     <div>
       <div className="max-w-4xl mx-auto">
-        <div className="bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/20 rounded-2xl shadow-xl border border-border p-6 md:p-8">
-          {/* --- NEW: Search input field outside the grid, for a full-width appearance --- */}
-          <div className="relative mb-6">
+        <div className="bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/20 rounded-2xl shadow-xl border border-border md:p-4 p-2">
+        <div className='flex flex-row space-x-4'>
+          <div className="relative mb-6 bg-green-500 w-full">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-           <Input
-  placeholder="Search services or companies..."
-  className="w-full pl-12 h-12 text-base border-border/50 focus:border-accent text-foreground hover:bg-muted bg-white"
-  value={filters.searchTerm}
-  onChange={(e) =>
-    setFilters((prev) => ({
-      ...prev,
-      searchTerm: e.target.value,
-    }))
-  }
-  onKeyDown={(e) => {
-    if (e.key === "Enter") {
-      e.preventDefault(); // prevent form submission or page reload
-      handleSearch();     // 🔑 trigger search
-    }
-  }}
-  // --- This makes the phone keyboard show a "Search" button instead of just Enter ---
-  type="search"
-  inputMode="search"
-/>
+            <Input
+              placeholder="Search services or companies..."
+              className="w-full pl-12 h-12 text-base border-border/50 focus:border-accent text-foreground hover:bg-muted bg-white"
+              value={filters.searchTerm}
+              onChange={(e) =>
+                setFilters((prev) => ({
+                  ...prev,
+                  searchTerm: e.target.value,
+                }))
+              }
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault(); // prevent form submission or page reload
+                  handleSearch();     // 🔑 trigger search
+                }
+              }}
+              // --- This makes the phone keyboard show a "Search" button instead of just Enter ---
+              type="search"
+              inputMode="search"
+            />
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
-           <Popover
-              open={companyTypePopoverOpen}
-              onOpenChange={setCompanyTypePopoverOpen}
-            >
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="h-12 flex-shrink-0 w-full justify-center md:justify-start text-base border-border/50 focus:border-accent text-foreground hover:bg-muted"
-                  disabled={dataLoading}
-                >
-                  <LayoutDashboard className="mr-2 h-5 w-5 text-muted-foreground" />
-                  <span className='md:block hidden'>Company Type</span>{" "}
-                  {selectedCompanyTypeCount > 0 && `(${selectedCompanyTypeCount})`}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[250px] p-0">
-                <Command>
-                  <CommandInput placeholder="Search type..." />
-                  <CommandList>
-                    {dataLoading ? ( <CommandItem>Loading...</CommandItem> ) : (
-                      <CommandGroup>
-                        {companyTypes.map((type) => (
-                          <CommandItem
-                            key={type.id}
-                            onSelect={() => handleCompanyTypeToggle(type.id)}
-                          >
-                            <Check
-                              // --- FIX 5: Update checkmark logic for an array ---
-                              className={`mr-2 h-4 w-4 ${
-                                filters.companyTypeIds.includes(type.id)
-                                  ? "opacity-100 text-primary"
-                                  : "opacity-0"
-                              }`}
-                            />
-                            {type.name}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    )}
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-
+          <div >
             <Popover
               open={locationPopoverOpen}
               onOpenChange={setLocationPopoverOpen}
@@ -240,8 +196,8 @@ export default function Filterherosection() {
                   className="h-12 flex-shrink-0 w-full justify-center md:justify-start text-base border-border/50 focus:border-accent text-foreground hover:bg-muted"
                   disabled={dataLoading}
                 >
-                  <MapPin className="mr-2 h-5 w-5 text-muted-foreground" />
-                  <span className='md:block hidden'>Location</span>{" "}
+                  <MapPin className=" h-5 w-5 text-muted-foreground" />
+                  <span className='text-sm'>Location</span>{" "}
                   {selectedLocationCount > 0 && `(${selectedLocationCount})`}
                 </Button>
               </PopoverTrigger>
@@ -263,13 +219,12 @@ export default function Filterherosection() {
                             className="hover:bg-muted text-foreground"
                           >
                             <Check
-                              className={`mr-2 h-4 w-4 ${
-                                filters.locations.some(
-                                  (l) => l.value === loc.value
-                                )
+                              className={`mr-2 h-4 w-4 ${filters.locations.some(
+                                (l) => l.value === loc.value
+                              )
                                   ? "opacity-100 text-primary"
                                   : "opacity-0"
-                              }`}
+                                }`}
                             />
                             {loc.label}
                           </CommandItem>
@@ -280,62 +235,12 @@ export default function Filterherosection() {
                 </Command>
               </PopoverContent>
             </Popover>
-
-            <Popover
-              open={companyPopoverOpen}
-              onOpenChange={setCompanyPopoverOpen}
-            >
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="h-12 flex-shrink-0 w-full justify-center md:justify-start text-base border-border/50 focus:border-accent text-foreground hover:bg-muted"
-                  disabled={dataLoading}
-                >
-                  <House className="mr-2 h-5 w-5 text-muted-foreground" />
-                  <span className='md:block hidden'>Company</span>{" "}
-                  {selectedCompanyCount > 0 && `(${selectedCompanyCount})`}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent
-                className="w-[250px] p-0 bg-popover text-popover-foreground border-border shadow-lg"
-              >
-                <Command className="[&_[cmdk-group]]:px-2 [&_[cmdk-group]_:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-item]_svg]:h-4 [&_[cmdk-item]_svg]:w-4 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-1.5 [&_[cmdk-item]_span]:ml-2 [&_[cmdk-item]_span]:flex-1 [&_[cmdk-item]_span]:text-sm">
-                  <CommandInput placeholder="Search company..." className="h-10 text-base placeholder-muted-foreground" />
-                  <CommandList>
-                    {dataLoading ? (
-                      <CommandItem className="text-muted-foreground">Loading...</CommandItem>
-                    ) : (
-                      <CommandGroup>
-                        {companyOptions.map((company) => (
-                          <CommandItem
-                            key={company.value}
-                            onSelect={() =>
-                              handleCompanyToggle(company.value)
-                            }
-                            className="hover:bg-muted text-foreground"
-                          >
-                            <Check
-                              className={`mr-2 h-4 w-4 ${
-                                filters.companyIds.includes(company.value)
-                                  ? "opacity-100 text-primary"
-                                  : "opacity-0"
-                              }`}
-                            />
-                            {company.label}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    )}
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
           </div>
-
+</div>
           <Button
             size="lg"
             onClick={handleSearch}
-            className="w-full mt-6 h-12 text-base font-semibold bg-accent hover:bg-accent/90 text-accent-foreground rounded-xl focus-visible:outline-ring"
+            className="w-full h-12 text-base font-semibold bg-accent hover:bg-accent/90 text-accent-foreground rounded-xl focus-visible:outline-ring"
           >
             <Search className="h-5 w-5 mr-2" />
             Find Services

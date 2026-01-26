@@ -3,30 +3,57 @@
 
 import { useState, useEffect } from 'react';
 import { getGlobalStats } from '@/lib/supabase-utils';
-import { Building2, ClipboardList, BadgeCheck, Users } from 'lucide-react';
+import { Building2, ClipboardList, BadgeCheck, Users, TrendingUp } from 'lucide-react';
 import React from 'react';
 
 interface StatItem {
   icon: React.ReactNode;
   value: string;
   label: string;
-  loading: boolean;
+ loading:boolean
 }
 
 const StatCardSkeleton = () => (
-  <div className="flex flex-col items-center justify-center gap-2 py-5 px-3 rounded-lg animate-pulse">
-    <div className="h-10 w-10 rounded-full bg-gray-200"></div>
-    <div className="h-7 w-20 bg-gray-200 rounded-md"></div>
-    <div className="h-4 w-28 bg-gray-200 rounded-md"></div>
+  <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl p-6 shadow-lg border border-gray-100 animate-pulse">
+    <div className="flex items-start justify-between">
+      <div className="space-y-4">
+        <div className="h-6 w-24 bg-gray-200 rounded-lg"></div>
+        <div className="h-10 w-20 bg-gray-200 rounded-lg"></div>
+      </div>
+      <div className="h-12 w-12 rounded-xl bg-gray-200"></div>
+    </div>
+    <div className="mt-6 h-4 w-32 bg-gray-200 rounded-lg"></div>
   </div>
 );
 
 const StatsSection = () => {
   const [stats, setStats] = useState<StatItem[]>([
-    { icon: <Building2 size={32} />, label: 'Companies Registered', value: '—', loading: true },
-    { icon: <ClipboardList size={32} />, label: 'Active Services', value: '—', loading: true },
-    { icon: <BadgeCheck size={32} />, label: 'Services Completed', value: '—', loading: true },
-    { icon: <Users size={32} />, label: 'Registered Users', value: '—', loading: true },
+    { 
+      icon: <Building2 size={24} />, 
+      label: 'Companies Registered', 
+     value: '—', 
+      loading: true,
+    },
+    { 
+      icon: <ClipboardList size={24} />, 
+      label: 'Active Services', 
+     value: '—', 
+      loading: true,
+    },
+    { 
+      icon: <BadgeCheck size={24} />, 
+      label: 'Services Completed', 
+      value: '—', 
+      loading: true,
+      
+    },
+    { 
+      icon: <Users size={24} />, 
+      label: 'Registered Users', 
+      value: '—', 
+      loading: true,
+      
+    },
   ]);
 
   useEffect(() => {
@@ -34,10 +61,34 @@ const StatsSection = () => {
       try {
         const s = await getGlobalStats();
         setStats([
-          { icon: <Building2 size={32} className="text-orange-600" />, label: 'Companies Registered', value: s.companiesCount.toLocaleString(), loading: false },
-          { icon: <ClipboardList size={32} className="text-orange-600" />, label: 'Active Services', value: s.activeServicesCount.toLocaleString(), loading: false },
-          { icon: <BadgeCheck size={32} className="text-orange-600" />, label: 'Services Completed', value: s.servicesCompletedCount.toLocaleString(), loading: false },
-          { icon: <Users size={32} className="text-orange-600" />, label: 'Registered Users', value: s.usersCount.toLocaleString(), loading: false },
+          { 
+            icon: <Building2 size={24} className="text-orange-500" />, 
+            label: 'Companies Registered', 
+            value: s.companiesCount.toLocaleString(), 
+            loading: false,
+         
+          },
+          { 
+            icon: <ClipboardList size={24} className="text-blue-500" />, 
+            label: 'Active Services', 
+            value: s.activeServicesCount.toLocaleString(), 
+            loading: false,
+           
+          },
+          { 
+            icon: <BadgeCheck size={24} className="text-green-500" />, 
+            label: 'Services Completed', 
+            value: s.servicesCompletedCount.toLocaleString(), 
+            loading: false,
+           
+          },
+          { 
+            icon: <Users size={24} className="text-purple-500" />, 
+            label: 'Registered Users', 
+            value: s.usersCount.toLocaleString(), 
+            loading: false,
+            
+          },
         ]);
       } catch (error) {
         console.error("Failed to load global stats:", error);
@@ -48,37 +99,32 @@ const StatsSection = () => {
   }, []);
 
   return (
-    <div className="">
+    <div className="py-12 md:py-16">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        
-        {/* Stats Grid */}
-        <div className="grid md:grid-cols-4 grid-cols-2 gap-y-8 gap-x-6">
-          {stats.map((stat, index) => (
-            <div key={index}>
-              {stat.loading ? (
-                <StatCardSkeleton />
-              ) : (
-                <div className="flex flex-col items-center justify-center gap-2 py-5 px-3 rounded-lg">
-                  <div className="flex items-center justify-center h-12 w-12 rounded-full bg-tertiary/20">
-                    {stat.icon}
-                  </div>
-                  <p className="text-3xl sm:text-4xl font-extrabold tracking-tight text-gray-900">
-                    {stat.value}
-                  </p>
-                  <p className="text-sm sm:text-base font-medium text-gray-500">
-                    {stat.label}
-                  </p>
-                </div>
-              )}
+
+        {/* Footer Stats */}
+        <div className="mt-12 bg-gradient-to-r from-orange-50 to-gray-50 rounded-2xl p-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="text-center">
+              <div className="text-4xl font-bold text-orange-600 mb-2">99%</div>
+              <p className="text-gray-600 font-medium">Customer Satisfaction</p>
             </div>
-          ))}
+            <div className="text-center">
+              <div className="text-4xl font-bold text-orange-600 mb-2">24/7</div>
+              <p className="text-gray-600 font-medium">Service Availability</p>
+            </div>
+            <div className="text-center">
+              <div className="text-4xl font-bold text-orange-600 mb-2">50+</div>
+              <p className="text-gray-600 font-medium">Service Categories</p>
+            </div>
+          </div>
         </div>
 
         {/* Bottom Tagline */}
-        <div className="mt-10 text-center">
-          {/* <p className="mt-2 text-gray-600 max-w-2xl mx-auto">
-            Join our network of businesses and users who rely on us for seamless service booking and reliable professionals.
-          </p> */}
+        <div className="mt-12 text-center">
+          <p className="text-gray-700 text-lg font-medium italic">
+            "Trusted by businesses for seamless service management"
+          </p>  
         </div>
       </div>
     </div>

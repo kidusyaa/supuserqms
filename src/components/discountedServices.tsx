@@ -78,7 +78,7 @@ export default function DiscountedServices() {
   }
 
   return (
-    <section className="py-12   overflow-hidden">
+    <section className="py-6   overflow-hidden">
       <div className="max-w-6xl mx-auto px-4">
         <div className="flex items-center justify-between md:mb-10 mb-4">
             <h2 className="text-2xl font-bold text-tertiary flex items-center gap-2">
@@ -123,7 +123,7 @@ export default function DiscountedServices() {
                           className="aspect-video w-full object-cover"
                         />
                         {/* Gradient Overlay */}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent"></div>
+                        <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/40 to-transparent"></div>
                         
                         {/* Discount Badge */}
                         <div className="absolute top-3 left-3 rounded-full bg-red-500 px-3 py-1 text-xs font-bold text-white shadow-lg">
