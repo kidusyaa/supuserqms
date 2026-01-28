@@ -98,30 +98,6 @@ export default function CompanyDetailPage() {
     <div className="mx-auto">
     <div className="  text-slate-200">
    <div>
-      {/* ✨ Combined & Themed Navigation Bar */}
-      {/* <div className="  bg-transparent border-b border-slate-700 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <nav className="flex items-center space-x-2 text-sm text-slate-400">
-            <Link href="/" className="flex items-center hover:text-amber-400 transition-colors">
-              <Home className="h-4 w-4 mr-1.5" />
-              Home
-            </Link>
-            <ChevronRight className="h-4 w-4 text-slate-600" />
-            <span className="font-medium text-slate-200">{company.name}</span>
-          </nav>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => router.back()}
-            className="hover:bg-slate-700 hover:text-slate-100"
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
-          </Button>
-        </div>
-      </div> */}
-
-      {/* Company Header with Banner */}
      
       <CompanyHeader company={company} />
 

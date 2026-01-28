@@ -80,7 +80,9 @@ const companyTypeIcon = service.company?.company_types?.[0]?.icon;
             )}
              {/* Price / Discount Badge */}
             <div className="absolute top-2 right-2 bg-card/90 backdrop-blur-sm rounded-full px-2.5 py-1 text-sm font-semibold text-card-foreground shadow">
-              {hasDiscount ? (
+              {service.price === null ? (
+                <span className="">Call for prices</span>
+              ) : hasDiscount ? (
                 <div className="flex items-center gap-1.5">
                   <span className="line-through text-muted-foreground">${service.price}</span>
                   <span className="text-emerald-600">${newPrice}</span>

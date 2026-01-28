@@ -54,10 +54,10 @@ export default function ServiceDetailsCard({
   const [isAutoPlayPaused, setIsAutoPlayPaused] = useState(false);
 
   const hasDiscount = service.discount_type && service.discount_value !== null && parseFloat(service.price || '0') > 0;
-  
+
   const originalPriceValue = parseFloat(service.price || '0');
   const formattedOriginalPrice = originalPriceValue > 0 ? `$${originalPriceValue.toFixed(2)}` : null;
-  
+
   const discountedPriceValue = hasDiscount ? parseFloat(calculateDiscountedPrice(service) || '0') : originalPriceValue;
   const formattedDiscountedPrice = discountedPriceValue > 0 ? `$${discountedPriceValue.toFixed(2)}` : null;
 
@@ -135,7 +135,7 @@ export default function ServiceDetailsCard({
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                       </div>
-                      
+
                       {/* Discount Badge */}
                       {hasDiscount && discountLabel && (
                         <Badge className="absolute top-4 left-4 bg-gradient-to-r from-red-500 to-orange-500 text-white text-sm py-2 px-4 rounded-full shadow-lg border-0">
@@ -179,8 +179,8 @@ export default function ServiceDetailsCard({
                   {/* Fullscreen Image View */}
                   <DialogContent className="max-w-6xl max-h-[90vh] p-0 bg-black/95 border-none">
                     <div className="relative w-full h-full">
-                      <button 
-                        onClick={() => setSelectedImage(null)} 
+                      <button
+                        onClick={() => setSelectedImage(null)}
                         className="absolute top-4 right-4 text-white z-50 bg-black/50 hover:bg-black/70 rounded-full p-2 transition backdrop-blur-sm"
                         aria-label="Close"
                       >
@@ -206,9 +206,9 @@ export default function ServiceDetailsCard({
               {uniqueImageUrls.length > 1 && (
                 <div className="mt-4 px-2">
                   <div className="relative">
-                   
-                    
-                    <div 
+
+
+                    <div
                       ref={thumbnailRef}
                       className="flex gap-3 overflow-x-auto scrollbar-hide px-8 py-2"
                     >
@@ -216,11 +216,10 @@ export default function ServiceDetailsCard({
                         <button
                           key={index}
                           onClick={() => setCurrentImageIndex(index)}
-                          className={`flex-shrink-0 w-24 h-20 rounded-lg overflow-hidden border-2 transition-all duration-200 ${
-                            index === currentImageIndex 
-                              ? 'border-primary scale-105 shadow-md ring-2 ring-primary/20' 
+                          className={`flex-shrink-0 w-24 h-20 rounded-lg overflow-hidden border-2 transition-all duration-200 ${index === currentImageIndex
+                              ? 'border-primary scale-105 shadow-md ring-2 ring-primary/20'
                               : 'border-gray-200 hover:border-gray-300 hover:scale-102'
-                          }`}
+                            }`}
                         >
                           <Image
                             src={url}
@@ -233,7 +232,7 @@ export default function ServiceDetailsCard({
                       ))}
                     </div>
 
-                   
+
                   </div>
                 </div>
               )}
@@ -247,16 +246,11 @@ export default function ServiceDetailsCard({
               <div className="flex items-start justify-between mb-4">
                 <div>
                   <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-2">{service.name}</h1>
-                  {/* <div className="flex items-center gap-2 text-gray-600">
-                    <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
-                    <span className="font-medium">{service.rating || "4.8"}</span>
-                    <span className="text-gray-400">•</span>
-                    <span className="text-gray-500">{service.category}</span>
-                  </div> */}
+
                 </div>
-                
+
                 {/* Price Display */}
-                {formattedOriginalPrice && (
+              {formattedOriginalPrice ? (
                   <div className="text-right">
                     {hasDiscount && (
                       <span className="line-through text-lg text-gray-400 block mb-1">
@@ -267,7 +261,11 @@ export default function ServiceDetailsCard({
                       {formattedDiscountedPrice}
                     </span>
                   </div>
-                )}
+                ):(
+                <div className="text-sm text-muted-foreground italic">
+                  Call for prices
+                </div>
+  )}
               </div>
 
               <p className="text-gray-700 text-lg leading-relaxed">{service.description}</p>

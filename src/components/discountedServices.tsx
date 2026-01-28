@@ -143,12 +143,18 @@ export default function DiscountedServices() {
                     {/* Price and Button Section (below the image) */}
                     <div className=" flex flex-row justify-between p-4 bg-gray-50">
                       <div className="flex items-baseline gap-2 mb-3">
-                        <span className="text-2xl font-extrabold text-primary">
-                          ${calculateDiscountedPrice(service)}
-                        </span>
-                        <span className="text-base text-gray-400 line-through">
-                          ${service.price}
-                        </span>
+                        {service.price === null ? (
+                          <span className="text-lg font-medium text-amber-600">Call for prices</span>
+                        ) : (
+                          <>
+                            <span className="text-2xl font-extrabold text-primary">
+                              ${calculateDiscountedPrice(service)}
+                            </span>
+                            <span className="text-base text-gray-400 line-through">
+                              ${service.price}
+                            </span>
+                          </>
+                        )}
                       </div>
                       
                       <Button asChild  variant="outline">

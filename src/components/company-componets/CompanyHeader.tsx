@@ -4,20 +4,30 @@ import { MapPin, Phone, Mail, Globe, Facebook, Instagram } from "lucide-react";
 import { Company } from "@/type";
 import { Icon } from "@iconify/react/dist/iconify.js";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface CompanyHeaderProps {
   company: Company;
 }
 
+const getInitials = (name: string) => {
+  if (!name) return 'CO';
+  return name
+    .split(' ')
+    .map(word => word[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+};
+
 export default function CompanyHeader({ company }: CompanyHeaderProps) {
-  // ✨ Use a company-specific banner or a fallback
-  // const bannerImageUrl = company.banner_image || "/default-banner.jpg";
+  const bannerImageUrl = company.logo || "/images/one photo.jpg";
 
   return (
     <div className="relative w-full h-[400px] md:min-h-96 border-b ">
       {/* Background Banner Image */}
       <Image
-        src={company.logo || "/placeholder-company.png"}
+        src={company.logo || "/images/one photo.jpg"}
         alt={`${company.name} banner`}
         fill
         className="object-cover"
@@ -31,16 +41,21 @@ export default function CompanyHeader({ company }: CompanyHeaderProps) {
         <div className="container md:mx-20 mx-auto px-4 py-8 ">
           <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
             <div className="flex-shrink-0">
-              <Image
-                src={
-                  company.logo ||
-                  "/placeholder.svg?height=120&width=120&query=company logo"
-                }
-                alt={`${company.name} logo`}
-                width={120}
-                height={120}
-                className="rounded-xl border-2 border-border bg-card"
-              />
+              {company.logo ? (
+                <Image
+                  src={company.logo}
+                  alt={`${company.name} logo`}
+                  width={120}
+                  height={120}
+                  className="rounded-xl border-2 border-border bg-card object-cover"
+                />
+              ) : (
+                <div className="w-30 h-30 rounded-xl border-2 border-border bg-gradient-to-br from-orange-800 to-orange-00 flex items-center justify-center">
+                  <span className="text-4xl font-bold text-white">
+                    {getInitials(company.name)}
+                  </span>
+                </div>
+              )}
             </div>
             <div className="flex-1">
               <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
