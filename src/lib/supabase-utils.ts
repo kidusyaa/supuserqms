@@ -63,7 +63,9 @@ const mapToService = (serviceData: any): Service => ({
     photo: serviceData.photo || null,
     featureEnabled: serviceData.featureEnabled === true, // Ensure it's a boolean, default to false if null/undefined
     discount_type:serviceData.discount_type,
-    discount_value:serviceData.discount_value
+    discount_value:serviceData.discount_value,
+    requires_prepayment: serviceData.requires_prepayment || false,
+    prepayment_amount: serviceData.prepayment_amount || null,
 });
 
 // Helper to convert database rows to our Company type
@@ -81,6 +83,10 @@ const mapToCompany = (companyData: any): Company => ({
     owner_uid: companyData.owner_uid,
     created_at: companyData.created_at || null, 
     socials: companyData.socials || null,
+    bank_accounts: Array.isArray(companyData.bank_accounts) ? companyData.bank_accounts : [],
+    bank_name: companyData.bank_name || null,
+    account_name: companyData.account_name || null,
+    account_number: companyData.account_number || null,
 });
 
 // ===== LOCATIONS =====

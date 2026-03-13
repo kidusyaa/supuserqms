@@ -5,6 +5,14 @@ export type QueueTypeStatus = 'walk_in' | 'online' | 'scheduled' | 'other'; // A
 
 // --- Ensure your QueueEntryStatus for the 'status' column is also correct ---
 export type QueueEntryStatus = 'waiting' | 'serving' | 'completed' | 'cancelled';
+export type BankAccount = {
+  id: string;
+  account_type: string;
+  account_user_name: string;
+  account_number: string;
+  is_active?: boolean;
+};
+
 export type Company = {
   id: string;
   name: string;
@@ -27,7 +35,12 @@ export type Company = {
   company_types?: CompanyType[];
   services?: Service[];
   providers?: Provider[];
-  
+  license?: string | null;
+  bank_accounts: BankAccount[];
+  // --- DEPRECATED: Keep for backward compatibility during migration ---
+  bank_name?: string | null;
+  account_name?: string | null;
+  account_number?: string | null;
 };
   
 interface ServicePhoto {
@@ -46,14 +59,15 @@ export type Service = {
   providers?: Provider[]; 
   price: string | null;
   photo?: string | null;
-  featureEnabled?: boolean; // Changed to boolean, default handled in mapping
+  featureEnabled?: boolean;
   company?: Company;      
   queue_entries?: QueueItem[]; 
   service_photos?: ServicePhoto[];
   discount_type: 'percentage' | 'fixed' | null;
   discount_value: number | null; 
-  service_category?: { name: string }; // Use service_category to avoid conflict with `category_id`
-  
+  service_category?: { name: string };
+  requires_prepayment: boolean;
+  prepayment_amount?: number | null;
 };
 
 // In your type.ts file:
@@ -84,15 +98,16 @@ export interface Booking {
   id: string;
   user_id: string | null;
   user_name: string;
-  phone_number: string | null; // <--- CHANGED: To allow null, matching your component's usage
+  phone_number: string | null;
   service_id: string;
   company_id: string;
   provider_id: string | null;
-  start_time: string; // ISO 8601 string
-  end_time: string;   // ISO 8601 string
+  start_time: string;
+  end_time: string;
   status: BookingStatus;
   created_at: string;
   notes: string | null;
+  payment_proof?: string | null;
   service?: Service;
   company?: Company;
   provider?: Provider;
