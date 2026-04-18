@@ -35,7 +35,7 @@ const calculateDiscountedPrice = (service: Service): string | null => {
 const formatDiscount = (service: Service): string => {
   if (!service.discount_type || !service.discount_value) return "";
   if (service.discount_type === 'percentage') return `${service.discount_value}% OFF`;
-  return `-$${service.discount_value} OFF`;
+  return `-${service.discount_value} ETB OFF`;
 };
 
 // +++ NEW: A skeleton loader that matches the new overlay card design +++
@@ -148,10 +148,10 @@ export default function DiscountedServices() {
                         ) : (
                           <>
                             <span className="text-2xl font-extrabold text-primary">
-                              ${calculateDiscountedPrice(service)}
+                              {calculateDiscountedPrice(service)} ETB
                             </span>
                             <span className="text-base text-gray-400 line-through">
-                              ${service.price}
+                              {service.price} ETB
                             </span>
                           </>
                         )}

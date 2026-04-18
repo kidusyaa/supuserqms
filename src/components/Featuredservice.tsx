@@ -132,7 +132,7 @@ const FeaturedServices = () => {
                                     <Clock className="w-4 h-4" />
                                     <span className="text-sm">{service.estimated_wait_time_mins} min</span>
                                   </div>
-                                <div className="md:text-lg font-bold text-green-600">${service.price}</div>
+                                <div className="md:text-lg font-bold text-green-600">{service.price} ETB</div>
                               </div>
                             </div>
                           </Link>

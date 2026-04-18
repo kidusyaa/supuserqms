@@ -31,7 +31,7 @@ const formatDiscount = (service: Service): string => {
     return `${service.discount_value}% OFF`;
   }
   if (service.discount_type === 'fixed') {
-    return `Save $${service.discount_value}`;
+    return `Save ${service.discount_value} ETB`;
   }
   return "";
 };
@@ -54,9 +54,9 @@ export default function CompanyServiceCard({ service }: ServiceCardProps) {
   // Discount calculations (no changes needed)
   const hasDiscount = service.discount_type && service.discount_value !== null && parseFloat(service.price || '0') > 0;
   const originalPriceValue = parseFloat(service.price || '0');
-  const formattedOriginalPrice = originalPriceValue > 0 ? `$${originalPriceValue.toFixed(2)}` : null;
+  const formattedOriginalPrice = originalPriceValue > 0 ? `${originalPriceValue.toFixed(2)} ETB` : null;
   const discountedPriceValue = hasDiscount ? parseFloat(calculateDiscountedPrice(service) || '0') : originalPriceValue;
-  const formattedDiscountedPrice = discountedPriceValue > 0 ? `$${discountedPriceValue.toFixed(2)}` : null;
+  const formattedDiscountedPrice = discountedPriceValue > 0 ? `${discountedPriceValue.toFixed(2)} ETB` : null;
   const discountLabel = hasDiscount ? formatDiscount(service) : null;
 
   return (

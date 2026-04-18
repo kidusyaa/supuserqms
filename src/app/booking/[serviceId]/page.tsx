@@ -19,6 +19,7 @@ import type {
   QueueItem,
   AvailableSlot,
 } from "@/type";
+import { ANY_PROVIDER_ID } from "@/type";
 import {
   getServiceDetails,
   getConfirmedBookingsForProvider,
@@ -65,15 +66,13 @@ interface ConfirmedQueueItem extends QueueItem {
 export default function BookingPage() {
   const params = useParams();
   const router = useRouter();
+  
+  // 1. ALL useState declarations must go first
   const [service, setService] = useState<Service | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // State for UI interaction
-  const [selectedProviderId, setSelectedProviderId] = useState<string>("");
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(
-    startOfDay(new Date())
-  );
+  const [selectedProviderId, setSelectedProviderId] = useState<string>(""); // <-- Declared here first!
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(startOfDay(new Date()));
   const [selectedSlot, setSelectedSlot] = useState<AvailableSlot | null>(null);
   const [joinQueueDialogOpen, setJoinQueueDialogOpen] = useState(false);
   const [bookServiceDialogOpen, setBookServiceDialogOpen] = useState(false);
@@ -87,12 +86,28 @@ export default function BookingPage() {
 
   const serviceId = params.serviceId as string;
 
+  // 2. Declare company BEFORE using it in selectedProvider
   const company = useMemo(() => service?.company, [service]);
-  const selectedProvider = useMemo(
-    () => service?.providers?.find((p) => p.id === selectedProviderId),
-    [service?.providers, selectedProviderId]
-  );
 
+  // 3. NOW declare selectedProvider (Only ONCE)
+  const selectedProvider = useMemo(() => {
+    if (!selectedProviderId) return undefined;
+    
+    if (selectedProviderId === ANY_PROVIDER_ID) {
+      return {
+        id: ANY_PROVIDER_ID,
+        name: "Any Provider",
+        specialization: "First available professional",
+        is_active: true,
+        company_id: company?.id || "",
+        created_at: new Date().toISOString(),
+        isAny: true
+      } as Provider;
+    }
+    return service?.providers?.find((p) => p.id === selectedProviderId);
+  }, [service?.providers, selectedProviderId, company?.id]);
+
+  // 4. Declare isCompanyOpenToday
   const isCompanyOpenToday = useMemo(() => {
     if (!company) return false;
     const todayHours = getCompanyWorkingHoursForDay(company, new Date());
@@ -110,11 +125,16 @@ export default function BookingPage() {
       setLoading(true);
       try {
         const data = await getServiceDetails(serviceId);
-        if (!data || !data.company)
-          throw new Error("Service or company not found.");
+        if (!data || !data.company) throw new Error("Service or company not found.");
+        
         setService(data);
-        const activeProvider = data.providers?.find((p) => p.is_active);
-        if (activeProvider) setSelectedProviderId(activeProvider.id);
+        
+        // Auto-select provider logic
+        // Always select "Any Provider" by default if there are active providers
+        const activeProviders = data.providers?.filter((p) => p.is_active) || [];
+        if (activeProviders.length > 0) {
+          setSelectedProviderId(ANY_PROVIDER_ID);
+        }
       } catch (err: any) {
         setError(err.message);
       } finally {

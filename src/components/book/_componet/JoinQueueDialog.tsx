@@ -84,7 +84,7 @@ export function JoinQueueDialog({
       // --- Use the new CreateQueuePayload type ---
       const queueEntryPayload: CreateQueuePayload = { // <--- Explicitly type with CreateQueuePayload
           service_id: service.id,
-          provider_id: selectedProvider.id,
+          provider_id: selectedProvider.isAny ? null : selectedProvider.id,
           user_name: userName.trim(),
           phone_number: fullPhone ,
           notes: notes.trim() || null,
