@@ -1,134 +1,154 @@
 // components/company-componets/CompanyHeader.tsx
+"use client"
+
+import React, { useState } from 'react';
 import Image from "next/image";
-import { MapPin, Phone, Mail, Globe, Facebook, Instagram } from "lucide-react";
-import { Company } from "@/type";
-import { Icon } from "@iconify/react/dist/iconify.js";
+import { Star, Share2, Heart, Globe, Facebook, Instagram, MapPin ,} from "lucide-react";
+import { Company, WorkingHoursJsonb } from "@/type";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { getDay, format } from 'date-fns';
+import { parseWorkingHours } from "@/lib/booking-utils";
+import { Icon } from "@iconify/react";
+import ShareDialog from "./ShareDialog";
 
 interface CompanyHeaderProps {
   company: Company;
 }
 
-const getInitials = (name: string) => {
-  if (!name) return 'CO';
-  return name
-    .split(' ')
-    .map(word => word[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2);
-};
-
 export default function CompanyHeader({ company }: CompanyHeaderProps) {
-  const bannerImageUrl = company.logo || "/images/one photo.jpg";
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+
+  // Logic for Working Hours
+  const getWorkingStatus = () => {
+    if (!company.working_hours) return null;
+    try {
+      const parsedHours = parseWorkingHours(company.working_hours as WorkingHoursJsonb);
+      const today = new Date();
+      const dayOfWeek = getDay(today);
+      const rangesForToday = parsedHours[dayOfWeek];
+
+      if (rangesForToday && rangesForToday.length > 0) {
+        const timeStr = rangesForToday.map(r => `${format(r.start, "h:mm a")}`).join(', ');
+        return { status: "Open", text: `until ${format(rangesForToday[0].end, "h:mm a")}`, color: "text-green-600" };
+      }
+      return { status: "Closed", text: "Today", color: "text-red-500" };
+    } catch (e) {
+      return null;
+    }
+  };
+
+  const workingStatus = getWorkingStatus();
+
+  // Get the current URL for sharing
+  const companyUrl = typeof window !== 'undefined' 
+    ? window.location.href 
+    : `https://yourdomain.com/company/${company.slug || company.id}`;
 
   return (
-    <div className="relative w-full h-[400px] md:min-h-96 border-b ">
-      {/* Background Banner Image */}
-      <Image
-        src={company.logo || "/images/one photo.jpg"}
-        alt={`${company.name} banner`}
-        fill
-        className="object-cover"
-        priority
-      />
-      {/* Gradient Overlay for Text Readability */}
-      <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/70 to-transparent" />
-
-      {/* Content */}
-      <div className="absolute inset-0 flex items-end p-4 md:p-8">
-        <div className="container md:mx-20 mx-auto px-4 py-8 ">
-          <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
-            <div className="flex-shrink-0">
-              {company.logo ? (
-                <Image
-                  src={company.logo}
-                  alt={`${company.name} logo`}
-                  width={120}
-                  height={120}
-                  className="rounded-xl border-2 border-border bg-card object-cover"
-                />
-              ) : (
-                <div className="w-30 h-30 rounded-xl border-2 border-border bg-gradient-to-br from-orange-800 to-orange-00 flex items-center justify-center">
-                  <span className="text-4xl font-bold text-white">
-                    {getInitials(company.name)}
-                  </span>
-                </div>
-              )}
+    <>
+    <div className="py-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+      <div className="flex items-center gap-4">
+        {/* Company Logo */}
+        {company.logo && (
+          <div className="relative h-16 w-16 md:h-20 md:w-20 overflow-hidden rounded-xl border border-gray-100 shadow-sm flex-shrink-0">
+            <Image 
+              src={company.logo} 
+              alt={company.name} 
+              fill 
+              className="object-cover"
+            />
+          </div>
+        )}
+        
+        <div>
+          <h1 className="text-4xl md:text-5xl font-bold text-[#0f172a] tracking-tight mb-2">
+            {company.name}
+          </h1>
+          
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-[15px] font-medium text-gray-500">
+            {/* Mock Rating */}
+            <div className="flex items-center gap-1">
+              <span className="font-bold text-black">4.7</span>
+              <div className="flex text-amber-400">
+                {[...Array(4)].map((_, i) => <Star key={i} className="h-4 w-4 fill-current" />)}
+                <Star className="h-4 w-4 text-gray-300 fill-gray-300" />
+              </div>
+              <span className="text-gray-400">(4,923)</span>
             </div>
-            <div className="flex-1">
-              <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
-                {company.name}
-              </h1>
-              <div className="flex flex-wrap items-center gap-4 text-muted-white mb-4">
-                <div className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4" />
-                  <span className="text-sm">{company.location_text}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Phone className="h-4 w-4" />
-                  <span className="text-sm">{company.phone}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Mail className="h-4 w-4" />
-                  <span className="text-sm">{company.email}</span>
-                </div>
+
+            <span className="text-gray-300">•</span>
+
+            {/* Working Hours Status */}
+            {workingStatus && (
+              <div className="flex items-center gap-1">
+                <span className={`${workingStatus.color} font-bold`}>{workingStatus.status}</span>
+                <span>{workingStatus.text}</span>
               </div>
-              <div className="flex flex-wrap gap-2 text-tertiary">
-                {company.socials?.website && (
-                  <Button variant="outline" size="sm" asChild>
-                    <a
-                      href={company.socials.website}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <Globe className="h-4 w-4 mr-2" />
-                      Website
-                    </a>
-                  </Button>
-                )}
-                {company.socials?.facebook && (
-                  <Button variant="outline" size="sm" asChild>
-                    <a
-                      href={company.socials.facebook}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <Facebook className="h-4 w-4 mr-2" />
-                      Facebook
-                    </a>
-                  </Button>
-                )}
-                {company.socials?.instagram && (
-                  <Button variant="outline" size="sm" asChild>
-                    <a
-                      href={company.socials.instagram}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <Instagram className="h-4 w-4 mr-2" />
-                      Instagram
-                    </a>
-                  </Button>
-                )}
-                {company.socials?.tiktok && (
-                  <Button variant="outline" size="sm" asChild>
-                    <a
-                      href={company.socials.instagram}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <Instagram className="h-4 w-4 mr-2" />
-                      TikTok
-                    </a>
-                  </Button>
-                )}
-              </div>
+            )}
+
+            <span className="text-gray-300">•</span>
+
+            {/* Location & Directions */}
+            <div className="flex items-center gap-2">
+              <span>{company.location_text || "Location available"}</span>
+              {company.location_link && (
+                <a 
+                  href={company.location_link} 
+                  target="_blank" 
+                  className="text-orange-600 hover:underline font-bold"
+                >
+                  Get directions
+                </a>
+              )}
             </div>
           </div>
         </div>
       </div>
+
+      {/* Social Media & Action Icons */}
+      <div className="flex items-center gap-3">
+         {company.socials?.website && (
+           <a href={company.socials.website} target="_blank" className="p-2.5 rounded-full border border-gray-200 hover:bg-gray-50 transition-colors">
+              <Globe className="h-5 w-5 text-gray-700" />
+           </a>
+        )}
+        {company.socials?.instagram && (
+           <a href={company.socials.instagram} target="_blank" className="p-2.5 rounded-full border border-gray-200 hover:bg-gray-50 transition-colors">
+              <Instagram className="h-5 w-5 text-gray-700" />
+           </a>
+        )}
+        {company.socials?.facebook && (
+           <a href={company.socials.facebook} target="_blank" className="p-2.5 rounded-full border border-gray-200 hover:bg-gray-50 transition-colors">
+              <Facebook className="h-5 w-5 text-gray-700" />
+           </a>
+        )}
+        {company.socials?.tiktok && (
+           <a href={company.socials.tiktok} target="_blank" className="p-2.5 rounded-full border border-gray-200 hover:bg-gray-50 transition-colors">
+              <Icon icon="ic:baseline-tiktok" className="h-5 w-5 text-gray-700" />
+           </a>
+        )}
+        <div className="w-[1px] h-8 bg-gray-200 mx-1 hidden md:block" />
+        <Button 
+          variant="outline" 
+          size="icon" 
+          className="rounded-full h-11 w-11 border-gray-200"
+          onClick={() => setShareDialogOpen(true)}
+        >
+          <Share2 className="h-5 w-5 text-gray-700" />
+        </Button>
+        <Button variant="outline" size="icon" className="rounded-full h-11 w-11 border-gray-200">
+          <Heart className="h-5 w-5 text-gray-700" />
+        </Button>
+      </div>
     </div>
+    
+    {/* Share Dialog */}
+    <ShareDialog
+      open={shareDialogOpen}
+      onOpenChange={setShareDialogOpen}
+      companyUrl={companyUrl}
+      companyName={company.name}
+    />
+    </>
   );
 }

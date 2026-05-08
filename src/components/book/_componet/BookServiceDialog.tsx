@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { format } from "date-fns"
 import {
   Dialog,
@@ -16,9 +16,8 @@ import { Label } from "@/components/ui/label"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
-import { createBooking } from "@/lib/supabase-utils"
+import { createBooking, getAuthUserOrNull, getMyProfileOrNull, isProfileComplete } from "@/lib/supabase-utils"
 import type { Company, Service, Provider, AvailableSlot } from "@/type"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Calendar, Clock, User, Wallet, AlertCircle, Building2, Copy, Check } from "lucide-react"
 
 interface BookServiceDialogProps {
@@ -39,18 +38,14 @@ export default function BookServiceDialog({
   selectedSlot,
 }: BookServiceDialogProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const [isLoading, setIsLoading] = useState(false);
-  const [userName, setUserName] = useState("");
-  const [countryCode, setCountryCode] = useState("+251");
-  const [phoneLocal, setPhoneLocal] = useState("");
   const [notes, setNotes] = useState("");
   const [paymentProof, setPaymentProof] = useState("");
   
   // Track which account index was copied to show the checkmark
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   
-  const isValidName = userName.trim().length > 0;
-  const isValidLocal = phoneLocal.trim().length >= 7;
   const requiresPayment = service.requires_prepayment && service.prepayment_amount;
   const isValidPaymentProof = !requiresPayment || paymentProof.trim().length > 0;
 
@@ -73,18 +68,27 @@ export default function BookServiceDialog({
   const handleBookingConfirm = async () => {
     setIsLoading(true);
     try {
-      if (!isValidName) return toast.error("Please provide your name.");
-      if (!isValidLocal) return toast.error("Please enter a valid phone number.");
       if (requiresPayment && !paymentProof.trim()) return toast.error("Please provide payment proof.");
       if (!selectedSlot) return toast.error("No time slot selected.");
 
-      const sanitizedLocal = phoneLocal.replace(/[^\d]/g, '');
-      const fullPhone = `${countryCode}${sanitizedLocal}`;
+      const user = await getAuthUserOrNull();
+      if (!user) {
+        onOpenChange(false);
+        router.push(`/auth?next=${encodeURIComponent(pathname || "/")}`);
+        return;
+      }
+
+      const profile = await getMyProfileOrNull();
+      if (!profile || !isProfileComplete(profile)) {
+        onOpenChange(false);
+        router.push(`/profile?next=${encodeURIComponent(pathname || "/")}`);
+        return;
+      }
 
       const newBookingData = { 
-        user_id: null,
-        user_name: userName.trim(),
-        phone_number: fullPhone,
+        user_id: user.id,
+        user_name: profile.name || "",
+        phone_number: profile.phone_number || "",
         service_id: service.id,
         company_id: company.id,
         provider_id: selectedProvider.id,
@@ -107,6 +111,17 @@ export default function BookServiceDialog({
       
     } catch (error) {
       console.error("Error creating booking:", error);
+      const anyErr = error as any;
+      if (anyErr?.code === "AUTH_REQUIRED") {
+        onOpenChange(false);
+        router.push(`/auth?next=${encodeURIComponent(pathname || "/")}`);
+        return;
+      }
+      if (anyErr?.code === "PROFILE_INCOMPLETE") {
+        onOpenChange(false);
+        router.push(`/profile?next=${encodeURIComponent(pathname || "/")}`);
+        return;
+      }
       toast.error("Failed to book service. Please try again.");
     } finally {
       setIsLoading(false);
@@ -228,53 +243,14 @@ export default function BookServiceDialog({
             </div>
           )}
 
-          {/* User Details Form */}
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="userName">Full Name <span className="text-red-500">*</span></Label>
-              <Input
-                id="userName"
-                value={userName}
-                onChange={(e) => setUserName(e.target.value)}
-                placeholder="John Doe"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="phoneLocal">Phone Number <span className="text-red-500">*</span></Label>
-              <div className="flex gap-2">
-                <Select value={countryCode} onValueChange={setCountryCode}>
-                  <SelectTrigger className="w-[110px] shrink-0">
-                    <SelectValue placeholder="Code" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="+251">🇪🇹 +251</SelectItem>
-                    <SelectItem value="+1">🇺🇸 +1</SelectItem>
-                    <SelectItem value="+44">🇬🇧 +44</SelectItem>
-                    <SelectItem value="+91">🇮🇳 +91</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Input
-                  id="phoneLocal"
-                  value={phoneLocal}
-                  onChange={(e) => setPhoneLocal(e.target.value.replace(/[^\d]/g, ''))}
-                  placeholder="912345678"
-                  type="tel"
-                  inputMode="tel"
-                  className="flex-1"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="notes">Additional Notes</Label>
-              <Input
-                id="notes"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Any special requests?"
-              />
-            </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="notes">Additional Notes</Label>
+            <Input
+              id="notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Any special requests?"
+            />
           </div>
 
         </div>
@@ -284,7 +260,7 @@ export default function BookServiceDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading} className="w-full sm:w-auto">
             Cancel
           </Button>
-          <Button onClick={handleBookingConfirm} disabled={isLoading || !selectedSlot || !isValidName || !isValidLocal || !isValidPaymentProof} className="w-full sm:w-auto mt-2 sm:mt-0">
+          <Button onClick={handleBookingConfirm} disabled={isLoading || !selectedSlot || !isValidPaymentProof} className="w-full sm:w-auto mt-2 sm:mt-0">
             {isLoading ? "Confirming..." : "Confirm Booking"}
           </Button>
         </DialogFooter>

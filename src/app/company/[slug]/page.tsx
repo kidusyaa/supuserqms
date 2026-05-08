@@ -3,17 +3,16 @@
 
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { ArrowLeft, ChevronRight, Home, XCircle } from "lucide-react"
-import Link from "next/link"
 import { Company } from "@/type"
 import { getCompanyBySlugWithServices } from "@/lib/supabase-utils"
 import { toast } from "sonner"
-import DivCenter from "@/components/divCenter"
-// Import the redesigned components
+import { ChevronRight, Home } from "lucide-react"
+import Link from "next/link"
+
 import CompanyHeader from "@/components/company-componets/CompanyHeader"
 import CompanyServicesList from "@/components/company-componets/CompanyServicesList"
 import CompanySidebar from "@/components/company-componets/CompanySidebar"
+import CompanyPhotosGallery from "@/components/company-componets/CompanyPhotosGallery"
 
 export default function CompanyDetailPage() {
   const params = useParams()
@@ -24,101 +23,58 @@ export default function CompanyDetailPage() {
   const companySlug = (() => {
     const raw = String((params as any)?.slug ?? "");
     const trimmed = raw.trim().replace(/^\/+|\/+$/g, "");
-    try {
-      return decodeURIComponent(trimmed);
-    } catch {
-      return trimmed;
-    }
+    try { return decodeURIComponent(trimmed); } catch { return trimmed; }
   })();
 
   useEffect(() => {
     const fetchCompanyData = async () => {
       try {
         setLoading(true);
-        // ✨ UPDATE LOGIC TO USE slug ✨
-        if (!companySlug) {
-          toast.error("Company identifier is missing from URL.");
-          router.push('/');
-          return;
-        }
-        // ✨ CALL THE NEW FUNCTION ✨
+        if (!companySlug) return router.push('/');
         const companyData = await getCompanyBySlugWithServices(companySlug);
-
-        if (!companyData) {
-          toast.error("Company not found");
-          router.push('/');
-          return;
-        }
-
+        if (!companyData) return router.push('/');
         setCompany(companyData);
       } catch (error) {
-        console.error('Error fetching company data:', error);
         toast.error("Failed to load company details");
-        router.push('/');
       } finally {
         setLoading(false);
       }
     };
-
-    // ✨ UPDATE DEPENDENCY ✨
-    if (companySlug) {
-      fetchCompanyData();
-    }
+    if (companySlug) fetchCompanyData();
   }, [companySlug, router])
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-white-900 text-slate-200 flex items-center justify-center">
-        <div className="text-center">
-          {/* ✨ Themed Spinner */}
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500 mx-auto mb-4"></div>
-          <p className="text-slate-400">Loading Company Details...</p>
-        </div>
-      </div>
-    )
-  }
+  if (loading) return <div className="h-screen flex items-center justify-center">Loading...</div>
 
-  if (!company) {
-    return (
-      <div className="min-h-screen bg-white text-slate-200 flex items-center justify-center">
-        <div className="text-center p-8">
-            <XCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold mb-2">Company Not Found</h2>
-            <p className="text-slate-400 mb-6">The company you're looking for doesn't exist or has been removed.</p>
-            <Button onClick={() => router.push('/')} className="bg-amber-600 hover:bg-amber-700 text-white">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Home
-            </Button>
-        </div>
-      </div>
-    )
-  }
+  if (!company) return null;
 
   return (
-    <div className="mx-auto">
-    <div className="  text-slate-200">
-   <div>
-     
-      <CompanyHeader company={company} />
+    <div className="bg-white min-h-screen text-slate-900">
+      {/* Breadcrumbs */}
+      <div className="container mx-auto px-4 py-4 flex items-center gap-2 text-sm text-gray-500">
+        <Link href="/" className="hover:text-amber-600 transition-colors">Home</Link>
+        <ChevronRight className="h-4 w-4" />
+        <span className="capitalize">{company.location_text?.split(',')[0] || "City"}</span>
+        <ChevronRight className="h-4 w-4" />
+        <span className="font-medium text-slate-900">{company.name}</span>
+      </div>
 
-      {/* Main Content Area */}
-      <DivCenter>
-      <main className="container mx-auto px-4 py-8 lg:py-12">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-12">
-          {/* Services List */}
+      <div className="container mx-auto px-4">
+        {/* Header Section */}
+        <CompanyHeader company={company} />
+
+        {/* Mosaic Photo Gallery / Slider */}
+        <CompanyPhotosGallery photos={company.company_photos || []} />
+
+        {/* Main Content */}
+        <main className="grid grid-cols-1 lg:grid-cols-3 gap-12 py-10">
           <div className="lg:col-span-2">
             <CompanyServicesList services={company.services} />
           </div>
-
-          {/* Sidebar */}
           <div className="lg:col-span-1">
             <CompanySidebar company={company} />
           </div>
-        </div>
-      </main>
-      </DivCenter>
+        </main>
       </div>
-    </div>
     </div>
   )
 }

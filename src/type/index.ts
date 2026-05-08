@@ -37,11 +37,21 @@ export type Company = {
   providers?: Provider[];
   license?: string | null;
   bank_accounts: BankAccount[];
+  company_photos?: CompanyPhoto[];
   // --- DEPRECATED: Keep for backward compatibility during migration ---
   bank_name?: string | null;
   account_name?: string | null;
   account_number?: string | null;
 };
+
+export interface CompanyPhoto {
+  id: string;
+  company_id: string;
+  url: string;
+  type: 'venue' | 'gallery';
+  created_at?: string;
+}
+
   
 interface ServicePhoto {
   url: string;

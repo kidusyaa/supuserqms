@@ -8,6 +8,7 @@ const items = [
   { name: "Home", href: "/", icon: "material-symbols:home-outline" },
   { name: "Services", href: "/services", icon: "solar:hand-stars-linear" },
   { name: "Companies", href: "/company", icon: "iconoir:shop-four-tiles" },
+  { name: "Profile", href: "/profile", icon: "material-symbols:person-outline" },
 
 ];
 

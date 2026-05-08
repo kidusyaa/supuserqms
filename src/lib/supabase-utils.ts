@@ -43,7 +43,8 @@ import type {
 } from '../type';
 import { ANY_PROVIDER_ID } from '../type';
 
-import { addMinutes, isAfter, max, min, startOfDay, endOfDay, isBefore, format, getDay, setHours, setMinutes, setSeconds, setMilliseconds } from 'date-fns';
+import { addDays, addMinutes, isAfter, max, min, startOfDay, endOfDay, isBefore, format, getDay, setHours, setMinutes, setSeconds, setMilliseconds } from 'date-fns';
+import type { User as SupabaseAuthUser } from '@supabase/supabase-js';
 
 export type CategoryWithServices = Category & {
 
@@ -57,15 +58,219 @@ import { parseWorkingHours, getDayRange, generateAvailableSlots } from './bookin
 
 const SERVICE_IMAGES_BUCKET = 'service-images';
 
+export type UserProfile = {
+  id: string; // uuid (auth.users.id)
+  name: string | null;
+  email: string | null;
+  phone_number: string | null;
+  avatar_id: string | null;
+  created_at: string | null;
+};
+
+class AuthRequiredError extends Error {
+  code = "AUTH_REQUIRED" as const;
+  constructor(message: string = "Please sign in to continue.") {
+    super(message);
+    this.name = "AuthRequiredError";
+  }
+}
+
+class ProfileIncompleteError extends Error {
+  code = "PROFILE_INCOMPLETE" as const;
+  constructor(message: string = "Please complete your profile (name and phone number) to continue.") {
+    super(message);
+    this.name = "ProfileIncompleteError";
+  }
+}
+
+export async function getAuthUserOrNull(): Promise<SupabaseAuthUser | null> {
+  const { data, error } = await supabase.auth.getUser();
+  if (error) return null;
+  return data.user ?? null;
+}
+
+export async function getMyProfileOrNull(): Promise<UserProfile | null> {
+  const user = await getAuthUserOrNull();
+  if (!user) return null;
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, name, email, phone_number, avatar_id, created_at")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Error fetching profile:", error);
+    return null;
+  }
+
+  if (data) return data as UserProfile;
+
+  const { data: created, error: createError } = await supabase
+    .from("profiles")
+    .upsert(
+      {
+        id: user.id,
+        name: null,
+        email: user.email ?? null,
+        phone_number: null,
+        avatar_id: null,
+      },
+      { onConflict: "id" }
+    )
+    .select("id, name, email, phone_number, avatar_id, created_at")
+    .single();
+
+  if (createError || !created) {
+    console.error("Error creating profile:", createError);
+    return null;
+  }
+
+  return created as UserProfile;
+}
+
+export async function upsertMyProfile(updates: {
+  name?: string | null;
+  phone_number?: string | null;
+  avatar_id?: string | null;
+}): Promise<UserProfile> {
+  const user = await getAuthUserOrNull();
+  if (!user) throw new AuthRequiredError();
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .upsert(
+      {
+        id: user.id,
+        email: user.email ?? null,
+        ...updates,
+      },
+      { onConflict: "id" }
+    )
+    .select("id, name, email, phone_number, avatar_id, created_at")
+    .single();
+
+  if (error || !data) {
+    console.error("Error upserting profile:", error);
+    throw new Error(error?.message || "Failed to update profile.");
+  }
+
+  return data as UserProfile;
+}
+
+export function isProfileComplete(profile: UserProfile | null | undefined): boolean {
+  const nameOk = Boolean(profile?.name && profile.name.trim().length > 0);
+  const phoneOk = Boolean(profile?.phone_number && String(profile.phone_number).trim().length > 0);
+  return nameOk && phoneOk;
+}
+
+export async function requireUserAndCompletedProfile(): Promise<{ user: SupabaseAuthUser; profile: UserProfile }> {
+  const user = await getAuthUserOrNull();
+  if (!user) throw new AuthRequiredError();
+
+  const profile = await getMyProfileOrNull();
+  if (!profile || !isProfileComplete(profile)) {
+    throw new ProfileIncompleteError();
+  }
+
+  return { user, profile };
+}
+
+export async function getAvatars(): Promise<{ id: string; url: string }[]> {
+  // Preferred source: `public.avatars` table (id + public URL)
+  const { data: rows, error: tableError } = await supabase
+    .from("avatars")
+    .select("id, url")
+    .order("id", { ascending: true });
+
+  if (!tableError && rows && rows.length > 0) {
+    return rows as { id: string; url: string }[];
+  }
+
+  if (tableError) {
+    console.error("Error fetching avatars table:", tableError);
+  }
+
+  // Fallback: storage list (useful if table is empty / RLS blocks it)
+  const { data: files, error: storageError } = await supabase.storage.from("avatars").list("", {
+    limit: 200,
+    offset: 0,
+    sortBy: { column: "name", order: "asc" },
+  });
+
+  if (storageError) {
+    console.error("Error fetching avatars from storage:", storageError);
+    return [];
+  }
+
+  return (files || [])
+    .filter((f) => Boolean(f?.name) && !f.name.endsWith("/"))
+    .map((file) => {
+      const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(file.name);
+      return { id: file.name, url: urlData.publicUrl };
+    });
+}
+
+export async function getMyBookings(): Promise<Booking[]> {
+  const user = await getAuthUserOrNull();
+  if (!user) throw new AuthRequiredError();
+
+  const { data, error } = await supabase
+    .from("bookings")
+    .select(
+      `
+      *,
+      service:services(*),
+      company:companies(*),
+      provider:providers(*)
+    `
+    )
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("Error fetching my bookings:", error);
+    throw new Error(error.message);
+  }
+  return (data || []) as Booking[];
+}
+
+export async function getMyQueueEntries(): Promise<QueueItem[]> {
+  const user = await getAuthUserOrNull();
+  if (!user) throw new AuthRequiredError();
+
+  const { data, error } = await supabase
+    .from("queue_entries")
+    .select(
+      `
+      *,
+      service:services(
+        *,
+        company:companies(*)
+      ),
+      provider:providers(*)
+    `
+    )
+    .eq("user_id", user.id)
+    .order("joined_at", { ascending: false });
+
+  if (error) {
+    console.error("Error fetching my queue entries:", error);
+    throw new Error(error.message);
+  }
+  return (data || []) as QueueItem[];
+}
+
 
 
   // The main function to create a new queue entry
 
  export type CreateQueuePayload = {
 
-  user_name: string;
+  // When authenticated, these are auto-filled from `profiles`.
+  user_name?: string;
 
-  phone_number: string;
+  phone_number?: string;
 
   service_id: string;
 
@@ -1772,21 +1977,19 @@ export async function getCompanyWithServices(companyId: string): Promise<Company
     .from('companies')
 
     .select(`
-
       *,
-
+      company_photos (
+        id,
+        url,
+        type,
+        created_at
+      ),
       services (
-
         *,
-
         service_photos (
-
           url
-
         )
-
       )
-
     `)
 
     .eq('id', companyId)
@@ -1894,21 +2097,19 @@ export async function getCompanyBySlugWithServices(companySlug: string): Promise
     .from('companies')
 
     .select(`
-
       *,
-
+      company_photos (
+        id,
+        url,
+        type,
+        created_at
+      ),
       services (
-
         *,
-
         service_photos (
-
           url
-
         )
-
       )
-
     `)
 
     .eq('slug', cleanSlug)
@@ -2206,6 +2407,11 @@ export async function getLatestAvailableTimeForProvider(
 export async function joinQueue(payload: CreateQueuePayload): Promise<AugmentedQueueItem> {
   let { service_id, provider_id, user_name, phone_number, notes, queue_type } = payload;
 
+  // Require sign-in + completed profile for queue/join
+  const { user, profile } = await requireUserAndCompletedProfile();
+  user_name = (profile.name ?? user_name ?? "").trim();
+  phone_number = (profile.phone_number ?? phone_number ?? "").trim();
+
   if (!service_id || !user_name) {
     throw new Error("Missing required data to join queue (service or name).");
   }
@@ -2242,30 +2448,49 @@ export async function joinQueue(payload: CreateQueuePayload): Promise<AugmentedQ
 
   try {
     const latestAvailable = await getLatestAvailableTimeForProvider(company, provider_id, service_id);
-    const companyWorkingHours = getCompanyWorkingHours(company, latestAvailable || new Date());
-
-    if (!companyWorkingHours || !latestAvailable) {
+    if (!latestAvailable) {
       throw new Error("Company is closed today or working hours are not defined.");
     }
 
-    let alignedPossibleStart = new Date(latestAvailable);
-    const minutesIntoInterval = alignedPossibleStart.getMinutes() % estimatedServiceDuration;
-    
-    if (minutesIntoInterval !== 0) {
-      alignedPossibleStart = addMinutes(alignedPossibleStart, estimatedServiceDuration - minutesIntoInterval);
-    }
-    alignedPossibleStart = setMilliseconds(setSeconds(alignedPossibleStart, 0), 0);
+    const providerObj =
+      service.providers?.find((p) => p.id === provider_id) ||
+      ({
+        id: provider_id,
+        name: "Provider",
+        specialization: null,
+        is_active: true,
+        created_at: new Date().toISOString(),
+        company_id: company.id,
+      } as Provider);
 
-    if (alignedPossibleStart.getTime() <= latestAvailable.getTime()) {
-      alignedPossibleStart = addMinutes(alignedPossibleStart, estimatedServiceDuration);
+    // Instead of failing near closing time, find the next available slot (today or next open day).
+    const MAX_DAYS_AHEAD = 14;
+    const baseDate = startOfDay(new Date());
+    let found: { start: Date; end: Date } | null = null;
+
+    for (let i = 0; i <= MAX_DAYS_AHEAD; i++) {
+      const day = addDays(baseDate, i);
+      const { start: dayStart, end: dayEnd } = getDayRange(day);
+      const occupied = await getProviderOccupiedSlots(provider_id, dayStart, dayEnd);
+      let slots = generateAvailableSlots(company, service, providerObj, day, occupied);
+
+      // For "today", don't show anything before the provider is actually available.
+      if (i === 0 && latestAvailable) {
+        slots = slots.filter((s) => s.start.getTime() >= latestAvailable.getTime());
+      }
+
+      if (slots.length > 0) {
+        found = { start: slots[0].start, end: slots[0].end };
+        break;
+      }
     }
 
-    projectedStartTime = alignedPossibleStart;
-    projectedEndTime = addMinutes(projectedStartTime, estimatedServiceDuration);
-
-    if (isAfter(projectedEndTime, companyWorkingHours.end)) {
-      throw new Error("Joining the queue now would mean service extends past closing hours. Please try again tomorrow.");
+    if (!found) {
+      throw new Error("No available time slots found in the next two weeks.");
     }
+
+    projectedStartTime = found.start;
+    projectedEndTime = found.end;
   } catch (calcError: any) {
     throw new Error(`Failed to determine an available queue slot: ${calcError.message}`);
   }
@@ -2276,7 +2501,14 @@ export async function joinQueue(payload: CreateQueuePayload): Promise<AugmentedQ
 
   try {
     const { data: queueResult, error: queueError } = await supabase.from('queue_entries').insert({
-      service_id, provider_id, user_name, phone_number, queue_type, status: 'waiting', notes,
+      service_id,
+      provider_id,
+      user_name,
+      phone_number,
+      queue_type,
+      status: 'waiting',
+      notes,
+      user_id: user.id,
       projected_start_time: projectedStartTime!.toISOString(),
       projected_end_time: projectedEndTime!.toISOString(),
       position: estimatedPosition,
@@ -2317,6 +2549,12 @@ export async function createBooking(
   bookingData: Omit<Booking, 'id' | 'created_at' | 'status'> & { status?: BookingStatus }
 ): Promise<Booking> {
   let { provider_id, service_id, start_time, end_time, user_id } = bookingData;
+
+  // Require sign-in + completed profile for booking
+  const { user, profile } = await requireUserAndCompletedProfile();
+  bookingData.user_id = user.id;
+  bookingData.user_name = (profile.name ?? bookingData.user_name ?? "").trim();
+  bookingData.phone_number = (profile.phone_number ?? bookingData.phone_number ?? "").trim();
 
   if (!service_id || !start_time || !end_time) {
       throw new Error("Missing required booking data for reservation.");

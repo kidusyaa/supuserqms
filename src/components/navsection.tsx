@@ -40,6 +40,14 @@ const NavSection = ({ servicesSectionId }: NavSectionProps) => {
 
         {/* Right: Book Now button + Mobile Search Icon */}
         <div className="flex items-center gap-3">
+          {/* Profile */}
+          <Link href="/profile">
+            <button className="hidden sm:inline-flex items-center gap-2 rounded-md bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:bg-white/15 transition-colors">
+              <Icon icon="material-symbols:person-outline" width="20" height="20" />
+              Profile
+            </button>
+          </Link>
+
           {/* Mobile Search Icon */}
           <button
             className="md:hidden p-2 rounded-full hover:bg-gray-100 text-white"

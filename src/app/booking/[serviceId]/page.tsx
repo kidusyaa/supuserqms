@@ -157,19 +157,37 @@ export default function BookingPage() {
       setSlotsLoading(true);
       try {
         const { start: dayStart, end: dayEnd } = getDayRange(selectedDate);
-        const occupiedSlots = await getProviderOccupiedSlots(
-          selectedProvider.id,
-          dayStart,
-          dayEnd
-        );
-        const slots = generateAvailableSlots(
-          company,
-          service,
-          selectedProvider,
-          selectedDate,
-          occupiedSlots
-        );
-        setAvailableSlots(slots);
+        // If "Any Provider" is selected, only show slots where at least one real provider is free.
+        if (selectedProviderId === ANY_PROVIDER_ID) {
+          const activeProviders = (service.providers || []).filter((p) => p.is_active);
+          if (activeProviders.length === 0) {
+            setAvailableSlots([]);
+            return;
+          }
+
+          const perProviderOccupied = await Promise.all(
+            activeProviders.map(async (p) => ({
+              provider: p,
+              occupied: await getProviderOccupiedSlots(p.id, dayStart, dayEnd),
+            }))
+          );
+
+          const slotMap = new Map<string, AvailableSlot>();
+          for (const { provider, occupied } of perProviderOccupied) {
+            const slotsForProvider = generateAvailableSlots(company, service, provider, selectedDate, occupied);
+            for (const s of slotsForProvider) {
+              const key = `${s.start.toISOString()}__${s.end.toISOString()}`;
+              if (!slotMap.has(key)) slotMap.set(key, s);
+            }
+          }
+
+          const merged = Array.from(slotMap.values()).sort((a, b) => a.start.getTime() - b.start.getTime());
+          setAvailableSlots(merged);
+        } else {
+          const occupiedSlots = await getProviderOccupiedSlots(selectedProvider.id, dayStart, dayEnd);
+          const slots = generateAvailableSlots(company, service, selectedProvider, selectedDate, occupiedSlots);
+          setAvailableSlots(slots);
+        }
       } catch (err) {
         toast.error("Failed to load available slots.");
         setAvailableSlots([]);
