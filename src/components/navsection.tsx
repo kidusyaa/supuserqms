@@ -6,6 +6,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { searchServices } from '@/lib/supabase-utils';
 import type { Service } from '@/type';
 import { Icon } from '@iconify/react';
+import { UserMenu } from './Usermenu';
 
 interface NavSectionProps {
   servicesSectionId: string;
@@ -39,30 +40,28 @@ const NavSection = ({ servicesSectionId }: NavSectionProps) => {
         </div>
 
         {/* Right: Book Now button + Mobile Search Icon */}
-        <div className="flex items-center gap-3">
-          {/* Profile */}
-          <Link href="/profile">
-            <button className="hidden sm:inline-flex items-center gap-2 rounded-md bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:bg-white/15 transition-colors">
-              <Icon icon="material-symbols:person-outline" width="20" height="20" />
-              Profile
-            </button>
-          </Link>
+  
+<div className="flex items-center gap-3">
+  {/* Profile - Hidden on mobile, shown on Desktop */}
+  <div className="hidden md:block">
+    <UserMenu />
+  </div>
 
-          {/* Mobile Search Icon */}
-          <button
-            className="md:hidden p-2 rounded-full hover:bg-gray-100 text-white"
-            onClick={() => setMobileSearchOpen(true)}
-          >
-            <Icon icon="material-symbols-light:search-rounded" width="24" height="24" />
-          </button>
+  {/* Mobile Search Icon */}
+  <button
+    className="md:hidden p-2 rounded-full hover:bg-gray-100 text-white"
+    onClick={() => setMobileSearchOpen(true)}
+  >
+    <Icon icon="material-symbols-light:search-rounded" width="24" height="24" />
+  </button>
 
-          {/* Book Now */}
-          <Link href={'https://app.gizebook.com/registration/company' } target='_black'>
-            <button className="rounded-md bg-amber-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-amber-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 transition-colors duration-200">
-              Register Services
-            </button>
-          </Link>
-        </div>
+  {/* Book Now (Register) */}
+  <Link href={'https://app.gizebook.com/registration/company'} target='_blank'>
+    <button className="rounded-md bg-amber-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-amber-700 transition-colors">
+      Register Services
+    </button>
+  </Link>
+</div>
       </div>
 
       {/* Mobile Search Overlay */}

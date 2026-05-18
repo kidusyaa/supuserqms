@@ -68,7 +68,8 @@ export default function CompanyDetailPage() {
         {/* Main Content */}
         <main className="grid grid-cols-1 lg:grid-cols-3 gap-12 py-10">
           <div className="lg:col-span-2">
-            <CompanyServicesList services={company.services} />
+            <CompanyServicesList services={company.services} companyTypes={company.company_types}  />
+            
           </div>
           <div className="lg:col-span-1">
             <CompanySidebar company={company} />

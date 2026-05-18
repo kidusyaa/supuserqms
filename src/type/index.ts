@@ -42,6 +42,11 @@ export type Company = {
   bank_name?: string | null;
   account_name?: string | null;
   account_number?: string | null;
+  rating_summary?: {
+  average_stars: number;
+  total_ratings: number;
+} | null;
+
 };
 
 export interface CompanyPhoto {

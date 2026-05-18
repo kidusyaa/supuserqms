@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import ProfileClient from "./ProfileClient";
+import ProfileClient from "./_component/ProfileClient";
 
 export default function ProfilePage() {
   return (

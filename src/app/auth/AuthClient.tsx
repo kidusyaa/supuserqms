@@ -1,156 +1,158 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { supabase } from "@/lib/supabaseClient";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-
-type Mode = "signin" | "signup" | "otp";
+import { supabase }    from "@/lib/supabaseClient";
+import { getAvatars }  from "@/lib/supabase-utils";
+import { Step1Email } from "./_steps/Step1email";
+import { Step2Info } from "./_steps/stepinfo";
+import { StepIndicator } from "./Stepindicator";
+import { Step3Avatar } from "./_steps/Stepavatar";
+import { Step4Password } from "./_steps/Step4password";
 
 export default function AuthClient() {
-  const router = useRouter();
+  const router       = useRouter();
   const searchParams = useSearchParams();
-  const nextUrl = useMemo(() => searchParams.get("next") || "/", [searchParams]);
 
-  const [mode, setMode] = useState<Mode>("signin");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const redirectAfterAuth = () => router.push(nextUrl);
-
-  const handleSignIn = async () => {
-    setLoading(true);
+  // Unwrap any nested /profile?next= from previous redirects
+  const nextUrl = useMemo(() => {
+    const raw = searchParams.get("next") || "/";
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
-      });
-      if (error) throw error;
-      if (!data.user) throw new Error("Sign in failed.");
-      toast.success("Signed in.");
-      redirectAfterAuth();
-    } catch (e: any) {
-      toast.error(e?.message || "Failed to sign in.");
-    } finally {
-      setLoading(false);
+      const decoded = decodeURIComponent(raw);
+      const inner   = new URL(decoded, "http://x").searchParams.get("next");
+      if (decoded.startsWith("/profile") && inner) return inner;
+      return decoded;
+    } catch {
+      return raw;
     }
-  };
+  }, [searchParams]);
 
-  const handleSignUp = async () => {
+  // ── Form state ────────────────────────────────────────────────
+  const [step, setStep]         = useState(1);
+  const [email, setEmail]       = useState("");
+  const [name, setName]         = useState("");
+  const [phone, setPhone]       = useState("");
+  const [avatarId, setAvatarId] = useState<string | null>(null);
+  const [password, setPassword] = useState("");
+  const [loading, setLoading]   = useState(false);
+  const [avatars, setAvatars]   = useState<{ id: string; url: string }[]>([]);
+
+  // Load avatars once
+  useEffect(() => {
+    getAvatars().then(setAvatars).catch(console.warn);
+  }, []);
+
+  // ── Final submit on step 4 ────────────────────────────────────
+  const handleSubmit = async () => {
     setLoading(true);
     try {
+      // 1. Create the auth account
       const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
         password,
-      });
-      if (error) throw error;
-
-      if (!data.user) {
-        toast.success("Check your email to confirm your account.");
-        return;
-      }
-
-      toast.success("Account created.");
-      redirectAfterAuth();
-    } catch (e: any) {
-      toast.error(e?.message || "Failed to sign up.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleOtp = async () => {
-    setLoading(true);
-    try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email: email.trim(),
         options: {
-          emailRedirectTo: typeof window !== "undefined" ? window.location.origin + nextUrl : undefined,
+          data: { role: "customer" }, // triggers only creates profiles row for customers
         },
       });
       if (error) throw error;
-      toast.success("OTP link sent. Check your email.");
+
+      const user = data.user;
+      if (!user) {
+        // Email confirmation required — tell them to verify
+        toast.success("Check your email to confirm your account, then sign in.");
+        router.push("/auth");
+        return;
+      }
+
+      // 2. Save the profile (name, phone, avatar) immediately
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .upsert(
+          {
+            id:           user.id,
+            email:        email.trim(),
+            name:         name.trim(),
+            phone_number: phone.trim(),
+            avatar_id:    avatarId || null,
+          },
+          { onConflict: "id" }
+        );
+
+      if (profileError) {
+        // Non-fatal — profile can be completed later
+        console.warn("Profile save error:", profileError.message);
+      }
+
+      toast.success("Account created! Welcome 🎉");
+      router.push(`/profile?next=${encodeURIComponent(nextUrl)}`);
     } catch (e: any) {
-      toast.error(e?.message || "Failed to send OTP.");
+      toast.error(e?.message || "Failed to create account.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-[calc(100vh-56px)] bg-gradient-to-b from-gray-50 to-white flex items-center justify-center px-4 py-10">
-      <Card className="w-full max-w-md shadow-xl">
-        <CardHeader className="space-y-2">
-          <CardTitle className="text-2xl">Sign in to continue</CardTitle>
-          <CardDescription>
-            Booking and queue require an account. After sign in, you’ll complete your profile (name + phone) once.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Tabs value={mode} onValueChange={(v) => setMode(v as Mode)}>
-            <TabsList className="grid grid-cols-3 w-full">
-              <TabsTrigger value="signin">Sign in</TabsTrigger>
-              <TabsTrigger value="signup">Sign up</TabsTrigger>
-              <TabsTrigger value="otp">OTP</TabsTrigger>
-            </TabsList>
+    <div className="min-h-screen bg-gradient-to-b from-amber-50/60 via-white to-white flex items-center justify-center px-4 py-12">
+      <div className="w-full max-w-md">
 
-            <div className="space-y-4 mt-6">
-              <div className="space-y-1.5">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  inputMode="email"
-                  autoComplete="email"
-                />
-              </div>
+        {/* Card */}
+        <div className="bg-white rounded-3xl shadow-xl shadow-gray-100 border border-gray-100 overflow-hidden">
+          <div className="h-1.5 bg-gradient-to-r from-amber-400 via-orange-400 to-rose-400" />
+          <div className="px-8 py-8">
+            <StepIndicator current={step} />
 
-              {(mode === "signin" || mode === "signup") && (
-                <div className="space-y-1.5">
-                  <Label htmlFor="password">Password</Label>
-                  <Input
-                    id="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    type="password"
-                    autoComplete={mode === "signin" ? "current-password" : "new-password"}
-                  />
-                </div>
-              )}
-            </div>
+            {step === 1 && (
+              <Step1Email
+                email={email}
+                onChange={setEmail}
+                onNext={() => setStep(2)}
+              />
+            )}
 
-            <TabsContent value="signin" className="mt-6">
-              <Button className="w-full" disabled={loading || !email.trim() || !password} onClick={handleSignIn}>
-                {loading ? "Signing in..." : "Sign in"}
-              </Button>
-            </TabsContent>
+            {step === 2 && (
+              <Step2Info
+                name={name} phone={phone}
+                onNameChange={setName} onPhoneChange={setPhone}
+                onNext={() => setStep(3)}
+                onBack={() => setStep(1)}
+              />
+            )}
 
-            <TabsContent value="signup" className="mt-6">
-              <Button className="w-full" disabled={loading || !email.trim() || !password} onClick={handleSignUp}>
-                {loading ? "Creating account..." : "Create account"}
-              </Button>
-            </TabsContent>
+            {step === 3 && (
+              <Step3Avatar
+                avatars={avatars} avatarId={avatarId}
+                onAvatarChange={setAvatarId}
+                onNext={() => setStep(4)}
+                onBack={() => setStep(2)}
+              />
+            )}
 
-            <TabsContent value="otp" className="mt-6 space-y-3">
-              <Button className="w-full" disabled={loading || !email.trim()} onClick={handleOtp}>
-                {loading ? "Sending..." : "Send OTP link"}
-              </Button>
-              <p className="text-xs text-muted-foreground">
-                We’ll email you a magic link to sign in. (No password needed.)
-              </p>
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+            {step === 4 && (
+              <Step4Password
+                password={password}
+                onPasswordChange={setPassword}
+                onSubmit={handleSubmit}
+                onBack={() => setStep(3)}
+                loading={loading}
+              />
+            )}
+          </div>
+        </div>
+
+        {/* Already have account */}
+        <p className="text-center text-xs text-gray-400 mt-4">
+          Already have an account?{" "}
+          <button
+            onClick={() => router.push(`/auth/signin?next=${encodeURIComponent(nextUrl)}`)}
+            className="text-amber-500 hover:text-amber-600 font-medium"
+          >
+            Sign in
+          </button>
+        </p>
+
+      </div>
     </div>
   );
 }
-

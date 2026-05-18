@@ -1,16 +1,14 @@
-// app/auth/page.tsx  ← sign-UP entry point (4-step wizard)
+// app/auth/signin/page.tsx
 import { Suspense } from "react";
-// your existing 4-step wizard
-import AuthClient from "./AuthClient";
-
-export default function AuthPage() {
+import SignInClient from "./Signinclient";
+export default function SignInPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center">
         <div className="w-8 h-8 rounded-full border-2 border-amber-400 border-t-transparent animate-spin" />
       </div>
     }>
-      <AuthClient />
+      <SignInClient />
     </Suspense>
   );
 }

@@ -2069,33 +2069,19 @@ export async function getCompanyWithServices(companyId: string): Promise<Company
 
 
 export async function getCompanyBySlugWithServices(companySlug: string): Promise<Company | null> {
-
   const cleanSlug = (() => {
-
     const trimmed = (companySlug ?? "").trim().replace(/^\/+|\/+$/g, "");
-
     try {
-
       return decodeURIComponent(trimmed);
-
     } catch {
-
       return trimmed;
-
     }
-
   })();
-
-
 
   if (!cleanSlug) return null;
 
-
-
   const { data, error } = await supabase
-
     .from('companies')
-
     .select(`
       *,
       company_photos (
@@ -2104,34 +2090,63 @@ export async function getCompanyBySlugWithServices(companySlug: string): Promise
         type,
         created_at
       ),
+      company_company_types (
+        company_types (
+          id,
+          name,
+          icon,
+          company_type_service_category_mapping (
+            service_category_id
+          )
+        )
+      ),
       services (
         *,
         service_photos (
           url
+        ),
+        service_categories (
+          id,
+          name
         )
       )
     `)
-
     .eq('slug', cleanSlug)
-
-    // Avoids 406 when the slug doesn't match any row.
-
     .maybeSingle();
 
-
-
   if (error) {
-
     console.error('Error fetching company by slug:', error);
-
     return null;
-
   }
 
-  return data as Company;
+  if (!data) return null;
 
+  // Fetch rating summary from the view we created
+  const { data: ratingSummary } = await supabase
+    .from('company_rating_summary')
+    .select('average_stars, total_ratings')
+    .eq('company_id', data.id)
+    .maybeSingle();
+
+  const companyTypes = data.company_company_types?.map((item: any) => {
+    const type = item.company_types;
+    return {
+      id: type.id,
+      name: type.name,
+      icon: type.icon,
+      allowedCategoryIds: type.company_type_service_category_mapping?.map(
+        (m: any) => m.service_category_id
+      ) || []
+    };
+  }) || [];
+
+  return {
+    ...data,
+    company_types: companyTypes,
+    // Attach rating summary — null if no ratings yet
+    rating_summary: ratingSummary ?? null,
+  } as unknown as Company;
 }
-
 
 
 export async function getCompanyLocationOptions(): Promise<LocationOption[]> {

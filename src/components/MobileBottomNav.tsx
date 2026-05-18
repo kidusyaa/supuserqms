@@ -1,19 +1,38 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon } from "@iconify/react";
-
-const items = [
-  { name: "Home", href: "/", icon: "material-symbols:home-outline" },
-  { name: "Services", href: "/services", icon: "solar:hand-stars-linear" },
-  { name: "Companies", href: "/company", icon: "iconoir:shop-four-tiles" },
-  { name: "Profile", href: "/profile", icon: "material-symbols:person-outline" },
-
-];
+import { supabase } from "@/lib/supabaseClient";
 
 export default function MobileBottomNav() {
   const pathname = usePathname();
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setIsLoggedIn(!!session);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsLoggedIn(!!session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const items = [
+    { name: "Home", href: "/", icon: "material-symbols:home-outline" },
+    { name: "Services", href: "/services", icon: "solar:hand-stars-linear" },
+    { name: "Companies", href: "/company", icon: "iconoir:shop-four-tiles" },
+    { 
+      name: "Profile", 
+      href: isLoggedIn ? "/profile" : "/auth/signin", 
+      icon: "material-symbols:person-outline" 
+    },
+  ];
+
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
 
   return (
@@ -25,9 +44,7 @@ export default function MobileBottomNav() {
               <Link
                 href={item.href}
                 className={`flex flex-col items-center justify-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                  isActive(item.href)
-                    ? "text-amber-700"
-                    : "text-gray-600 hover:text-gray-900"
+                  isActive(item.href) ? "text-amber-700" : "text-gray-600"
                 }`}
               >
                 <Icon
