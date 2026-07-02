@@ -1,103 +1,117 @@
-// pages/company-types.tsx or app/company-types/page.tsx
-
 "use client";
-import { useState, useEffect } from "react";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { CompanyTypeWithCount } from "@/type";
+import { ArrowRight } from "lucide-react";
+
 import { getCompanyTypesWithCounts } from "@/lib/supabase-utils";
-import {  LayoutDashboard } from "lucide-react"
-import DivCenter from "./divCenter";
-// --- Image mapping remains the same ---
-const categoryImages: { [key: string]: string } = {
-  'ctyp_barbershop': '/images/category/barbershop.png',
-  'ctyp_beauty_salon': '/images/category/beautysalon.png',
-  'ctyp_massage_parlor': '/images/bodymassage.png',
+import { CompanyTypeWithCount } from "@/type";
+
+// This mapping uses the names from your database. 
+// Make sure these strings match your database 'name' column exactly.
+const categoryImages: Record<string, string> = {
+  "Barbershop": "/catgorylist/barbershop (1).png",
+  "Beauty Salon": "/catgorylist/woman-hair.png",
+  "Makeup Artist": "/catgorylist/makeover.png",
+  "Massage Parlor": "/catgorylist/spa.png",
+  "Nail Studio": "/catgorylist/nail-polish.png",
+  "Skincare Clinic": "/catgorylist/skincare (1).png",
 };
 
 export default function CompanyTypesPage() {
   const [companyTypes, setCompanyTypes] = useState<CompanyTypeWithCount[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchCompanyTypes = async () => {
-      setIsLoading(true);
+    const loadCompanyTypes = async () => {
       try {
         const data = await getCompanyTypesWithCounts();
         setCompanyTypes(data);
       } catch (error) {
-        console.error("Failed to fetch company types:", error);
+        console.error("Error loading company types:", error);
       } finally {
-        setIsLoading(false);
+        setLoading(false);
       }
     };
-    fetchCompanyTypes();
+
+    loadCompanyTypes();
   }, []);
-  
-  // +++ NEW: A skeleton loader that matches the new circular design +++
-  const ItemSkeleton = () => (
-    <div className="flex flex-col items-center gap-4 animate-pulse">
-      <div className="h-32 w-32 rounded-full bg-gray-200 md:h-40 md:w-40"></div>
-      <div className="h-5 w-28 rounded bg-gray-200"></div>
+
+  const SkeletonCard = () => (
+    <div className="flex items-center gap-4 p-5 rounded-2xl border bg-white animate-pulse">
+      <div className="h-16 w-16 rounded-full bg-gray-200"></div>
+      <div className="flex-1">
+        <div className="h-5 w-32 bg-gray-200 rounded mb-2"></div>
+        <div className="h-4 w-20 bg-gray-200 rounded"></div>
+      </div>
     </div>
   );
 
   return (
-    <div className="mb-4 ">
-    <DivCenter>
-     
-    <div className=" mx-auto  ">
-      <div className="container mx-auto px-4">
-        {isLoading ? (
-          <div className="grid  gap-x-6 gap-y-12 grid-cols-3 ">
-            <ItemSkeleton />
-            <ItemSkeleton />
-            <ItemSkeleton />
-          </div>
-        ) : (
-          <div className="grid  gap-x-6 gap-y-12 grid-cols-3">
-            {companyTypes.map((type) => (
-              // +++ THE NEW "PLANE" DESIGN +++
-              <Link
-                key={type.id}
-                href={`/company?companyTypeId=${type.id}`}
-                // The 'group' is essential for hover effects on child elements
-                className="group flex flex-col items-center gap-4 text-center "
-              >
-                {/* 1. Circular Image Container */}
-                <div className="relative  overflow-hidden rounded-full ring-2 ring-gray-200 transition-all duration-300 group-hover:ring-4 group-hover:ring-primary h-16 w-16 bg-white">
-                  <Image
-                    src={categoryImages[type.id] || '/placeholder.svg'}
-                    alt={type.name}
-                    fill
-                    className="object-contain transition-transform duration-500 group-hover:scale-110 p-2"
-                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                  />
-                </div>
+    <section className="py-20 bg-slate-50/50">
+      <div className="max-w-6xl mx-auto px-4">
+        {/* Heading */}
+        <div className="text-center mb-12">
+          <h2 className="text-5xl font-bold text-slate-900">
+            Explore by Category
+          </h2>
+          <p className="mt-4 text-lg text-gray-500">
+            Discover and book the best local service providers
+          </p>
+        </div>
 
-                {/* 2. Centered Text Below */}
-                <div>
-                  <h3 className="md:text-lg text-sm font-bold text-white/50 transition-colors group-hover:text-primary ">
-                    {type.name}
-                  </h3>
-                  <p className="text-xs text-gray-500">
-                    {type.company_count}{" "}
-                    {type.company_count === 1 ? "provider" : "providers"}
-                  </p>
-                </div>
-              </Link>
+        {/* Loading State */}
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {[...Array(6)].map((_, i) => (
+              <SkeletonCard key={i} />
             ))}
           </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {companyTypes.map((type) => {
+              // FIX: Use type.name to find the image, fallback to cosmetics if not found
+              const imageSrc = categoryImages[type.name] || "/catgorylist/cosmetics.png";
+
+              return (
+                <Link
+                  key={type.id}
+                  href={`/company?companyTypeId=${type.id}`}
+                  className="group flex items-center gap-5 bg-white border rounded-3xl p-6 hover:shadow-xl transition-all duration-300"
+                >
+                  {/* Image Container */}
+                  <div className="relative h-20 w-20 flex-shrink-0 rounded-full overflow-hidden bg-slate-900 flex items-center justify-center">
+                    <Image
+                      src={imageSrc}
+                      alt={type.name}
+                      fill
+                      className="object-cover p-3" // added padding so icons don't hit the edges
+                      sizes="80px"
+                    />
+                  </div>
+
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-2xl font-bold text-slate-900 truncate">
+                      {type.name}
+                    </h3>
+                    <p className="text-gray-500 text-lg">
+                      {type.company_count}{" "}
+                      {type.company_count === 1 ? "provider" : "providers"}
+                    </p>
+                  </div>
+
+                  {/* Arrow Button */}
+                  <div className="h-12 w-12 rounded-full bg-gray-100 flex items-center justify-center group-hover:bg-orange-500 group-hover:text-white transition-all">
+                    <ArrowRight className="h-5 w-5" />
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
         )}
-      </div> 
-    </div>
-     {/* <div className="flex items-center justify-between md:mb-10 mb-4 pt-5 ">
-            <h2 className="text-2xl font-bold text-tertiary flex items-center gap-2">
-              <LayoutDashboard className="w-6 h-6 text-orange-500" />
-              Business Categories
-            </h2>
-        </div> */}
-    </DivCenter>
-    </div>
+      </div>
+    </section>
   );
 }

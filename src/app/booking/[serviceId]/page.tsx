@@ -250,16 +250,19 @@ export default function BookingPage() {
     setUiMode("scheduleAppointment");
   };
 
-  const handleQueueJoined = (
-    queueEntry: QueueItem,
-    estimatedStartTime: Date | null
-  ) => {
-    setConfirmedQueueEntry({
-      ...queueEntry,
-      estimatedServiceStartTime: estimatedStartTime,
-    });
-    setQueueConfirmationDialogOpen(true);
-  };
+ const handleQueueJoined = (
+  queueEntry: QueueItem,
+  estimatedStartTime: Date | null,
+  estimatedEndTime: Date | null        // ← now passed from JoinQueueDialog
+) => {
+  setConfirmedQueueEntry({
+    ...queueEntry,
+    estimatedServiceStartTime: estimatedStartTime,
+    estimatedServiceEndTime: estimatedEndTime,   // ← stored for QueueConfirmationDialog
+  });
+  setQueueConfirmationDialogOpen(true);
+};
+
 
   if (loading) {
     return (

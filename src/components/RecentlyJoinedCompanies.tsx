@@ -10,7 +10,8 @@ import {
   Mail, 
   Clock,
   Users,
-  Building
+  Building,
+  ArrowRight
 } from "lucide-react";
 import { getRecentCompanies } from "@/lib/supabase-utils";
 import { Company } from "@/type";
@@ -89,124 +90,105 @@ const RecentlyJoinedCompanies = () => {
   }
 
   return (
-    <section className="py-16 bg-gradient-to-t from-tertiary/90 to-tertiary">
+    <section className="py-16 md:py-20 bg-slate-900 dark:bg-slate-950/60 border-y border-slate-800">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
+        
+        {/* Modern Header */}
         <div className="mb-12 text-center">
-          <h2 className="text-3xl font-bold text-white mb-4">
-            Recently Joined Companies
+          <div className="inline-flex items-center gap-2 mb-2">
+            <span className="text-xs uppercase tracking-wider font-extrabold text-primary bg-primary/10 px-3 py-1 rounded-full">
+              New Partners
+            </span>
+          </div>
+          <h2 className="text-2xl md:text-4xl font-black text-white mb-3">
+            Recently Joined Businesses
           </h2>
-          <p className="text-gray-300 max-w-2xl mx-auto">
-            Discover our newest partners providing quality services in your area
+          <p className="text-sm md:text-base text-gray-400 max-w-xl mx-auto">
+            Discover our newest partners providing quality beauty and wellness services in your city
           </p>
         </div>
 
         {/* Companies Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
           {companies.map((company) => (
-           <Link
-  key={company.id}
-  href={`/company/${company.slug ? encodeURIComponent(company.slug.replace(/^\/+|\/+$/g, '')) : company.id}`}
-  className="group"
->
-              <div className="bg-white/10 backdrop-blur-sm rounded-xl border border-gray-700 hover:border-white hover:shadow-lg hover:shadow-primary/10 transition-all duration-300 h-full flex flex-col overflow-hidden">
+            <Link
+              key={company.id}
+              href={`/company/${company.slug ? encodeURIComponent(company.slug.replace(/^\/+|\/+$/g, '')) : company.id}`}
+              className="group h-full"
+            >
+              <div className="bg-slate-800/40 hover:bg-slate-800/80 backdrop-blur-md rounded-2xl border border-slate-800 hover:border-primary/30 hover:shadow-xl hover:shadow-primary/5 hover:-translate-y-1.5 transition-all duration-300 h-full flex flex-col overflow-hidden p-5">
+                
                 {/* Logo Section */}
-                <div className="p-6 pb-4">
-                  <div className="relative">
-                    <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-primary/20 to-primary/10 rounded-full flex items-center justify-center border border-primary/20 group-hover:border-primary/40 transition-colors">
-                      {company.logo ? (
-                        <Image
-                          src={company.logo}
-                          alt={company.name}
-                          width={64}
-                          height={64}
-                          className="w-20 h-20 object-cover rounded-full "
-                        />
-                      ) : (
-                        <span className="text-primary text-2xl font-bold">
-                          {getInitials(company.name)}
-                        </span>
-                      )}
-                    </div>
+                <div className="text-center mb-4 flex-grow-0">
+                  <div className="relative w-24 h-24 mx-auto mb-4 bg-white rounded-full flex items-center justify-center p-1 border border-slate-700/50 shadow-md group-hover:border-primary/50 transition-all duration-300 overflow-hidden">
+                    {company.logo ? (
+                      <Image
+                        src={company.logo}
+                        alt={company.name}
+                        width={88}
+                        height={88}
+                        className="w-full h-full object-cover rounded-full transition-transform duration-500 group-hover:scale-105"
+                      />
+                    ) : (
+                      <span className="text-primary text-2xl font-black">
+                        {getInitials(company.name)}
+                      </span>
+                    )}
                   </div>
+
+                  {/* Business Type Badge */}
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-primary/10 text-primary border border-primary/20">
+                    <Building2 className="h-3.5 w-3.5" />
+                    {getCompanyTypeName(company)}
+                  </span>
                   
                   {/* Company Name */}
-                  <h3 className="text-lg font-semibold text-white text-center group-hover:text-primary transition-colors line-clamp-2 mb-2">
+                  <h3 className="text-base font-bold text-white mt-3 line-clamp-1 group-hover:text-primary transition-colors">
                     {company.name}
                   </h3>
+
+                  {/* Pulsing Active indicator */}
+                  <div className="flex items-center justify-center gap-2 mt-1.5">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                    </span>
+                    <span className="text-xs font-medium text-gray-400">Active Now</span>
+                  </div>
                 </div>
 
-                {/* Company Details */}
-                <div className="px-6  flex-1">
-                  {/* Category */}
-                  <div className="">
-                    <div className="flex items-center justify-center gap-2 mb-2">
-                      <Building2 className="h-4 w-4 text-primary" />
-                      <span className="text-sm font-medium text-primary">
-                        {getCompanyTypeName(company)}
+                {/* Company Details (Collapsed & Simplified) */}
+                <div className="flex-grow flex flex-col justify-end">
+                  
+                  {/* Location Info */}
+                  {company.location_text && (
+                    <div className="flex items-start gap-1.5 py-2 px-2.5 mt-4 rounded-xl bg-slate-900/40 text-gray-400 text-xs w-full">
+                      <MapPin className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+                      <span className="line-clamp-1 leading-normal">
+                        {company.location_text}
                       </span>
                     </div>
-                    
-                    {/* Active Status */}
-                    <div className="flex items-center justify-center gap-2">
-                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                      <span className="text-xs text-gray-300">Active now</span>
-                    </div>
-                  </div>
-
-                  {/* Location */}
-                  {company.location_text && (
-                    <div className="flex items-start gap-2 mb-4 p-2 bg-gray-900/30 rounded-lg w-full mt-4 ">
-                      <MapPin className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                      <div>
-                        <p className="text-xs text-gray-400">Location</p>
-                        <p className="text-sm text-gray-200 line-clamp-2">
-                          {company.location_text}
-                        </p>
-                      </div>
-                    </div>
                   )}
-
-                  {/* Contact Info */}
-                  <div className="space-y-3">
+                  
+                  {/* Contact Info (Simplified) */}
+                  <div className="flex justify-center gap-3 mt-3 text-gray-400">
                     {company.phone && (
-                      <div className="flex items-center gap-3 p-3 bg-gray-900/30 rounded-lg">
-                        <div className="w-8 h-8 bg-primary/10 rounded flex items-center justify-center">
-                          <Phone className="h-4 w-4 text-primary" />
-                        </div>
-                        <div>
-                          <p className="text-xs text-gray-400">Phone</p>
-                          <p className="text-sm text-gray-200 truncate">
-                            {company.phone}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {company.email && (
-                      <div className="flex items-center gap-3 p-3 bg-gray-900/30 rounded-lg">
-                        <div className="w-8 h-8 bg-primary/10 rounded flex items-center justify-center">
-                          <Mail className="h-4 w-4 text-primary" />
-                        </div>
-                        <div>
-                          <p className="text-xs text-gray-400">Email</p>
-                          <p className="text-sm text-gray-200 truncate">
-                            {company.email}
-                          </p>
-                        </div>
-                      </div>
+                      <span className="flex items-center gap-1 text-xs" title={company.phone}>
+                        <Phone className="h-3.5 w-3.5 text-primary" />
+                        <span className="truncate max-w-[80px]">{company.phone}</span>
+                      </span>
                     )}
                   </div>
                 </div>
 
-                {/* View Button */}
-                <div className="px-6 pb-6 pt-2">
-                  <div className="text-center">
-                    <span className="text-primary text-sm font-medium group-hover:underline">
-                      View Services →
-                    </span>
-                  </div>
+                {/* Explore Button */}
+                <div className="mt-5">
+                  <span className="w-full py-2.5 px-4 bg-slate-800/80 group-hover:bg-primary text-white text-xs font-bold rounded-xl transition-all duration-300 flex items-center justify-center gap-1.5 border border-slate-700/50 group-hover:border-primary/20">
+                    Explore Services
+                    <ArrowRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-1" />
+                  </span>
                 </div>
+
               </div>
             </Link>
           ))}

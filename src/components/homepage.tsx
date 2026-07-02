@@ -21,6 +21,20 @@ export default function Homepage() {
     <div>
 
       <HeroSection />
+      
+      {/* Categories Explorer Section */}
+      <section className="py-16 bg-gray-50 dark:bg-slate-900/25 border-y border-gray-100 dark:border-slate-800/50">
+        <div className="max-w-7xl mx-auto px-4 text-center">
+          <h2 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-2 tracking-tight">
+            Explore by Category
+          </h2>
+          <p className="text-sm sm:text-base text-gray-500 dark:text-slate-400 mb-10 max-w-md mx-auto">
+            Discover and book the best local service providers in your category
+          </p>
+          <CompanyTypesPage />
+        </div>
+      </section>
+
       <DiscountedServices />
       <PartnersCarousel />
       <RecentlyJoinedCompanies />

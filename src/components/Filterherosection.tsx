@@ -157,15 +157,16 @@ export default function Filterherosection() {
   const selectedCompanyTypeCount = filters.companyTypeIds.length;
 
   return (
-    <div>
-      <div className="max-w-4xl mx-auto">
-        <div className="bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/20 rounded-2xl shadow-xl border border-border md:p-4 p-2">
-        <div className='flex flex-row space-x-4'>
-          <div className="relative mb-6 bg-green-500 w-full">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+    <div className="w-full max-w-4xl mx-auto">
+      <div className="bg-white rounded-2xl md:rounded-full shadow-2xl border border-gray-150 p-2 md:p-3 transition-all duration-300 hover:shadow-orange-500/5 focus-within:ring-2 focus-within:ring-primary/20">
+        <div className="flex flex-col md:flex-row items-center gap-2 md:gap-0">
+          
+          {/* Search Input */}
+          <div className="relative flex-1 w-full">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
             <Input
               placeholder="Search services or companies..."
-              className="w-full pl-12 h-12 text-base border-border/50 focus:border-accent text-foreground hover:bg-muted bg-white"
+              className="w-full pl-12 pr-4 h-12 text-base text-gray-900 placeholder-gray-400 bg-transparent border-none shadow-none ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none"
               value={filters.searchTerm}
               onChange={(e) =>
                 setFilters((prev) => ({
@@ -185,24 +186,32 @@ export default function Filterherosection() {
             />
           </div>
 
-          <div >
+          {/* Desktop Vertical Separator */}
+          <div className="hidden md:block h-8 w-[1px] bg-gray-200 mx-3" />
+
+          {/* Location Popover */}
+          <div className="w-full md:w-auto">
             <Popover
               open={locationPopoverOpen}
               onOpenChange={setLocationPopoverOpen}
             >
               <PopoverTrigger asChild>
                 <Button
-                  variant="outline"
-                  className="h-12 flex-shrink-0 w-full justify-center md:justify-start text-base border-border/50 focus:border-accent text-foreground hover:bg-muted"
+                  variant="ghost"
+                  className="h-12 w-full md:w-auto justify-start md:justify-center text-base font-medium text-gray-700 hover:bg-gray-50 border-0 rounded-full px-4 gap-2 flex-shrink-0"
                   disabled={dataLoading}
                 >
-                  <MapPin className=" h-5 w-5 text-muted-foreground" />
-                  <span className='text-sm'>Location</span>{" "}
-                  {selectedLocationCount > 0 && `(${selectedLocationCount})`}
+                  <MapPin className="h-5 w-5 text-gray-400" />
+                  <span className="truncate">
+                    {selectedLocationCount > 0 
+                      ? `${selectedLocationCount} Location${selectedLocationCount > 1 ? 's' : ''}` 
+                      : "Location"}
+                  </span>
                 </Button>
               </PopoverTrigger>
               <PopoverContent
-                className="w-[250px] p-0 bg-popover text-popover-foreground border-border shadow-lg"
+                align="end"
+                className="w-[280px] p-0 bg-popover text-popover-foreground border-border shadow-lg"
               >
                 <Command className="[&_[cmdk-group]]:px-2 [&_[cmdk-group]_:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-item]_svg]:h-4 [&_[cmdk-item]_svg]:w-4 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-1.5 [&_[cmdk-item]_span]:ml-2 [&_[cmdk-item]_span]:flex-1 [&_[cmdk-item]_span]:text-sm">
                   <CommandInput placeholder="Search location..." className="h-10 text-base placeholder-muted-foreground" />
@@ -216,7 +225,7 @@ export default function Filterherosection() {
                           <CommandItem
                             key={loc.value}
                             onSelect={() => handleLocationToggle(loc)}
-                            className="hover:bg-muted text-foreground"
+                            className="hover:bg-muted text-foreground cursor-pointer"
                           >
                             <Check
                               className={`mr-2 h-4 w-4 ${filters.locations.some(
@@ -236,17 +245,22 @@ export default function Filterherosection() {
               </PopoverContent>
             </Popover>
           </div>
-</div>
+
+          {/* Desktop Spacer / Separator */}
+          <div className="hidden md:block w-4" />
+
+          {/* Submit Button */}
           <Button
             size="lg"
             onClick={handleSearch}
-            className="w-full h-12 text-base font-semibold bg-accent hover:bg-accent/90 text-accent-foreground rounded-xl focus-visible:outline-ring"
+            className="w-full md:w-auto h-12 px-8 text-base font-semibold bg-primary hover:bg-primary/90 text-white rounded-xl md:rounded-full shadow-md shadow-primary/20 hover:shadow-lg hover:shadow-primary/30 transition-all duration-300"
           >
-            <Search className="h-5 w-5 mr-2" />
-            Find Services
+            <Search className="h-5 w-5 md:mr-2" />
+            <span className="md:inline">Find Services</span>
           </Button>
+
         </div>
       </div>
     </div>
-  )
+  );
 }

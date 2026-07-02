@@ -265,24 +265,18 @@ export async function getMyQueueEntries(): Promise<QueueItem[]> {
 
   // The main function to create a new queue entry
 
- export type CreateQueuePayload = {
-
-  // When authenticated, these are auto-filled from `profiles`.
-  user_name?: string;
-
-  phone_number?: string;
-
+export type CreateQueuePayload = {
   service_id: string;
-
-  provider_id: string | null; // Can be null if 'Any Provider' is chosen
-
-  queue_type: 'walk-in' | 'booking';
-
-  appointment_time?: string | null; 
-
-  notes?: string | null; 
-
+  provider_id: string | null;       // null → "Any Provider" auto-assignment
+  queued_by_type: "walk_in" | "self"; // NEW: replaces the old queue_type for source
+  queue_type: "walk-in" | "booking";  // kept for backward-compat on the DB column
+  notes?: string | null;
+ 
+  // Required for walk_in; ignored (overwritten) for self
+  user_name?: string;
+  phone_number?: string;
 };
+ 
 
 
 
@@ -1648,115 +1642,7 @@ const findOrCreateUser = async (phoneNumber: string, name: string): Promise<{ id
 
 
 
-export const createQueueEntry = async (payload: CreateQueuePayload): Promise<QueueItem & {position: number}> => {
 
-  try {
-
-    // Only calculate position for 'walk-in' queues
-
-    // For 'booking' queues, position might be less relevant or handled differently later
-
-    const currentQueueCount = payload.queue_type === 'walk-in' ? await getCurrentQueueCount(payload.service_id) : 0;
-
-    const position = currentQueueCount + 1;
-
-
-
-    const { data, error } = await supabase
-
-      .from('queue_entries')
-
-      .insert({
-
-        service_id: payload.service_id,
-
-        provider_id: payload.provider_id, // This can now be null
-
-        user_name: payload.user_name,
-
-        phone_number: payload.phone_number,
-
-        queue_type: payload.queue_type,
-
-        status: 'waiting', // Default status for new entries
-
-        appointment_time: payload.appointment_time,
-
-        notes: payload.notes,
-
-        // The `joined_at` column in your DB should have a `DEFAULT NOW()`
-
-        // Supabase will automatically populate `created_at` which we can map to `joined_at`
-
-      })
-
-      .select()
-
-      .single();
-
-
-
-    if (error) {
-
-      console.error('Error creating queue entry:', error);
-
-      throw new Error(`Failed to join queue: ${error.message}`);
-
-    }
-
-
-
-    if (!data) {
-
-        throw new Error('Failed to retrieve new queue entry after creation.');
-
-    }
-
-
-
-    const queueItem: QueueItem = {
-
-        id: data.id,
-
-        service_id: data.service_id,
-
-        provider_id: data.provider_id || null,
-
-        user_id: data.user_uid || null, // Assuming user_uid might be null from the DB for walk-ins
-
-        user_name: data.user_name,
-
-        phone_number: data.phone_number,
-
-        status: data.status,
-
-        queue_type: data.queue_type,
-
-        notes: data.notes || null,
-
-        joined_at: data.created_at,
-
-        served_at:data.served_at,
-
-        position:data.position, // Use created_at from Supabase for joined_at
-
-    };
-
-
-
-    return { ...queueItem, position }; 
-
-
-
-  } catch (error) {
-
-    console.error('Error in createQueueEntry function:', error);
-
-    throw error;
-
-  }
-
-};
 
   //featured services
 
@@ -2419,34 +2305,63 @@ export async function getLatestAvailableTimeForProvider(
 
 
 
-export async function joinQueue(payload: CreateQueuePayload): Promise<AugmentedQueueItem> {
-  let { service_id, provider_id, user_name, phone_number, notes, queue_type } = payload;
-
-  // Require sign-in + completed profile for queue/join
-  const { user, profile } = await requireUserAndCompletedProfile();
-  user_name = (profile.name ?? user_name ?? "").trim();
-  phone_number = (profile.phone_number ?? phone_number ?? "").trim();
-
-  if (!service_id || !user_name) {
-    throw new Error("Missing required data to join queue (service or name).");
+export async function joinQueue(
+  payload: CreateQueuePayload
+): Promise<AugmentedQueueItem> {
+  let {
+    service_id,
+    provider_id,
+    queued_by_type,
+    queue_type,
+    notes,
+    user_name: payloadName,
+    phone_number: payloadPhone,
+  } = payload;
+ 
+  // ── 1. Identity resolution ────────────────────────────────────────────────
+  let resolvedUserId: string | null = null;
+  let resolvedName: string = "";
+  let resolvedPhone: string = "";
+ 
+  if (queued_by_type === "self") {
+    // Logged-in flow: require auth + complete profile
+    const { user, profile } = await requireUserAndCompletedProfile();
+    resolvedUserId = user.id;
+    resolvedName = (profile.name ?? "").trim();
+    resolvedPhone = (profile.phone_number ?? "").trim();
+ 
+    if (!resolvedName || !resolvedPhone) {
+      const err: any = new Error("Your profile is incomplete. Please add your name and phone number.");
+      err.code = "PROFILE_INCOMPLETE";
+      throw err;
+    }
+  } else {
+    // Walk-in flow: no auth required, name + phone come from the form
+    resolvedName = (payloadName ?? "").trim();
+    resolvedPhone = (payloadPhone ?? "").trim();
+ 
+    if (!resolvedName) throw new Error("Name is required to join the queue.");
+    if (!resolvedPhone) throw new Error("Phone number is required to join the queue.");
   }
-
+ 
+  // ── 2. Load service details ───────────────────────────────────────────────
+  if (!service_id) throw new Error("Missing service ID.");
+ 
   const service = await getServiceDetails(service_id);
   if (!service || !service.company || !service.estimated_wait_time_mins) {
     throw new Error("Service details, company, or estimated wait time not found.");
   }
-
   const company = service.company;
-
-  // --- AUTO-ASSIGNMENT LOGIC FOR "ANY PROVIDER" ---
+ 
+  // ── 3. Auto-assign provider if "Any Provider" ─────────────────────────────
   if (!provider_id || provider_id === ANY_PROVIDER_ID) {
-    const activeProviders = service.providers?.filter(p => p.is_active) || [];
-    if (activeProviders.length === 0) throw new Error("No active providers available.");
-
+    const activeProviders = service.providers?.filter((p) => p.is_active) || [];
+    if (activeProviders.length === 0)
+      throw new Error("No active providers available for this service.");
+ 
     let bestProvider = activeProviders[0];
     let earliestTime: Date | null = null;
-
-    // Find the provider with the earliest available time
+ 
     for (const p of activeProviders) {
       const t = await getLatestAvailableTimeForProvider(company, p.id, service_id);
       if (!earliestTime || (t && t < earliestTime)) {
@@ -2454,107 +2369,122 @@ export async function joinQueue(payload: CreateQueuePayload): Promise<AugmentedQ
         bestProvider = p;
       }
     }
-    provider_id = bestProvider.id; // Assign to the most available provider
+    provider_id = bestProvider.id;
   }
-
-  const estimatedServiceDuration = service.estimated_wait_time_mins;
-  let projectedStartTime: Date | null = null;
-  let projectedEndTime: Date | null = null;
-
-  try {
-    const latestAvailable = await getLatestAvailableTimeForProvider(company, provider_id, service_id);
-    if (!latestAvailable) {
-      throw new Error("Company is closed today or working hours are not defined.");
-    }
-
-    const providerObj =
-      service.providers?.find((p) => p.id === provider_id) ||
-      ({
-        id: provider_id,
-        name: "Provider",
-        specialization: null,
-        is_active: true,
-        created_at: new Date().toISOString(),
-        company_id: company.id,
-      } as Provider);
-
-    // Instead of failing near closing time, find the next available slot (today or next open day).
-    const MAX_DAYS_AHEAD = 14;
-    const baseDate = startOfDay(new Date());
-    let found: { start: Date; end: Date } | null = null;
-
-    for (let i = 0; i <= MAX_DAYS_AHEAD; i++) {
-      const day = addDays(baseDate, i);
-      const { start: dayStart, end: dayEnd } = getDayRange(day);
-      const occupied = await getProviderOccupiedSlots(provider_id, dayStart, dayEnd);
-      let slots = generateAvailableSlots(company, service, providerObj, day, occupied);
-
-      // For "today", don't show anything before the provider is actually available.
-      if (i === 0 && latestAvailable) {
-        slots = slots.filter((s) => s.start.getTime() >= latestAvailable.getTime());
-      }
-
-      if (slots.length > 0) {
-        found = { start: slots[0].start, end: slots[0].end };
-        break;
-      }
-    }
-
-    if (!found) {
-      throw new Error("No available time slots found in the next two weeks.");
-    }
-
-    projectedStartTime = found.start;
-    projectedEndTime = found.end;
-  } catch (calcError: any) {
-    throw new Error(`Failed to determine an available queue slot: ${calcError.message}`);
+ 
+  // ── 4. Calculate projected start / end times ──────────────────────────────
+  const latestAvailable = await getLatestAvailableTimeForProvider(
+    company,
+    provider_id,
+    service_id
+  );
+  if (!latestAvailable) {
+    throw new Error("The company is closed today or working hours are not defined.");
   }
-
+ 
+  const providerObj =
+    service.providers?.find((p) => p.id === provider_id) ||
+    ({
+      id: provider_id,
+      name: "Provider",
+      specialization: null,
+      is_active: true,
+      created_at: new Date().toISOString(),
+      company_id: company.id,
+    } as Provider);
+ 
+  const MAX_DAYS_AHEAD = 14;
+  const baseDate = startOfDay(new Date());
+  let found: { start: Date; end: Date } | null = null;
+ 
+  for (let i = 0; i <= MAX_DAYS_AHEAD; i++) {
+    const day = addDays(baseDate, i);
+    const { start: dayStart, end: dayEnd } = getDayRange(day);
+    const occupied = await getProviderOccupiedSlots(provider_id, dayStart, dayEnd);
+    let slots = generateAvailableSlots(company, service, providerObj, day, occupied);
+ 
+    if (i === 0 && latestAvailable) {
+      slots = slots.filter((s) => s.start.getTime() >= latestAvailable.getTime());
+    }
+ 
+    if (slots.length > 0) {
+      found = { start: slots[0].start, end: slots[0].end };
+      break;
+    }
+  }
+ 
+  if (!found) {
+    throw new Error("No available time slots found in the next two weeks.");
+  }
+ 
+  const projectedStartTime = found.start;
+  const projectedEndTime = found.end;
+ 
+  // ── 5. Insert queue entry + provider reservation ──────────────────────────
   const currentQueueCount = await getCurrentQueueCount(service_id);
   const estimatedPosition = currentQueueCount + 1;
   let createdQueueEntryResult: QueueItem | null = null;
-
+ 
   try {
-    const { data: queueResult, error: queueError } = await supabase.from('queue_entries').insert({
-      service_id,
-      provider_id,
-      user_name,
-      phone_number,
-      queue_type,
-      status: 'waiting',
-      notes,
-      user_id: user.id,
-      projected_start_time: projectedStartTime!.toISOString(),
-      projected_end_time: projectedEndTime!.toISOString(),
-      position: estimatedPosition,
-    }).select().single();
-
-    if (queueError || !queueResult) throw new Error(`Failed to join queue: ${queueError?.message}`);
+    const { data: queueResult, error: queueError } = await supabase
+      .from("queue_entries")
+      .insert({
+        service_id,
+        provider_id,
+        user_name: resolvedName,
+        phone_number: resolvedPhone,
+        queue_type,                          // existing DB column
+        queued_by_type,                      // new DB column (from migration)
+        queued_by_company_id: null,          // null → customer-initiated
+        status: "waiting",
+        notes: notes ?? null,
+        user_id: resolvedUserId,             // null for walk-in
+        projected_start_time: projectedStartTime.toISOString(),
+        projected_end_time: projectedEndTime.toISOString(),
+        position: estimatedPosition,
+      })
+      .select()
+      .single();
+ 
+    if (queueError || !queueResult) {
+      throw new Error(`Failed to join queue: ${queueError?.message}`);
+    }
     createdQueueEntryResult = queueResult as QueueItem;
-    
-    const { error: reservationError } = await supabase.from('provider_reservations').insert({
-      provider_id, service_id,
-      start_time: projectedStartTime!.toISOString(),
-      end_time: projectedEndTime!.toISOString(),
-      source_type: 'queue',
-      source_row_id: createdQueueEntryResult.id,
-    });
-
-    if (reservationError) throw new Error(`Failed to create reservation: ${reservationError.message}`);
-    
-    return { 
-      ...createdQueueEntryResult, 
-      position: estimatedPosition, 
-      estimatedServiceStartTime: projectedStartTime, 
-      estimatedServiceEndTime: projectedEndTime 
+ 
+    const { error: reservationError } = await supabase
+      .from("provider_reservations")
+      .insert({
+        provider_id,
+        service_id,
+        user_id: resolvedUserId,
+        start_time: projectedStartTime.toISOString(),
+        end_time: projectedEndTime.toISOString(),
+        source_type: "queue",
+        source_row_id: String(createdQueueEntryResult.id),
+      });
+ 
+    if (reservationError) {
+      throw new Error(`Failed to create reservation: ${reservationError.message}`);
+    }
+ 
+    return {
+      ...createdQueueEntryResult,
+      position: estimatedPosition,
+      estimatedServiceStartTime: projectedStartTime,
+      estimatedServiceEndTime: projectedEndTime,
     };
   } catch (error: any) {
+    // Rollback queue entry if reservation fails
     if (createdQueueEntryResult?.id) {
-      await supabase.from('queue_entries').delete().eq('id', createdQueueEntryResult.id);
+      await supabase
+        .from("queue_entries")
+        .delete()
+        .eq("id", createdQueueEntryResult.id);
     }
     throw error;
   }
 }
+ 
 
 
 
