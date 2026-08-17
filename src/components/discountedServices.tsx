@@ -81,35 +81,35 @@ export default function DiscountedServices() {
     <section className="py-6   overflow-hidden">
       <div className="max-w-6xl mx-auto px-4">
         <div className="flex items-center justify-between md:mb-10 mb-4">
-            <h2 className="text-2xl font-bold text-tertiary flex items-center gap-2">
-              <HandCoins className="w-6 h-6 text-orange-500" />
-              Special Offers
-            </h2>
-        </div> 
+          <h2 className="text-2xl font-bold text-tertiary flex items-center gap-2">
+            <HandCoins className="w-6 h-6 text-orange-500" />
+            Special Offers
+          </h2>
+        </div>
 
         <Carousel
-          opts={{ 
+          opts={{
             align: "start", // This is key for the partial view
             loop: true,
           }}
-          plugins={[ Autoplay({ delay: 3000, stopOnInteraction: true }) ]}
+          plugins={[Autoplay({ delay: 3000, stopOnInteraction: true })]}
           className="w-full"
         >
           <CarouselContent className="-ml-4">
-            {isLoading 
+            {isLoading
               ? Array.from({ length: 4 }).map((_, index) => (
-                  // Responsive sizing for the skeleton
-                  <CarouselItem key={index} className="pl-4 basis-4/5 md:basis-1/2 lg:basis-1/3">
-                    <DiscountCardSkeleton />
-                  </CarouselItem>
-                ))
+                // Responsive sizing for the skeleton
+                <CarouselItem key={index} className="pl-4 basis-4/5 md:basis-1/2 lg:basis-1/3">
+                  <DiscountCardSkeleton />
+                </CarouselItem>
+              ))
               : services.map((service) => (
-                <CarouselItem 
-                  key={service.id} 
+                <CarouselItem
+                  key={service.id}
                   // +++ KEY CHANGE: Responsive basis for partial view +++
                   className="pl-4 basis-4/5 md:basis-1/2 lg:basis-1/3"
                 >
-                  
+
                   {/* +++ THE NEW OVERLAY CARD DESIGN +++ */}
                   <div className="flex h-full flex-col overflow-hidden rounded-xl border bg-white shadow-md transition-shadow duration-300 hover:shadow-xl">
                     <Link href={`/booking/${service.id}`} className="block">
@@ -124,7 +124,7 @@ export default function DiscountedServices() {
                         />
                         {/* Gradient Overlay */}
                         <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/40 to-transparent"></div>
-                        
+
                         {/* Discount Badge */}
                         <div className="absolute top-3 left-3 rounded-full bg-red-500 px-3 py-1 text-xs font-bold text-white shadow-lg">
                           {formatDiscount(service)}
@@ -156,8 +156,8 @@ export default function DiscountedServices() {
                           </>
                         )}
                       </div>
-                      
-                      <Button asChild  variant="outline">
+
+                      <Button asChild variant="outline">
                         <Link href={`/booking/${service.id}`}>View Deal</Link>
                       </Button>
                     </div>
@@ -167,7 +167,7 @@ export default function DiscountedServices() {
               ))
             }
           </CarouselContent>
-          
+
           {/* Hide nav buttons on mobile where swipe is natural */}
           {/* <CarouselPrevious className="absolute left-2 top-1/2 -translate-y-1/2 z-10 hidden md:flex" />
           <CarouselNext className="absolute right-2 top-1/2 -translate-y-1/2 z-10 hidden md:flex" /> */}

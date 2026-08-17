@@ -16,62 +16,59 @@ const NavSection = ({ servicesSectionId }: NavSectionProps) => {
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
 
   return (
-    <nav className="sticky top-0 z-50 w-full bg-tertiary shadow-md">
+    <nav className="sticky top-0 z-50 w-full bg-white border-b border-gray-100 shadow-xs">
       <div className="container mx-auto flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
 
-        {/* Left: Logo */}
-        <div className="flex-shrink-0">
+        {/* Left: Search Box (Desktop) */}
+        <div className="hidden md:block w-48 sm:w-64 lg:w-72">
+          <SearchBox />
+        </div>
+
+        {/* Mobile Search Toggle Icon on Left for mobile layout */}
+        <div className="md:hidden flex items-center">
+          <button
+            className="p-2 rounded-full hover:bg-slate-100 text-slate-700 transition-colors"
+            onClick={() => setMobileSearchOpen(true)}
+            aria-label="Search"
+          >
+            <Icon icon="material-symbols-light:search-rounded" width="24" height="24" />
+          </button>
+        </div>
+
+        {/* Middle: Logo & GizeBook text with Tertiary background */}
+        <div className="flex-shrink-0 flex justify-center">
           <Link href="/" passHref>
-            <div className='flex items-center gap-2'>
-              <img src="/images/logopro.svg" alt="Company Logo" className='h-8 w-auto' />
-              <span className="text-2xl font-bold text-white cursor-pointer">GizeBook</span>
+            <div className="flex items-center gap-2 bg-tertiary px-4 py-1.5 rounded-full text-white shadow-xs hover:opacity-90 transition-all cursor-pointer">
+              <img src="/images/logopro.png" alt="GizeBook Logo" className="h-7 w-auto object-contain" />
+              <span className="text-lg sm:text-xl font-extrabold text-white tracking-tight">GizeBook</span>
             </div>
           </Link>
         </div>
 
-        {/* Middle: Search Box (Hidden on mobile) */}
-        <div className="hidden md:block flex-1 max-w-md mx-4">
-          <div className="relative">
-            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-              <Icon icon="material-symbols-light:search-rounded" width="24" height="24" />
-            </div>
-            <SearchBox />
+        {/* Right: Round buttons with white background & orange border line */}
+        <div className="flex items-center gap-2 sm:gap-3">
+          {/* User Menu / Sign In */}
+          <div className="hidden sm:block">
+            <UserMenu />
           </div>
+
+          {/* Register Services Button */}
+          <Link href={'https://app.gizebook.com/registration/company'} target='_blank'>
+            <button className="rounded-full bg-white border-2 border-amber-500 px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold text-amber-600 shadow-xs hover:bg-amber-50 transition-all">
+              Register Services
+            </button>
+          </Link>
         </div>
-
-        {/* Right: Book Now button + Mobile Search Icon */}
-  
-<div className="flex items-center gap-3">
-  {/* Profile - Hidden on mobile, shown on Desktop */}
-  <div className="hidden md:block">
-    <UserMenu />
-  </div>
-
-  {/* Mobile Search Icon */}
-  <button
-    className="md:hidden p-2 rounded-full hover:bg-gray-100 text-white"
-    onClick={() => setMobileSearchOpen(true)}
-  >
-    <Icon icon="material-symbols-light:search-rounded" width="24" height="24" />
-  </button>
-
-  {/* Book Now (Register) */}
-  <Link href={'https://app.gizebook.com/registration/company'} target='_blank'>
-    <button className="rounded-md bg-amber-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-amber-700 transition-colors">
-      Register Services
-    </button>
-  </Link>
-</div>
       </div>
 
       {/* Mobile Search Overlay */}
       {mobileSearchOpen && (
-        <div className="absolute top-0 left-0 w-full h-full bg-white z-50 p-4 flex flex-col">
+        <div className="absolute top-0 left-0 w-full h-full bg-white z-50 p-4 flex flex-col shadow-md">
           <div className="flex items-center justify-between mb-4">
-            <span className="text-lg font-semibold">Search</span>
+            <span className="text-lg font-semibold text-slate-800">Search Services</span>
             <button
               onClick={() => setMobileSearchOpen(false)}
-              className="p-2 rounded-full hover:bg-gray-100"
+              className="p-2 rounded-full hover:bg-gray-100 text-slate-700"
             >
               <Icon icon="material-symbols:close-rounded" width="24" height="24" />
             </button>
@@ -123,7 +120,7 @@ const SearchBox = ({ autoFocus = false, closeSearch }: { autoFocus?: boolean, cl
 
   return (
     <div className="relative" ref={containerRef}>
-      
+
       <input
         autoFocus={autoFocus}
         id="global-search"

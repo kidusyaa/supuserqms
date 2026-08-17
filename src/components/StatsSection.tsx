@@ -10,7 +10,7 @@ interface StatItem {
   icon: React.ReactNode;
   value: string;
   label: string;
- loading:boolean
+  loading: boolean
 }
 
 const StatCardSkeleton = () => (
@@ -28,31 +28,31 @@ const StatCardSkeleton = () => (
 
 const StatsSection = () => {
   const [stats, setStats] = useState<StatItem[]>([
-    { 
-      icon: <Building2 size={24} />, 
-      label: 'Companies Registered', 
-     value: '—', 
+    {
+      icon: <Building2 size={24} />,
+      label: 'Companies Registered',
+      value: '—',
       loading: true,
     },
-    { 
-      icon: <ClipboardList size={24} />, 
-      label: 'Active Services', 
-     value: '—', 
+    {
+      icon: <ClipboardList size={24} />,
+      label: 'Active Services',
+      value: '—',
       loading: true,
     },
-    { 
-      icon: <BadgeCheck size={24} />, 
-      label: 'Services Completed', 
-      value: '—', 
+    {
+      icon: <BadgeCheck size={24} />,
+      label: 'Services Completed',
+      value: '—',
       loading: true,
-      
+
     },
-    { 
-      icon: <Users size={24} />, 
-      label: 'Registered Users', 
-      value: '—', 
+    {
+      icon: <Users size={24} />,
+      label: 'Registered Users',
+      value: '—',
       loading: true,
-      
+
     },
   ]);
 
@@ -61,33 +61,33 @@ const StatsSection = () => {
       try {
         const s = await getGlobalStats();
         setStats([
-          { 
-            icon: <Building2 size={24} className="text-orange-500" />, 
-            label: 'Companies Registered', 
-            value: s.companiesCount.toLocaleString(), 
+          {
+            icon: <Building2 size={24} className="text-orange-500" />,
+            label: 'Companies Registered',
+            value: s.companiesCount.toLocaleString(),
             loading: false,
-         
+
           },
-          { 
-            icon: <ClipboardList size={24} className="text-blue-500" />, 
-            label: 'Active Services', 
-            value: s.activeServicesCount.toLocaleString(), 
+          {
+            icon: <ClipboardList size={24} className="text-blue-500" />,
+            label: 'Active Services',
+            value: s.activeServicesCount.toLocaleString(),
             loading: false,
-           
+
           },
-          { 
-            icon: <BadgeCheck size={24} className="text-green-500" />, 
-            label: 'Services Completed', 
-            value: s.servicesCompletedCount.toLocaleString(), 
+          {
+            icon: <BadgeCheck size={24} className="text-green-500" />,
+            label: 'Services Completed',
+            value: s.servicesCompletedCount.toLocaleString(),
             loading: false,
-           
+
           },
-          { 
-            icon: <Users size={24} className="text-purple-500" />, 
-            label: 'Registered Users', 
-            value: s.usersCount.toLocaleString(), 
+          {
+            icon: <Users size={24} className="text-purple-500" />,
+            label: 'Registered Users',
+            value: s.usersCount.toLocaleString(),
             loading: false,
-            
+
           },
         ]);
       } catch (error) {
@@ -124,7 +124,7 @@ const StatsSection = () => {
         <div className="mt-12 text-center">
           <p className="text-gray-700 text-lg font-medium italic">
             "Trusted by businesses for seamless service management"
-          </p>  
+          </p>
         </div>
       </div>
     </div>

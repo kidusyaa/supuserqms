@@ -3,11 +3,11 @@
 import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { 
-  Building2, 
-  MapPin, 
-  Phone, 
-  Mail, 
+import {
+  Building2,
+  MapPin,
+  Phone,
+  Mail,
   Clock,
   Users,
   Building
@@ -50,11 +50,11 @@ const RecentlyJoinedCompanies = () => {
 
   // Calculate stats
   const totalCompanies = companies.length;
-  
+
   const totalCategories = new Set(
     companies.flatMap(c => c.company_types?.map(t => t.id) || [])
   ).size;
-  
+
   const totalLocations = new Set(
     companies
       .map(c => c.location_text?.split(',')[0]?.trim())
@@ -69,7 +69,7 @@ const RecentlyJoinedCompanies = () => {
             <div className="h-8 w-64 bg-gray-800 rounded mb-4 animate-pulse"></div>
             <div className="h-4 w-96 bg-gray-800 rounded animate-pulse"></div>
           </div>
-          
+
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5">
             {[...Array(5)].map((_, i) => (
               <div key={i} className="animate-pulse">
@@ -104,11 +104,11 @@ const RecentlyJoinedCompanies = () => {
         {/* Companies Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
           {companies.map((company) => (
-           <Link
-  key={company.id}
-  href={`/company/${company.slug ? encodeURIComponent(company.slug.replace(/^\/+|\/+$/g, '')) : company.id}`}
-  className="group"
->
+            <Link
+              key={company.id}
+              href={`/company/${company.slug ? encodeURIComponent(company.slug.replace(/^\/+|\/+$/g, '')) : company.id}`}
+              className="group"
+            >
               <div className="bg-white/10 backdrop-blur-sm rounded-xl border border-gray-700 hover:border-white hover:shadow-lg hover:shadow-primary/10 transition-all duration-300 h-full flex flex-col overflow-hidden">
                 {/* Logo Section */}
                 <div className="p-6 pb-4">
@@ -129,7 +129,7 @@ const RecentlyJoinedCompanies = () => {
                       )}
                     </div>
                   </div>
-                  
+
                   {/* Company Name */}
                   <h3 className="text-lg font-semibold text-white text-center group-hover:text-primary transition-colors line-clamp-2 mb-2">
                     {company.name}
@@ -146,7 +146,7 @@ const RecentlyJoinedCompanies = () => {
                         {getCompanyTypeName(company)}
                       </span>
                     </div>
-                    
+
                     {/* Active Status */}
                     <div className="flex items-center justify-center gap-2">
                       <div className="w-2 h-2 bg-green-500 rounded-full"></div>
@@ -182,7 +182,7 @@ const RecentlyJoinedCompanies = () => {
                         </div>
                       </div>
                     )}
-                    
+
                     {company.email && (
                       <div className="flex items-center gap-3 p-3 bg-gray-900/30 rounded-lg">
                         <div className="w-8 h-8 bg-primary/10 rounded flex items-center justify-center">

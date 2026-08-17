@@ -65,11 +65,11 @@ export type Service = {
   id: string;
   company_id: string;
   name: string;
-  category_id: string; 
-  description: string ;
+  category_id: string | null; 
+  description: string;
   estimated_wait_time_mins: number;
   status: "active" | "inactive";
-  code: string ;
+  code: string;
   created_at: Date;
   providers?: Provider[]; 
   price: string | null;
@@ -83,6 +83,11 @@ export type Service = {
   service_category?: { name: string };
   requires_prepayment: boolean;
   prepayment_amount?: number | null;
+  is_package?: boolean | null;
+  included_service_ids?: string[] | string | null;
+  included_services?: Service[];
+  video_url?: string | null;
+  video_platform?: string | null;
 };
 
 // In your type.ts file:

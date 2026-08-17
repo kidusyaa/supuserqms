@@ -2,12 +2,15 @@
 
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Clock, MapPin, Building, Tag, Percent } from "lucide-react";
+import { Clock, MapPin, Building, Tag, Percent, Package, Video, Play } from "lucide-react";
 import type { Service, Category } from "@/type";
+import PackageCard from "@/components/PackageCard";
+import ServiceVideoModal from "@/components/ServiceVideoModal";
 import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils"; // Make sure you have this utility from shadcn/ui
+import { cn } from "@/lib/utils";
 
 // --- Helper Functions for Discounts (reusable logic) ---
 const calculateDiscountedPrice = (service: Service): string | null => {
@@ -27,22 +30,19 @@ const calculateDiscountedPrice = (service: Service): string | null => {
 const formatDiscount = (service: Service): string => {
   if (!service.discount_type || !service.discount_value) return "";
   if (service.discount_type === 'percentage') {
-    // Use Math.round to avoid floating point issues like 14.999...%
     return `${Math.round(Number(service.discount_value))}% OFF`;
   }
   return `-$${service.discount_value} OFF`;
 };
 
-// --- Component Props Interface ---
 interface ServiceCardProps {
   service: Service;
-  category?: Category; // Pass the single category object, makes the component more efficient
-  // --- Customization Props ---
+  category?: Category;
   showImage?: boolean;
   showCompanyInfo?: boolean;
   showDetails?: boolean;
   showDiscountBadge?: boolean;
-  className?: string; // Allow passing custom classes
+  className?: string;
 }
 
 export default function ServiceCard({
@@ -54,45 +54,69 @@ export default function ServiceCard({
   showDiscountBadge = true,
   className,
 }: ServiceCardProps) {
+  const [isVideoOpen, setIsVideoOpen] = useState(false);
   const hasDiscount = !!(service.discount_type && service.discount_value);
   const newPrice = calculateDiscountedPrice(service);
-const companyTypeIcon = service.company?.company_types?.[0]?.icon;
+  const companyTypeIcon = service.company?.company_types?.[0]?.icon;
+
+  if (service.is_package) {
+    return <PackageCard service={service} className={className} />;
+  }
+
   return (
-    <Link
-      href={`/booking/${service.id}`}
-      className={cn("group block h-full", className)}
-    >
-      <div className="flex flex-col h-full bg-card rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden border hover:border-primary/20">
-        {/* 1. Optional Image Section */}
-        {showImage && (
-          <div className="relative h-44 bg-muted/50 overflow-hidden">
-            <Image
-              src={service.photo|| "/placeholder.svg"} // A generic placeholder
-              alt={service.name}
-              fill
-              className="object-cover group-hover:scale-105 transition-transform duration-300"
-              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-            />
-            {service.featureEnabled && (
-              <Badge className="absolute top-2 left-2 bg-primary hover:bg-primary/90 text-primary-foreground">
-                Featured
-              </Badge>
-            )}
-             {/* Price / Discount Badge */}
-            <div className="absolute top-2 right-2 bg-card/90 backdrop-blur-sm rounded-full px-2.5 py-1 text-sm font-semibold text-card-foreground shadow">
-              {service.price === null ? (
-                <span className="">Call for prices</span>
-              ) : hasDiscount ? (
-                <div className="flex items-center gap-1.5">
-                  <span className="line-through text-muted-foreground">${service.price}</span>
-                  <span className="text-emerald-600">${newPrice}</span>
-                </div>
-              ) : (
-                <span>${service.price}</span>
+    <>
+      <Link
+        href={`/booking/${service.id}`}
+        className={cn("group block h-full", className)}
+      >
+        <div className="flex flex-col h-full bg-card rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden border hover:border-primary/20">
+          {/* 1. Optional Image Section */}
+          {showImage && (
+            <div className="relative h-44 bg-muted/50 overflow-hidden">
+              <Image
+                src={service.photo || "/placeholder.svg"}
+                alt={service.name}
+                fill
+                className="object-cover group-hover:scale-105 transition-transform duration-300"
+                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+              />
+              {service.featureEnabled && (
+                <Badge className="absolute top-2 left-2 bg-primary hover:bg-primary/90 text-primary-foreground">
+                  Featured
+                </Badge>
               )}
+
+              {/* Treatment Video Badge Button */}
+              {service.video_url && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setIsVideoOpen(true);
+                  }}
+                  className="absolute bottom-2 left-2 z-10 bg-amber-500/90 hover:bg-amber-600 active:scale-95 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow-lg backdrop-blur-xs flex items-center gap-1.5 transition-all"
+                  title="Watch treatment video"
+                >
+                  <Play className="w-3.5 h-3.5 fill-white" />
+                  <span>Watch Video</span>
+                </button>
+              )}
+
+              <div className="absolute top-2 right-2 bg-card/90 backdrop-blur-sm rounded-full px-2.5 py-1 text-sm font-semibold text-card-foreground shadow">
+                {service.price === null ? (
+                  <span>Call for prices</span>
+                ) : hasDiscount ? (
+                  <div className="flex items-center gap-1.5">
+                    <span className="line-through text-muted-foreground">${service.price}</span>
+                    <span className="text-emerald-600">${newPrice}</span>
+                  </div>
+                ) : (
+                  <span>${service.price}</span>
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
         {/* 2. Service Info Section */}
         <div className=" p-2 flex flex-col flex-grow">
@@ -154,5 +178,14 @@ const companyTypeIcon = service.company?.company_types?.[0]?.icon;
         </div>
       </div>
     </Link>
+
+    <ServiceVideoModal
+      isOpen={isVideoOpen}
+      onClose={() => setIsVideoOpen(false)}
+      videoUrl={service.video_url}
+      videoPlatform={service.video_platform}
+      serviceName={service.name}
+    />
+  </>
   );
 }

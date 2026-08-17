@@ -7,10 +7,11 @@ import {
 } from "@/components/ui/card"; // Adjusted imports, Card, CardContent, etc. are not directly used in JSX
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Clock, Zap, Tag } from "lucide-react";
+import { Clock, Zap, Tag, Package } from "lucide-react";
 
 // Assuming your Service type is defined in "@/type"
 import { Service } from "@/type";
+import PackageCard from "@/components/PackageCard";
 
 interface ServiceCardProps {
   service: Service;
@@ -56,14 +57,17 @@ export default function ServiceCard({ service }: ServiceCardProps) {
   
   const discountedPriceValue = hasDiscount ? parseFloat(calculateDiscountedPrice(service) || '0') : originalPriceValue;
   const formattedDiscountedPrice = discountedPriceValue > 0 ? `${discountedPriceValue.toFixed(2)} ETB` : null;
-
   const discountLabel = hasDiscount ? formatDiscount(service) : null;
-  // --- End of Discount calculations ---
 
+  // --- UNIQUE CARD FOR PACKAGE DEALS ---
+  if (service.is_package) {
+    return <PackageCard service={service} />;
+  }
 
+  // --- STANDARD CARD FOR REGULAR SERVICES ---
   return (
-    <div className="bg-gray-50 border text-tertiary rounded-lg overflow-hidden transition-all duration-300 hover:border-amber-500 hover:shadow-2xl hover:shadow-amber-900/20 group ">
-      <div className="aspect-video relative overflow-hidden">
+    <div className="bg-gray-50 border text-tertiary rounded-lg overflow-hidden transition-all duration-300 hover:border-amber-500 hover:shadow-2xl hover:shadow-amber-900/20 group flex flex-col h-full">
+      <div className="aspect-video relative overflow-hidden bg-slate-900">
         <Image
           src={service.photo || "/placeholder-service.png"}
           alt={service.name}
@@ -72,7 +76,7 @@ export default function ServiceCard({ service }: ServiceCardProps) {
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
         />
         
-        {/* Discount Badge - Top Left (e.g., "20% OFF" or "Save $10") */}
+        {/* Discount Badge - Top Left */}
         {hasDiscount && discountLabel && (
           <Badge className="absolute top-3 left-3 bg-red-600/80 backdrop-blur-sm border border-red-400 text-white text-sm py-1 px-3 flex items-center gap-1 z-10">
             <Tag className="h-3 w-3" /> {discountLabel}
@@ -87,22 +91,19 @@ export default function ServiceCard({ service }: ServiceCardProps) {
         )}
       </div>
 
-      <div className="p-4 flex flex-col space-y-4"> {/* Reduced space-y for tighter content */}
+      <div className="p-4 flex flex-col space-y-4">
         {/* Service Name and Price */}
         <div className="flex flex-row items-center justify-between">
           <CardTitle className="text-lg font-bold ">{service.name}</CardTitle>
           
-          {/* Price Display */}
-         
           {formattedOriginalPrice && (
-            <div className="flex items-baseline mt-1 gap-2"> {/* Added gap-2 for spacing between prices */}
+            <div className="flex items-baseline mt-1 gap-2">
               {hasDiscount && (
                 <span className="line-through text-sm text-slate-500">{formattedOriginalPrice}</span>
               )}
               <span className="text-xl font-semibold text-tertiary">{formattedDiscountedPrice}</span>
             </div>
           )}
-          
         </div>
 
         {/* Service Description */}
@@ -111,7 +112,7 @@ export default function ServiceCard({ service }: ServiceCardProps) {
         )}
 
         {/* Wait Time and Availability */}
-        <div className="flex items-center justify-between text-sm mt-auto"> {/* mt-auto pushes this and button to bottom */}
+        <div className="flex items-center justify-between text-sm mt-auto">
           {service.estimated_wait_time_mins != null && service.estimated_wait_time_mins > 0 && (
             <div className="flex items-center gap-2 text-slate-400">
               <Clock className="h-4 w-4 text-amber-400" />
@@ -124,7 +125,7 @@ export default function ServiceCard({ service }: ServiceCardProps) {
         </div>
         
         {/* Book Now Button */}
-        <div className="mt-4"> {/* Added mt-4 for consistent spacing before button */}
+        <div className="mt-4">
           <Button 
             asChild 
             className="w-full bg-amber-600 text-white font-semibold hover:bg-amber-700 disabled:bg-slate-600 disabled:text-slate-400 disabled:cursor-not-allowed"
@@ -138,5 +139,5 @@ export default function ServiceCard({ service }: ServiceCardProps) {
         </div>
       </div>
     </div>
-  )
+  );
 }

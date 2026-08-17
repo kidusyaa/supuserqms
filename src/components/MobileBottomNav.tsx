@@ -26,10 +26,10 @@ export default function MobileBottomNav() {
     { name: "Home", href: "/", icon: "material-symbols:home-outline" },
     { name: "Services", href: "/services", icon: "solar:hand-stars-linear" },
     { name: "Companies", href: "/company", icon: "iconoir:shop-four-tiles" },
-    { 
-      name: "Profile", 
-      href: isLoggedIn ? "/profile" : "/auth/signin", 
-      icon: "material-symbols:person-outline" 
+    {
+      name: "Profile",
+      href: isLoggedIn ? "/profile" : "/auth/signin",
+      icon: "material-symbols:person-outline"
     },
   ];
 
@@ -43,9 +43,8 @@ export default function MobileBottomNav() {
             <li key={item.name} className="flex-1">
               <Link
                 href={item.href}
-                className={`flex flex-col items-center justify-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                  isActive(item.href) ? "text-amber-700" : "text-gray-600"
-                }`}
+                className={`flex flex-col items-center justify-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${isActive(item.href) ? "text-amber-700" : "text-gray-600"
+                  }`}
               >
                 <Icon
                   icon={item.icon}

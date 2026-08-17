@@ -308,41 +308,44 @@ const mapToProvider = (providerData: any): Provider => ({
 
 // Helper to convert database rows to our Service type
 
-const mapToService = (serviceData: any): Service => ({
+const mapToService = (serviceData: any): Service => {
+  let parsedIncludedIds: string[] = [];
+  if (serviceData.included_service_ids) {
+    if (Array.isArray(serviceData.included_service_ids)) {
+      parsedIncludedIds = serviceData.included_service_ids;
+    } else if (typeof serviceData.included_service_ids === 'string') {
+      try {
+        const parsed = JSON.parse(serviceData.included_service_ids);
+        if (Array.isArray(parsed)) parsedIncludedIds = parsed;
+      } catch {
+        parsedIncludedIds = [];
+      }
+    }
+  }
 
+  return {
     id: serviceData.id,
-
     company_id: serviceData.company_id,
-
     name: serviceData.name,
-
-    category_id: serviceData.category_id,
-
+    category_id: serviceData.category_id || null,
     description: serviceData.description || null,
-
     estimated_wait_time_mins: serviceData.estimated_wait_time_mins || null,
-
     status: serviceData.status,
-
     code: serviceData.code || null,
-
     created_at: serviceData.created_at, 
-
     price: serviceData.price ? String(serviceData.price) : null,
-
     photo: serviceData.photo || null,
-
-    featureEnabled: serviceData.featureEnabled === true, // Ensure it's a boolean, default to false if null/undefined
-
-    discount_type:serviceData.discount_type,
-
-    discount_value:serviceData.discount_value,
-
+    featureEnabled: serviceData.featureEnabled === true,
+    discount_type: serviceData.discount_type,
+    discount_value: serviceData.discount_value,
     requires_prepayment: serviceData.requires_prepayment || false,
-
     prepayment_amount: serviceData.prepayment_amount || null,
-
-});
+    is_package: Boolean(serviceData.is_package),
+    included_service_ids: parsedIncludedIds,
+    video_url: serviceData.video_url || null,
+    video_platform: serviceData.video_platform || null,
+  };
+};
 
 
 
@@ -1215,74 +1218,43 @@ export const searchServices = async (searchTerm: string, categoryId?: string): P
 // Featured services: status active AND featureEnabled true
 
 export async function getDiscountedServices(): Promise<Service[]> {
-
   try {
-
     const { data, error } = await supabase
-
       .from('services')
-
       .select(`
-
         *,
-
         company:companies (
-
           name,
-
           location_text
-
         ),
-
-        service_category:service_categories (
-
-          name
-
-        ),
-
         service_photos (
-
           url
-
         )
-
       `)
-
       .eq('status', 'active')
-
       .not('discount_type', 'is', null) // Ensure there is a discount
-
       .not('discount_value', 'is', null);
 
-
-
     if (error) {
-
       console.error("Error fetching discounted services:", error);
-
-      throw error;
-
+      return [];
     }
 
-    
+    const services: Service[] = (data || []).map((raw: any) => ({
+      ...mapToService(raw),
+      company: raw.company,
+      service_photos: raw.service_photos || [],
+      photo: raw.service_photos?.[0]?.url || raw.photo || null,
+    }));
 
-    // The query already returns the data in the shape we need.
+    await enrichServicesWithCategories(services);
 
-    return data || [];
-
-
-
+    return services;
   } catch (error) {
-
     console.error("Error in getDiscountedServices function:", error);
-
     return [];
-
   }
-
-};
-
-
+}
 
 // Global stats for the landing page
 
@@ -1548,23 +1520,35 @@ export const getCompanyOptions = async (): Promise<LocationOption[]> => {
 
 
 
-    // 5. Construct the final Service object
-
+    // 5. Construct the base Service object
     const service: Service = {
-
       ...mapToService(rawServiceData), // Map the base service properties
-
       photo: publicPhotoUrl,           // Add the processed photo URL
-
       service_photos: rawServiceData.service_photos || [], // Keep all photos for carousels/galleries
-
       providers: providers,            // Add the mapped providers
-
       company: company,                // Add the mapped company
-
     };
 
+    // 6. Fetch included services if this is a package
+    if (service.is_package && Array.isArray(service.included_service_ids) && service.included_service_ids.length > 0) {
+      try {
+        const { data: subServicesData, error: subError } = await supabase
+          .from('services')
+          .select('*, service_photos(url)')
+          .in('id', service.included_service_ids);
 
+        if (!subError && subServicesData) {
+          service.included_services = subServicesData.map((sub: any) => ({
+            ...mapToService(sub),
+            photo: sub.service_photos && sub.service_photos.length > 0 ? sub.service_photos[0].url : sub.photo,
+          }));
+        }
+      } catch (subErr) {
+        console.error("Error fetching included services for package:", subErr);
+      }
+    }
+
+    await enrichServicesWithCategories([service]);
 
     return service;
 
@@ -2104,10 +2088,6 @@ export async function getCompanyBySlugWithServices(companySlug: string): Promise
         *,
         service_photos (
           url
-        ),
-        service_categories (
-          id,
-          name
         )
       )
     `)
@@ -2120,6 +2100,10 @@ export async function getCompanyBySlugWithServices(companySlug: string): Promise
   }
 
   if (!data) return null;
+
+  if (data.services && Array.isArray(data.services)) {
+    await enrichServicesWithCategories(data.services);
+  }
 
   // Fetch rating summary from the view we created
   const { data: ratingSummary } = await supabase
@@ -2990,8 +2974,6 @@ export const getFilteredServices = async (
 
         ),
 
-        category:service_categories (*),
-
         service_photos ( url )  // <-- THIS IS THE CRUCIAL FIX FOR PHOTOS
 
       `)
@@ -3129,6 +3111,8 @@ export const getFilteredServices = async (
     }
 
 
+
+    await enrichServicesWithCategories(services);
 
     return services;
 
@@ -3285,6 +3269,222 @@ export async function getCompanyTypesWithCounts(): Promise<CompanyTypeWithCount[
   return data || [];
 
 }
+
+// Helper function to enrich service objects with their service_category using category_id
+export async function enrichServicesWithCategories(services: Service[]): Promise<void> {
+  if (!services || services.length === 0) return;
+
+  const categoryIds = new Set<string>();
+
+  services.forEach((s) => {
+    if (s.category_id) categoryIds.add(s.category_id);
+    if (s.included_services && Array.isArray(s.included_services)) {
+      s.included_services.forEach((sub) => {
+        if (sub.category_id) categoryIds.add(sub.category_id);
+      });
+    }
+  });
+
+  if (categoryIds.size === 0) return;
+
+  try {
+    const { data: categories, error } = await supabase
+      .from('service_categories')
+      .select('id, name')
+      .in('id', Array.from(categoryIds));
+
+    if (!error && categories) {
+      const categoryMap = new Map<string, string>();
+      categories.forEach((cat: any) => categoryMap.set(cat.id, cat.name));
+
+      services.forEach((s) => {
+        if (s.category_id && categoryMap.has(s.category_id)) {
+          s.service_category = { name: categoryMap.get(s.category_id)! };
+        }
+        if (s.included_services && Array.isArray(s.included_services)) {
+          s.included_services.forEach((sub) => {
+            if (sub.category_id && categoryMap.has(sub.category_id)) {
+              sub.service_category = { name: categoryMap.get(sub.category_id)! };
+            }
+          });
+        }
+      });
+    }
+  } catch (err) {
+    console.error("Error enriching services with category names:", err);
+  }
+}
+
+// Helper function to format included categories as "Haircut + Beard Trim + Wash"
+export function formatPackageCategories(service: Service): string {
+  if (service.included_services && service.included_services.length > 0) {
+    const categoryNames = service.included_services.map((sub) => {
+      return sub.service_category?.name || sub.name;
+    }).filter(Boolean);
+    if (categoryNames.length > 0) {
+      return categoryNames.join(" + ");
+    }
+  }
+  return service.description || "";
+}
+
+// Fetch all active package services with company and sub-service categories resolved
+export async function getAllPackages(): Promise<Service[]> {
+  try {
+    const { data, error } = await supabase
+      .from('services')
+      .select(`
+        *,
+        company:companies (
+          id,
+          name,
+          logo,
+          location_text
+        ),
+        service_photos ( url )
+      `)
+      .eq('is_package', true)
+      .eq('status', 'active');
+
+    if (error) {
+      console.error("Error fetching packages:", error);
+      return [];
+    }
+
+    if (!data) return [];
+
+    const packages: Service[] = data.map((raw: any) => {
+      let parsedIncludedIds: string[] = [];
+      if (raw.included_service_ids) {
+        if (Array.isArray(raw.included_service_ids)) {
+          parsedIncludedIds = raw.included_service_ids;
+        } else if (typeof raw.included_service_ids === 'string') {
+          try {
+            const parsed = JSON.parse(raw.included_service_ids);
+            if (Array.isArray(parsed)) parsedIncludedIds = parsed;
+          } catch {
+            parsedIncludedIds = [];
+          }
+        }
+      }
+
+      const photoUrl = raw.service_photos?.[0]?.url || raw.photo || null;
+
+      return {
+        ...mapToService(raw),
+        photo: photoUrl,
+        service_photos: raw.service_photos || [],
+        company: raw.company,
+        included_service_ids: parsedIncludedIds,
+      };
+    });
+
+    for (const pkg of packages) {
+      if (Array.isArray(pkg.included_service_ids) && pkg.included_service_ids.length > 0) {
+        try {
+          const { data: subServicesData } = await supabase
+            .from('services')
+            .select('*, service_photos(url)')
+            .in('id', pkg.included_service_ids);
+
+          if (subServicesData) {
+            pkg.included_services = subServicesData.map((sub: any) => ({
+              ...mapToService(sub),
+              photo: sub.service_photos?.[0]?.url || sub.photo || null,
+            }));
+          }
+        } catch (err) {
+          console.error(`Error resolving included services for package ${pkg.id}:`, err);
+        }
+      }
+    }
+
+    await enrichServicesWithCategories(packages);
+
+    return packages;
+  } catch (error) {
+    console.error("Error in getAllPackages:", error);
+    return [];
+  }
+}
+
+// Fetch single package by ID with full company and included services breakdown
+export async function getPackageById(packageId: string): Promise<Service | null> {
+  try {
+    const { data: rawServiceData, error } = await supabase
+      .from('services')
+      .select(`
+        *,
+        company:companies (
+          id,
+          name,
+          logo,
+          phone,
+          email,
+          address,
+          location_text
+        ),
+        service_photos ( url )
+      `)
+      .eq('id', packageId)
+      .single();
+
+    if (error || !rawServiceData) {
+      console.error(`Error fetching package details for ID ${packageId}:`, error);
+      return null;
+    }
+
+    let parsedIncludedIds: string[] = [];
+    if (rawServiceData.included_service_ids) {
+      if (Array.isArray(rawServiceData.included_service_ids)) {
+        parsedIncludedIds = rawServiceData.included_service_ids;
+      } else if (typeof rawServiceData.included_service_ids === 'string') {
+        try {
+          const parsed = JSON.parse(rawServiceData.included_service_ids);
+          if (Array.isArray(parsed)) parsedIncludedIds = parsed;
+        } catch {
+          parsedIncludedIds = [];
+        }
+      }
+    }
+
+    const photoUrl = rawServiceData.service_photos?.[0]?.url || rawServiceData.photo || null;
+
+    const packageService: Service = {
+      ...mapToService(rawServiceData),
+      photo: photoUrl,
+      service_photos: rawServiceData.service_photos || [],
+      company: rawServiceData.company,
+      included_service_ids: parsedIncludedIds,
+    };
+
+    if (Array.isArray(packageService.included_service_ids) && packageService.included_service_ids.length > 0) {
+      try {
+        const { data: subServicesData } = await supabase
+          .from('services')
+          .select('*, service_photos(url)')
+          .in('id', packageService.included_service_ids);
+
+        if (subServicesData) {
+          packageService.included_services = subServicesData.map((sub: any) => ({
+            ...mapToService(sub),
+            photo: sub.service_photos?.[0]?.url || sub.photo || null,
+          }));
+        }
+      } catch (err) {
+        console.error(`Error resolving included services for package ${packageId}:`, err);
+      }
+    }
+
+    await enrichServicesWithCategories([packageService]);
+
+    return packageService;
+  } catch (error) {
+    console.error(`Error in getPackageById for ${packageId}:`, error);
+    return null;
+  }
+}
+
 
 
 

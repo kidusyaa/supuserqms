@@ -40,9 +40,9 @@ export function UserMenu() {
     return (
       <Link
         href="/auth/signin"
-        className="flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600 transition-all"
+        className="flex items-center gap-2 px-4 py-2 rounded-full bg-white border-2 border-amber-500 text-amber-600 text-sm font-semibold hover:bg-amber-50 transition-all shadow-xs"
       >
-        <User className="w-4 h-4" />
+        <User className="w-4 h-4 text-amber-500" />
         <span>Sign In</span>
       </Link>
     );
@@ -51,14 +51,18 @@ export function UserMenu() {
   const initials = profile?.name?.slice(0, 2).toUpperCase() || user?.email?.slice(0, 2).toUpperCase() || "??";
 
   return (
-    <Link href="/profile" className="flex items-center gap-2 group">
-      <div className="w-9 h-9 rounded-full overflow-hidden bg-amber-100 border-2 border-transparent group-hover:border-amber-500 transition-all flex items-center justify-center shrink-0">
+    <Link
+      href="/profile"
+      className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border-2 border-amber-500 text-slate-800 text-sm font-semibold hover:bg-amber-50 transition-all shadow-xs"
+    >
+      <div className="w-7 h-7 rounded-full overflow-hidden bg-amber-100 flex items-center justify-center shrink-0 border border-amber-300">
         {profile?.avatar_url ? (
-          <Image src={profile.avatar_url} alt="Profile" width={36} height={36} className="object-cover" />
+          <Image src={profile.avatar_url} alt="Profile" width={28} height={28} className="object-cover" />
         ) : (
           <span className="text-xs font-bold text-amber-600">{initials}</span>
         )}
       </div>
+      <span className="text-xs font-semibold text-amber-600 hidden sm:inline">{profile?.name || "Account"}</span>
     </Link>
   );
 }

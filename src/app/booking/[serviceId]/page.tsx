@@ -46,7 +46,7 @@ import BookServiceDialog from "@/components/book/_componet/BookServiceDialog";
 import { JoinQueueDialog } from "@/components/book/_componet/JoinQueueDialog";
 import { QueueConfirmationDialog } from "@/components/book/_componet/QueueConfirmationDialog";
 import { toast } from "sonner";
-import { Calendar, Clock, Users, CheckCircle, ArrowLeft } from "lucide-react";
+import { Calendar, Clock, Users, CheckCircle, ArrowLeft, Package } from "lucide-react";
 
 // Import the new components
 import BookingBreadcrumb from "../_componets/BookingBreadcrumb";
@@ -130,9 +130,9 @@ export default function BookingPage() {
         setService(data);
         
         // Auto-select provider logic
-        // Always select "Any Provider" by default if there are active providers
+        // For packages or general services, default to ANY_PROVIDER_ID
         const activeProviders = data.providers?.filter((p) => p.is_active) || [];
-        if (activeProviders.length > 0) {
+        if (data.is_package || activeProviders.length > 0 || !selectedProviderId) {
           setSelectedProviderId(ANY_PROVIDER_ID);
         }
       } catch (err: any) {
@@ -339,15 +339,34 @@ export default function BookingPage() {
             </CardHeader>
             
             <CardContent className="space-y-8">
-              <ProviderSelector
-                providers={service.providers || []}
-                selectedProviderId={selectedProviderId}
-                onSelectProvider={(id) => {
-                  setSelectedProviderId(id);
-                  setUiMode("initial");
-                  setSelectedSlot(null);
-                }}
-              />
+              {service.is_package ? (
+                <div className="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-purple-100 text-purple-700 rounded-lg shrink-0">
+                      <Package className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-purple-950 text-base">Service Package</p>
+                      <p className="text-sm text-purple-800">
+                        This package combines multiple services into one deal and will be assigned to the first available professional.
+                      </p>
+                    </div>
+                  </div>
+                  <span className="px-3 py-1 bg-purple-600 text-white text-xs font-semibold rounded-full self-start sm:self-center shrink-0">
+                    Any Provider
+                  </span>
+                </div>
+              ) : (
+                <ProviderSelector
+                  providers={service.providers || []}
+                  selectedProviderId={selectedProviderId}
+                  onSelectProvider={(id) => {
+                    setSelectedProviderId(id);
+                    setUiMode("initial");
+                    setSelectedSlot(null);
+                  }}
+                />
+              )}
 
               {!selectedProvider ? (
                 <div className="text-center py-12">

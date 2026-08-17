@@ -4,11 +4,13 @@
 import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Clock, MapPin, Phone, Users, Tag, CodeSquare, X, Star, ChevronLeft, ChevronRight } from "lucide-react";
+import { Clock, MapPin, Phone, Users, Tag, CodeSquare, X, Star, ChevronLeft, ChevronRight, Package, Check, Video, Play, ExternalLink } from "lucide-react";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import type { Service, Company } from "@/type";
 import { format, isToday } from "date-fns";
 import { useEffect, useState, useRef } from "react";
+import { parseVideoUrl } from "@/lib/videoUtils";
+import ServiceVideoModal from "@/components/ServiceVideoModal";
 
 interface ServiceDetailsCardProps {
   service: Service;
@@ -52,6 +54,7 @@ export default function ServiceDetailsCard({
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const thumbnailRef = useRef<HTMLDivElement>(null);
   const [isAutoPlayPaused, setIsAutoPlayPaused] = useState(false);
+  const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
 
   const hasDiscount = service.discount_type && service.discount_value !== null && parseFloat(service.price || '0') > 0;
 
@@ -69,6 +72,16 @@ export default function ServiceDetailsCard({
   if (service.service_photos && service.service_photos.length > 0) {
     service.service_photos.forEach(p => {
       if (p.url) imageUrls.add(p.url);
+    });
+  }
+  if (service.is_package && service.included_services && service.included_services.length > 0) {
+    service.included_services.forEach(sub => {
+      if (sub.photo) imageUrls.add(sub.photo);
+      if (sub.service_photos && sub.service_photos.length > 0) {
+        sub.service_photos.forEach(p => {
+          if (p.url) imageUrls.add(p.url);
+        });
+      }
     });
   }
   const uniqueImageUrls = Array.from(imageUrls);
@@ -141,6 +154,21 @@ export default function ServiceDetailsCard({
                         <Badge className="absolute top-4 left-4 bg-gradient-to-r from-red-500 to-orange-500 text-white text-sm py-2 px-4 rounded-full shadow-lg border-0">
                           <Tag className="h-3 w-3 mr-1" /> {discountLabel}
                         </Badge>
+                      )}
+
+                      {/* Treatment Video Badge on main image */}
+                      {service.video_url && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setIsVideoModalOpen(true);
+                          }}
+                          className="absolute bottom-4 left-4 z-10 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white text-xs sm:text-sm font-bold px-3.5 py-1.5 rounded-full shadow-xl flex items-center gap-1.5 transition-all"
+                        >
+                          <Play className="w-4 h-4 fill-white" />
+                          <span>Watch Video</span>
+                        </button>
                       )}
 
                       {/* Image Counter */}
@@ -245,8 +273,12 @@ export default function ServiceDetailsCard({
             <div className="mb-6">
               <div className="flex items-start justify-between mb-4">
                 <div>
+                  {service.is_package && (
+                    <Badge className="mb-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold px-3 py-1 text-xs border-0 shadow flex items-center gap-1.5 w-fit">
+                      <Package className="h-3.5 w-3.5" /> Package Deal
+                    </Badge>
+                  )}
                   <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-2">{service.name}</h1>
-
                 </div>
 
                 {/* Price Display */}
@@ -361,19 +393,86 @@ export default function ServiceDetailsCard({
                 </div>
               </div>
 
-              {/* Additional Features (if any) */}
-              {/* {service.features && service.features.length > 0 && (
-                <div className="bg-white rounded-xl p-4 border border-gray-200">
-                  <h3 className="font-semibold text-gray-900 mb-3">Service Features</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {service.features.map((feature, index) => (
-                      <Badge key={index} variant="secondary" className="px-3 py-1.5">
-                        {feature}
-                      </Badge>
+              {/* Treatment Demonstration Video Section - Click to Open */}
+              {service.video_url && (
+                <>
+                  <div
+                    onClick={() => setIsVideoModalOpen(true)}
+                    className="group cursor-pointer bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-slate-900/5 hover:from-amber-500/20 hover:to-slate-900/10 rounded-2xl p-4 sm:p-5 border border-amber-200/80 hover:border-amber-400/80 shadow-sm hover:shadow-md transition-all duration-200 flex items-center justify-between gap-4"
+                  >
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-md shrink-0 group-hover:scale-105 transition-transform">
+                        <Video className="h-6 w-6" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="font-extrabold text-gray-900 text-base group-hover:text-amber-600 transition-colors">
+                            Treatment Demonstration Video
+                          </h3>
+                          <Badge className="bg-amber-500 text-white text-[10px] uppercase font-bold px-2 py-0.5">
+                            Click to watch
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-slate-600 mt-0.5 truncate">
+                          Watch video showing how this treatment will be performed
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsVideoModalOpen(true);
+                      }}
+                      className="shrink-0 bg-amber-500 group-hover:bg-amber-600 active:scale-95 text-white font-extrabold text-xs sm:text-sm py-2.5 px-4 sm:px-5 rounded-full shadow-md transition-all flex items-center gap-2"
+                    >
+                      <Play className="w-4 h-4 fill-white" />
+                      <span className="hidden sm:inline">Watch Video</span>
+                    </button>
+                  </div>
+
+                  <ServiceVideoModal
+                    isOpen={isVideoModalOpen}
+                    onClose={() => setIsVideoModalOpen(false)}
+                    videoUrl={service.video_url}
+                    videoPlatform={service.video_platform}
+                    serviceName={service.name}
+                  />
+                </>
+              )}
+
+              {/* Included Package Sub-Services (If package) */}
+              {service.is_package && service.included_services && service.included_services.length > 0 && (
+                <div className="bg-gradient-to-r from-purple-50/70 to-indigo-50/70 rounded-xl p-4 border border-purple-200/80 shadow-sm">
+                  <div className="flex items-center gap-2 mb-3 text-purple-950 font-bold text-base">
+                    <Package className="h-5 w-5 text-purple-600" />
+                    <span>Included Services ({service.included_services.length})</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {service.included_services.map((sub, idx) => (
+                      <div key={sub.id || idx} className="flex items-center gap-3 bg-white p-3 rounded-lg border border-purple-100 shadow-sm">
+                        <div className="relative w-12 h-12 rounded-md overflow-hidden bg-gray-100 shrink-0 border border-gray-200">
+                          <Image
+                            src={sub.photo || "/placeholder-service.png"}
+                            alt={sub.name}
+                            fill
+                            className="object-cover"
+                          />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold text-gray-900 text-sm truncate">{sub.name}</p>
+                          {sub.estimated_wait_time_mins ? (
+                            <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+                              <Clock className="h-3 w-3 text-purple-600" /> {sub.estimated_wait_time_mins} min
+                            </p>
+                          ) : null}
+                        </div>
+                      </div>
                     ))}
                   </div>
                 </div>
-              )} */}
+              )}
             </div>
           </div>
         </div>

@@ -4,20 +4,28 @@
 @custom-variant dark (&:is(.dark *));
 
 @keyframes special-offer-glow {
-  0%, 100% {
- 
-    transform: scale(1); /* No scale on text */
+
+  0%,
+  100% {
+
+    transform: scale(1);
+    /* No scale on text */
   }
+
   50% {
-   
-    transform: scale(1.05); /* Subtle scale for emphasis */
+
+    transform: scale(1.05);
+    /* Subtle scale for emphasis */
   }
 }
 
 @keyframes icon-pulse {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: scale(1);
   }
+
   50% {
     transform: scale(1.2);
   }
@@ -33,55 +41,84 @@
 
 :root {
   /* Define your core palette colors using OKLCH */
-  --color-dark-base: oklch(31.021% 0.05876 232.702); /* #1B3A47 */
-  --color-second-dark-base: oklch(53.25% 0.0631 70.07); /* #806B4D */
-  --color-logo-button-base: oklch(66.57% 0.1758 65.34); /* #EB842B */
-  --color-second-light-shade-base: oklch(46.33% 0.1329 60.18); /* #B26C19 */
+  --color-dark-base: oklch(31.021% 0.05876 232.702);
+  /* #1B3A47 */
+  --color-second-dark-base: oklch(53.25% 0.0631 70.07);
+  /* #806B4D */
+  --color-logo-button-base: oklch(66.57% 0.1758 65.34);
+  /* #EB842B */
+  --color-second-light-shade-base: oklch(46.33% 0.1329 60.18);
+  /* #B26C19 */
 
   /* Light Mode Palette - No changes here based on your request */
-  --background: oklch(1 0 0); /* Pure white background */
-  --foreground: oklch(20% 0 0); /* Near black for primary text */
-  
-  --card: oklch(0.97 0 0); /* Light gray for card backgrounds */
+  --background: oklch(1 0 0);
+  /* Pure white background */
+  --foreground: oklch(20% 0 0);
+  /* Near black for primary text */
+
+  --card: oklch(0.97 0 0);
+  /* Light gray for card backgrounds */
   --card-foreground: var(--foreground);
-  
-  --popover: oklch(1 0 0); /* White for popovers */
+
+  --popover: oklch(1 0 0);
+  /* White for popovers */
   --popover-foreground: var(--foreground);
-  
-  --primary: var(--color-logo-button-base); /* Your logo/button color for primary actions */
-  --primary-foreground: oklch(1 0 0); /* White text on primary button */
-  
-  --secondary: var(--color-second-light-shade-base); /* Your 'another second light shade' for secondary actions */
-  --secondary-foreground: oklch(1 0 0); /* White text on secondary */
-  
-  --muted: oklch(0.922 0 0); /* Light gray for subtle sections */
-  --muted-foreground: oklch(0.4 0 0); /* Medium gray for muted text */
-  
-  --accent: var(--color-logo-button-base); /* Your logo/button color as the main accent */
-  --accent-foreground: var(--foreground); /* Dark text on accent */
-  
-  --destructive: oklch(0.577 0.245 27.325); /* Default red for destructive actions */
+
+  --primary: var(--color-logo-button-base);
+  /* Your logo/button color for primary actions */
+  --primary-foreground: oklch(1 0 0);
+  /* White text on primary button */
+
+  --secondary: var(--color-second-light-shade-base);
+  /* Your 'another second light shade' for secondary actions */
+  --secondary-foreground: oklch(1 0 0);
+  /* White text on secondary */
+
+  --muted: oklch(0.922 0 0);
+  /* Light gray for subtle sections */
+  --muted-foreground: oklch(0.4 0 0);
+  /* Medium gray for muted text */
+
+  --accent: var(--color-logo-button-base);
+  /* Your logo/button color as the main accent */
+  --accent-foreground: var(--foreground);
+  /* Dark text on accent */
+
+  --destructive: oklch(0.577 0.245 27.325);
+  /* Default red for destructive actions */
   --destructive-foreground: oklch(1 0 0);
-  
-  --border: oklch(0.922 0 0); /* Light gray borders */
-  --input: oklch(0.97 0 0); /* Light gray input fields */
-  
-  --ring: oklch(66.57% 0.1758 65.34 / 0.5); /* Accent color with transparency for focus rings */
-  
+
+  --border: oklch(0.922 0 0);
+  /* Light gray borders */
+  --input: oklch(0.97 0 0);
+  /* Light gray input fields */
+
+  --ring: oklch(66.57% 0.1758 65.34 / 0.5);
+  /* Accent color with transparency for focus rings */
+
   /* Chart colors derived from your palette */
-  --chart-1: var(--color-logo-button-base); /* Primary orange */
-  --chart-2: var(--color-second-light-shade-base); /* Darker orange */
-  --chart-3: var(--color-second-dark-base); /* Muted olive/brown */
-  --chart-4: oklch(75% 0.1 65); /* Lighter desaturated orange */
-  --chart-5: oklch(35% 0.08 60); /* Darker desaturated orange */
-  
-  --radius: 0.5rem; /* Consistent rounded corners */
-  
-  --sidebar: oklch(1 0 0); /* White sidebar background */
+  --chart-1: var(--color-logo-button-base);
+  /* Primary orange */
+  --chart-2: var(--color-second-light-shade-base);
+  /* Darker orange */
+  --chart-3: var(--color-second-dark-base);
+  /* Muted olive/brown */
+  --chart-4: oklch(75% 0.1 65);
+  /* Lighter desaturated orange */
+  --chart-5: oklch(35% 0.08 60);
+  /* Darker desaturated orange */
+
+  --radius: 0.5rem;
+  /* Consistent rounded corners */
+
+  --sidebar: oklch(1 0 0);
+  /* White sidebar background */
   --sidebar-foreground: var(--foreground);
-  --sidebar-primary: oklch(0.97 0 0); /* Light gray for selected sidebar item background */
+  --sidebar-primary: oklch(0.97 0 0);
+  /* Light gray for selected sidebar item background */
   --sidebar-primary-foreground: var(--foreground);
-  --sidebar-accent: var(--color-logo-button-base); /* Sidebar accent color */
+  --sidebar-accent: var(--color-logo-button-base);
+  /* Sidebar accent color */
   --sidebar-accent-foreground: var(--foreground);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(66.57% 0.1758 65.34 / 0.5);
@@ -89,50 +126,76 @@
 
 .dark {
   /* Dark Mode Palette with your new assignments */
-  --background: var(--color-dark-base); /* #1B3A47 as main background */
-  --foreground: oklch(0.95 0 0); /* Very light gray for primary text */
-  
-  --card: oklch(30% 0.05 229.56); /* Slightly lighter version of dark-base for card backgrounds */
+  --background: var(--color-dark-base);
+  /* #1B3A47 as main background */
+  --foreground: oklch(0.95 0 0);
+  /* Very light gray for primary text */
+
+  --card: oklch(30% 0.05 229.56);
+  /* Slightly lighter version of dark-base for card backgrounds */
   --card-foreground: var(--foreground);
-  
-  --popover: oklch(30% 0.05 229.56); /* Same as card for consistency */
+
+  --popover: oklch(30% 0.05 229.56);
+  /* Same as card for consistency */
   --popover-foreground: var(--foreground);
-  
-  --primary: var(--color-logo-button-base); /* #EB842B for primary actions */
-  --primary-foreground: oklch(20% 0 0); /* Dark text for contrast on primary */
-  
-  --secondary: var(--color-second-light-shade-base); /* #B26C19 for secondary actions */
-  --secondary-foreground: var(--foreground); /* Light text for contrast on secondary */
-  
-  --muted: oklch(30% 0.03 229.56); /* A desaturated, slightly lighter version of dark-base for subtle elements */
-  --muted-foreground: oklch(0.7 0 0); /* Light gray for muted text */
-  
-  --accent: var(--color-dark-base); /* #1B3A47 as the accent color */
-  --accent-foreground: var(--foreground); /* Light text for contrast on dark accent */
-  
-  --destructive: oklch(0.396 0.141 25.723); /* Default red (darker) for destructive actions */
+
+  --primary: var(--color-logo-button-base);
+  /* #EB842B for primary actions */
+  --primary-foreground: oklch(20% 0 0);
+  /* Dark text for contrast on primary */
+
+  --secondary: var(--color-second-light-shade-base);
+  /* #B26C19 for secondary actions */
+  --secondary-foreground: var(--foreground);
+  /* Light text for contrast on secondary */
+
+  --muted: oklch(30% 0.03 229.56);
+  /* A desaturated, slightly lighter version of dark-base for subtle elements */
+  --muted-foreground: oklch(0.7 0 0);
+  /* Light gray for muted text */
+
+  --accent: var(--color-dark-base);
+  /* #1B3A47 as the accent color */
+  --accent-foreground: var(--foreground);
+  /* Light text for contrast on dark accent */
+
+  --destructive: oklch(0.396 0.141 25.723);
+  /* Default red (darker) for destructive actions */
   --destructive-foreground: oklch(0.985 0 0);
-  
-  --border: oklch(28% 0.05 229.56); /* Darker border, slightly lighter than background */
-  --input: oklch(30% 0.05 229.56); /* Same as card for input fields */
-  
-  --ring: var(--primary) / 0.5; /* Primary color with transparency for focus rings, ensures visibility */
-  
+
+  --border: oklch(28% 0.05 229.56);
+  /* Darker border, slightly lighter than background */
+  --input: oklch(30% 0.05 229.56);
+  /* Same as card for input fields */
+
+  --ring: var(--primary) / 0.5;
+  /* Primary color with transparency for focus rings, ensures visibility */
+
   /* Chart colors adjusted to align with new primary, secondary, accent */
-  --chart-1: var(--primary); /* #EB842B */
-  --chart-2: var(--secondary); /* #B26C19 */
-  --chart-3: var(--accent); /* #1B3A47 */
-  --chart-4: var(--color-second-dark-base); /* #806B4D */
-  --chart-5: oklch(60% 0.08 60); /* Mid-tone neutral for variety */
-  
-  --sidebar: oklch(30% 0.05 229.56); /* Dark sidebar background (same as card) */
+  --chart-1: var(--primary);
+  /* #EB842B */
+  --chart-2: var(--secondary);
+  /* #B26C19 */
+  --chart-3: var(--accent);
+  /* #1B3A47 */
+  --chart-4: var(--color-second-dark-base);
+  /* #806B4D */
+  --chart-5: oklch(60% 0.08 60);
+  /* Mid-tone neutral for variety */
+
+  --sidebar: oklch(30% 0.05 229.56);
+  /* Dark sidebar background (same as card) */
   --sidebar-foreground: var(--foreground);
-  --sidebar-primary: var(--primary); /* Use primary for active sidebar items */
-  --sidebar-primary-foreground: oklch(20% 0 0); /* Dark text on primary */
-  --sidebar-accent: var(--secondary); /* Use secondary for sidebar accent */
+  --sidebar-primary: var(--primary);
+  /* Use primary for active sidebar items */
+  --sidebar-primary-foreground: oklch(20% 0 0);
+  /* Dark text on primary */
+  --sidebar-accent: var(--secondary);
+  /* Use secondary for sidebar accent */
   --sidebar-accent-foreground: var(--foreground);
   --sidebar-border: oklch(28% 0.05 229.56);
-  --sidebar-ring: var(--primary) / 0.5; /* Aligned with main ring */
+  --sidebar-ring: var(--primary) / 0.5;
+  /* Aligned with main ring */
 }
 
 @theme inline {
@@ -174,17 +237,19 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
-   --color-tertiary: var(--color-dark-base)
+  --color-tertiary: var(--color-dark-base)
 }
 
 .bg-pattern {
-  background-color: #f8fafc; /* light mode fallback */
+  background-color: #f8fafc;
+  /* light mode fallback */
   background-image: radial-gradient(circle at 1px 1px, #d1d5db 1px, transparent 0);
   background-size: 24px 24px;
 }
 
 .dark .bg-pattern {
-  background-color: #020617; /* dark mode fallback */
+  background-color: #020617;
+  /* dark mode fallback */
   background-image: radial-gradient(circle at 1px 1px, #1e293b 1px, transparent 0);
   background-size: 24px 24px;
 }
@@ -205,15 +270,18 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
 }
+
 /* For the continuous scrolling partners carousel */
 @keyframes marquee {
   from {
     transform: translateX(0);
   }
+
   to {
     transform: translateX(-50%);
   }

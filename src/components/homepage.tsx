@@ -10,6 +10,7 @@ import HeroSection from './herosection';
 import StatsSection from './StatsSection';
 import CompanyTypesPage from './company-types';
 import DiscountedServices from './discountedServices';
+import PackagesSection from './PackagesSection';
 import PartnersCarousel from './PartnersCarousel';
 import RecentlyJoinedCompanies from './RecentlyJoinedCompanies';
 export default function Homepage() {
@@ -21,6 +22,7 @@ export default function Homepage() {
     <div>
 
       <HeroSection />
+      <PackagesSection />
       <DiscountedServices />
       <PartnersCarousel />
       <RecentlyJoinedCompanies />
