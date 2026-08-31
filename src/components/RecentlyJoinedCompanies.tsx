@@ -3,18 +3,17 @@
 import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import {
-  Building2,
-  MapPin,
-  Phone,
-  Mail,
-  Clock,
-  Users,
-  Building
-} from "lucide-react";
+import { Icon } from "@iconify/react";
+import Autoplay from "embla-carousel-autoplay";
 import { getRecentCompanies } from "@/lib/supabase-utils";
-import { Company } from "@/type";
+import type { Company } from "@/type";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+} from "@/components/ui/carousel";
 
+import { getCategoryIconInfo } from "@/lib/categoryIcons";
 
 const RecentlyJoinedCompanies = () => {
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -23,7 +22,7 @@ const RecentlyJoinedCompanies = () => {
   useEffect(() => {
     const fetchRecentCompanies = async () => {
       try {
-        const recentCompanies = await getRecentCompanies(5);
+        const recentCompanies = await getRecentCompanies(12);
         setCompanies(recentCompanies);
       } catch (error) {
         console.error("Error fetching recent companies:", error);
@@ -36,47 +35,24 @@ const RecentlyJoinedCompanies = () => {
   }, []);
 
   const getCompanyTypeName = (company: Company) => {
-    return company.company_types?.[0]?.name || "Business";
+    return company.company_types?.[0]?.name || "Hair Salon";
   };
-
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map(word => word[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
-  };
-
-  // Calculate stats
-  const totalCompanies = companies.length;
-
-  const totalCategories = new Set(
-    companies.flatMap(c => c.company_types?.map(t => t.id) || [])
-  ).size;
-
-  const totalLocations = new Set(
-    companies
-      .map(c => c.location_text?.split(',')[0]?.trim())
-      .filter(Boolean)
-  ).size;
 
   if (isLoading) {
     return (
-      <section className="py-12 bg-gradient-to-b from-tertiary/90 to-tertiary">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="mb-10">
-            <div className="h-8 w-64 bg-gray-800 rounded mb-4 animate-pulse"></div>
-            <div className="h-4 w-96 bg-gray-800 rounded animate-pulse"></div>
+      <section className="py-10 bg-white dark:bg-slate-950">
+        <div className="max-w-6xl mx-auto px-4">
+          <div className="flex items-center justify-between mb-8">
+            <div className="space-y-2">
+              <div className="h-7 w-48 bg-slate-100 rounded-lg animate-pulse" />
+              <div className="h-4 w-60 bg-slate-100 rounded-lg animate-pulse" />
+            </div>
+            <div className="h-4 w-16 bg-slate-100 rounded-lg animate-pulse" />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="animate-pulse">
-                <div className="h-48 bg-gray-800 rounded-lg mb-4"></div>
-                <div className="h-5 bg-gray-800 rounded w-3/4 mb-2"></div>
-                <div className="h-4 bg-gray-800 rounded w-1/2"></div>
-              </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-44 bg-slate-50 border border-slate-100 rounded-3xl p-5 animate-pulse" />
             ))}
           </div>
         </div>
@@ -89,128 +65,100 @@ const RecentlyJoinedCompanies = () => {
   }
 
   return (
-    <section className="py-16 bg-gradient-to-t from-tertiary/90 to-tertiary">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="mb-12 text-center">
-          <h2 className="text-3xl font-bold text-white mb-4">
-            Recently Joined Companies
-          </h2>
-          <p className="text-gray-300 max-w-2xl mx-auto">
-            Discover our newest partners providing quality services in your area
-          </p>
+    <section className="py-10 bg-white dark:bg-slate-950">
+      <div className="max-w-6xl mx-auto px-4">
+        {/* ── Section Header ── */}
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h2 className="text-2xl sm:text-3xl font-serif font-bold text-slate-900 dark:text-white tracking-tight">
+              New on Gize Book
+            </h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+              Recently joined, ready for you
+            </p>
+          </div>
+
+          <Link
+            href="/company"
+            className="inline-flex items-center text-sm font-semibold text-amber-600 hover:text-amber-700 transition-colors group"
+          >
+            <span>See all</span>
+            <span className="ml-1 transition-transform group-hover:translate-x-0.5">&gt;</span>
+          </Link>
         </div>
 
-        {/* Companies Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
-          {companies.map((company) => (
-            <Link
-              key={company.id}
-              href={`/company/${company.slug ? encodeURIComponent(company.slug.replace(/^\/+|\/+$/g, '')) : company.id}`}
-              className="group"
-            >
-              <div className="bg-white/10 backdrop-blur-sm rounded-xl border border-gray-700 hover:border-white hover:shadow-lg hover:shadow-primary/10 transition-all duration-300 h-full flex flex-col overflow-hidden">
-                {/* Logo Section */}
-                <div className="p-6 pb-4">
-                  <div className="relative">
-                    <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-primary/20 to-primary/10 rounded-full flex items-center justify-center border border-primary/20 group-hover:border-primary/40 transition-colors">
-                      {company.logo ? (
-                        <Image
-                          src={company.logo}
-                          alt={company.name}
-                          width={64}
-                          height={64}
-                          className="w-20 h-20 object-cover rounded-full "
-                        />
-                      ) : (
-                        <span className="text-primary text-2xl font-bold">
-                          {getInitials(company.name)}
+        {/* ── Companies Slider / Carousel ── */}
+        <Carousel
+          opts={{
+            align: "start",
+            loop: true,
+          }}
+          plugins={[Autoplay({ delay: 3500, stopOnInteraction: true })]}
+          className="w-full"
+        >
+          <CarouselContent className="-ml-4 py-2">
+            {companies.map((company) => {
+              const companyTypeName = getCompanyTypeName(company);
+              const fallbackIcon = getCategoryIconInfo("", "", companyTypeName).icon;
+              const locationText = company.location_text?.split(",")?.[0]?.trim() ||
+                company.address?.split(",")?.[0]?.trim() ||
+                "Bole";
+
+              const companyHref = `/company/${company.slug ? encodeURIComponent(company.slug.replace(/^\/+|\/+$/g, '')) : company.id}`;
+
+              return (
+                <CarouselItem
+                  key={company.id}
+                  className="pl-4 basis-[78%] sm:basis-1/2 md:basis-1/3 lg:basis-1/4"
+                >
+                  <Link
+                    href={companyHref}
+                    className="group bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl p-5 shadow-[0_2px_12px_rgba(0,0,0,0.03)] hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 flex flex-col justify-between h-full cursor-pointer"
+                  >
+                    <div>
+                      {/* Top: Circular Avatar / Logo with "NEW" Badge */}
+                      <div className="relative w-16 h-16 rounded-full bg-slate-50 dark:bg-slate-800/90 border border-slate-100 dark:border-slate-700 flex items-center justify-center mb-4 shrink-0 group-hover:scale-105 transition-transform">
+                        {/* "NEW" Badge */}
+                        <span className="absolute -top-1 -left-1 bg-amber-500 text-black text-[9px] font-black uppercase px-2 py-0.5 rounded-full shadow-xs tracking-wider z-10">
+                          NEW
                         </span>
-                      )}
-                    </div>
-                  </div>
 
-                  {/* Company Name */}
-                  <h3 className="text-lg font-semibold text-white text-center group-hover:text-primary transition-colors line-clamp-2 mb-2">
-                    {company.name}
-                  </h3>
-                </div>
-
-                {/* Company Details */}
-                <div className="px-6  flex-1">
-                  {/* Category */}
-                  <div className="">
-                    <div className="flex items-center justify-center gap-2 mb-2">
-                      <Building2 className="h-4 w-4 text-primary" />
-                      <span className="text-sm font-medium text-primary">
-                        {getCompanyTypeName(company)}
-                      </span>
-                    </div>
-
-                    {/* Active Status */}
-                    <div className="flex items-center justify-center gap-2">
-                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                      <span className="text-xs text-gray-300">Active now</span>
-                    </div>
-                  </div>
-
-                  {/* Location */}
-                  {company.location_text && (
-                    <div className="flex items-start gap-2 mb-4 p-2 bg-gray-900/30 rounded-lg w-full mt-4 ">
-                      <MapPin className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                      <div>
-                        <p className="text-xs text-gray-400">Location</p>
-                        <p className="text-sm text-gray-200 line-clamp-2">
-                          {company.location_text}
-                        </p>
+                        {/* Logo or Category Icon */}
+                        {company.logo ? (
+                          <Image
+                            src={company.logo}
+                            alt={company.name}
+                            width={48}
+                            height={48}
+                            className="w-12 h-12 object-contain rounded-full"
+                          />
+                        ) : (
+                          <Icon icon={fallbackIcon} width="28" height="28" className="text-slate-600 dark:text-slate-400" />
+                        )}
                       </div>
+
+                      {/* Company Name */}
+                      <h2 className="font-serif font-bold text-base sm:text-lg text-slate-900 dark:text-white line-clamp-1 mb-1 tracking-tight leading-snug group-hover:text-amber-600 transition-colors">
+                        {company.name}
+                      </h2>
+
+                      {/* Category Type */}
+                      <p className="text-xs font-semibold text-amber-600 dark:text-amber-500 mb-2">
+                        {companyTypeName}
+                      </p>
                     </div>
-                  )}
 
-                  {/* Contact Info */}
-                  <div className="space-y-3">
-                    {company.phone && (
-                      <div className="flex items-center gap-3 p-3 bg-gray-900/30 rounded-lg">
-                        <div className="w-8 h-8 bg-primary/10 rounded flex items-center justify-center">
-                          <Phone className="h-4 w-4 text-primary" />
-                        </div>
-                        <div>
-                          <p className="text-xs text-gray-400">Phone</p>
-                          <p className="text-sm text-gray-200 truncate">
-                            {company.phone}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-
-                    {company.email && (
-                      <div className="flex items-center gap-3 p-3 bg-gray-900/30 rounded-lg">
-                        <div className="w-8 h-8 bg-primary/10 rounded flex items-center justify-center">
-                          <Mail className="h-4 w-4 text-primary" />
-                        </div>
-                        <div>
-                          <p className="text-xs text-gray-400">Email</p>
-                          <p className="text-sm text-gray-200 truncate">
-                            {company.email}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* View Button */}
-                <div className="px-6 pb-6 pt-2">
-                  <div className="text-center">
-                    <span className="text-primary text-sm font-medium group-hover:underline">
-                      View Services →
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
+                    {/* Location */}
+                    <div className="flex items-center gap-1 text-xs text-slate-400 dark:text-slate-500 pt-2">
+                      <Icon icon="solar:map-point-linear" className="w-3.5 h-3.5 text-slate-400" />
+                      <span className="truncate">{locationText}</span>
+                    </div>
+                  </Link>
+                </CarouselItem>
+              );
+            })}
+          </CarouselContent>
+        </Carousel>
       </div>
     </section>
   );

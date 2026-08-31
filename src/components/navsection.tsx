@@ -1,166 +1,165 @@
 "use client";
 
 import Link from 'next/link';
-import React, { useEffect, useRef, useState } from 'react';
-// --- THE FIX: Import the new Supabase function ---
-import { searchServices } from '@/lib/supabase-utils';
-import type { Service } from '@/type';
+import { usePathname } from 'next/navigation';
+import React, { useState } from 'react';
 import { Icon } from '@iconify/react';
 import { UserMenu } from './Usermenu';
 
 interface NavSectionProps {
-  servicesSectionId: string;
+  servicesSectionId?: string;
 }
 
 const NavSection = ({ servicesSectionId }: NavSectionProps) => {
-  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const pathname = usePathname();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const navLinks = [
+    { name: 'Home', href: '/' },
+    { name: 'Explore', href: '/services' },
+    { name: 'Bookings', href: '/profile' },
+    { name: 'Companies', href: '/company' },
+  ];
+
+  const isLinkActive = (href: string) => {
+    if (href === '/') return pathname === '/';
+    return pathname.startsWith(href);
+  };
 
   return (
-    <nav className="sticky top-0 z-50 w-full bg-white border-b border-gray-100 shadow-xs">
-      <div className="container mx-auto flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
-
-        {/* Left: Search Box (Desktop) */}
-        <div className="hidden md:block w-48 sm:w-64 lg:w-72">
-          <SearchBox />
-        </div>
-
-        {/* Mobile Search Toggle Icon on Left for mobile layout */}
-        <div className="md:hidden flex items-center">
-          <button
-            className="p-2 rounded-full hover:bg-slate-100 text-slate-700 transition-colors"
-            onClick={() => setMobileSearchOpen(true)}
-            aria-label="Search"
-          >
-            <Icon icon="material-symbols-light:search-rounded" width="24" height="24" />
-          </button>
-        </div>
-
-        {/* Middle: Logo & GizeBook text with Tertiary background */}
-        <div className="flex-shrink-0 flex justify-center">
-          <Link href="/" passHref>
-            <div className="flex items-center gap-2 bg-tertiary px-4 py-1.5 rounded-full text-white shadow-xs hover:opacity-90 transition-all cursor-pointer">
-              <img src="/images/logopro.png" alt="GizeBook Logo" className="h-7 w-auto object-contain" />
-              <span className="text-lg sm:text-xl font-extrabold text-white tracking-tight">GizeBook</span>
-            </div>
+    <header className="sticky top-0 z-50 w-full bg-white/95 backdrop-blur-md border-b border-slate-100 shadow-[0_2px_12px_rgba(0,0,0,0.03)] transition-all">
+      <div className="container mx-auto flex h-16 sm:h-[70px] items-center justify-between px-4 sm:px-6 lg:px-8">
+        
+        {/* ── Left: Brand Logo & Unified Tertiary Title ── */}
+        <div className="flex items-center gap-6">
+          <Link href="/" className="flex items-center gap-2.5 group shrink-0">
+            <img
+              src="/images/logopro.png"
+              alt="GizeBook Logo"
+              className="h-8 sm:h-9 w-auto object-contain transition-transform group-hover:scale-105"
+            />
+            <span className="text-xl sm:text-2xl font-black tracking-tight text-tertiary">
+              GizeBook
+            </span>
           </Link>
         </div>
 
-        {/* Right: Round buttons with white background & orange border line */}
-        <div className="flex items-center gap-2 sm:gap-3">
-          {/* User Menu / Sign In */}
-          <div className="hidden sm:block">
+        {/* ── Center: Desktop Navigation Links (Styled matching reference) ── */}
+        <nav className="hidden md:flex items-center gap-6 lg:gap-8">
+          {navLinks.map((link) => {
+            const active = isLinkActive(link.href);
+            return (
+              <Link
+                key={link.name}
+                href={link.href}
+                className={`relative py-1 text-[15px] lg:text-base font-semibold tracking-normal transition-colors ${
+                  active
+                    ? 'text-tertiary font-bold'
+                    : 'text-tertiary/75 hover:text-tertiary'
+                }`}
+              >
+                {link.name}
+                {active && (
+                  <span className="absolute -bottom-1 left-0 right-0 h-[2.5px] bg-tertiary rounded-full animate-in fade-in duration-200" />
+                )}
+              </Link>
+            );
+          })}
+
+          {/* Unique "For business" Button */}
+          <Link
+            href="/for-business"
+            className={`group relative inline-flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-bold rounded-full transition-all hover:scale-[1.03] active:scale-[0.98] border ml-2 ${
+              pathname === '/for-business'
+                ? 'bg-amber-500 text-white border-amber-600 shadow-md'
+                : 'bg-gradient-to-r from-tertiary to-slate-800 text-white shadow-sm hover:shadow-md hover:from-slate-800 hover:to-tertiary border-slate-700/50'
+            }`}
+          >
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+            </span>
+            <span className="tracking-tight">For business</span>
+            <Icon
+              icon="solar:arrow-right-up-linear"
+              className="w-3.5 h-3.5 text-amber-400 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform"
+            />
+          </Link>
+        </nav>
+
+        {/* ── Right: Profile Section & Mobile Hamburger ── */}
+        <div className="flex items-center gap-2.5 sm:gap-4">
+          {/* Lazy/User Profile Section */}
+          <div className="flex items-center">
             <UserMenu />
           </div>
 
-          {/* Register Services Button */}
-          <Link href={'https://app.gizebook.com/registration/company'} target='_blank'>
-            <button className="rounded-full bg-white border-2 border-amber-500 px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold text-amber-600 shadow-xs hover:bg-amber-50 transition-all">
-              Register Services
+          {/* Mobile Menu Hamburger Button */}
+          <div className="md:hidden flex items-center">
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="p-2 rounded-xl text-tertiary hover:bg-slate-100 transition-colors focus:outline-none"
+              aria-label="Toggle Menu"
+            >
+              <Icon
+                icon={mobileMenuOpen ? "solar:close-circle-bold" : "solar:hamburger-menu-linear"}
+                width="26"
+                height="26"
+              />
             </button>
-          </Link>
+          </div>
         </div>
       </div>
 
-      {/* Mobile Search Overlay */}
-      {mobileSearchOpen && (
-        <div className="absolute top-0 left-0 w-full h-full bg-white z-50 p-4 flex flex-col shadow-md">
-          <div className="flex items-center justify-between mb-4">
-            <span className="text-lg font-semibold text-slate-800">Search Services</span>
-            <button
-              onClick={() => setMobileSearchOpen(false)}
-              className="p-2 rounded-full hover:bg-gray-100 text-slate-700"
-            >
-              <Icon icon="material-symbols:close-rounded" width="24" height="24" />
-            </button>
+      {/* ── Mobile Dropdown / Slide-down Menu ── */}
+      {mobileMenuOpen && (
+        <div className="md:hidden border-t border-slate-100 bg-white px-4 py-5 space-y-4 shadow-lg animate-in slide-in-from-top-2 duration-200">
+          <div className="space-y-1">
+            {navLinks.map((link) => {
+              const active = isLinkActive(link.href);
+              return (
+                <Link
+                  key={link.name}
+                  href={link.href}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-base font-semibold transition-colors ${
+                    active
+                      ? 'bg-slate-100 text-tertiary font-bold'
+                      : 'text-tertiary/80 hover:bg-slate-50 hover:text-tertiary'
+                  }`}
+                >
+                  <span>{link.name}</span>
+                  {active && <span className="w-1.5 h-1.5 rounded-full bg-tertiary" />}
+                </Link>
+              );
+            })}
           </div>
-          <SearchBox autoFocus closeSearch={() => setMobileSearchOpen(false)} />
-        </div>
-      )}
-    </nav>
-  );
-};
-export default NavSection;
 
-const SearchBox = ({ autoFocus = false, closeSearch }: { autoFocus?: boolean, closeSearch?: () => void }) => {
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState<Service[]>([]);
-  const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const containerRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener('click', handler);
-    return () => document.removeEventListener('click', handler);
-  }, []);
-
-  useEffect(() => {
-    const trimmed = query.trim();
-    if (trimmed.length < 2) {
-      setResults([]);
-      return;
-    }
-    setLoading(true);
-    const id = setTimeout(async () => {
-      try {
-        // This now calls our new, fast Supabase function!
-        const r = await searchServices(trimmed);
-        setResults(r); // The API already limits the results
-        setOpen(true);
-      } finally {
-        setLoading(false);
-      }
-    }, 300); // Debounce to avoid too many API calls
-    return () => clearTimeout(id);
-  }, [query]);
-
-  return (
-    <div className="relative" ref={containerRef}>
-
-      <input
-        autoFocus={autoFocus}
-        id="global-search"
-        name="global-search"
-        className="block w-full rounded-full border border-gray-300 bg-white py-2 pl-10 pr-3 leading-5 text-gray-900 placeholder-gray-500 focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-orange-500 sm:text-sm"
-        placeholder="Search services, companies, or codes"
-        type="search"
-        autoComplete="off"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        onFocus={() => query.trim().length >= 2 && setOpen(true)}
-      />
-
-      {open && (results.length > 0 || loading) && (
-        <div className="absolute z-50 mt-2 w-full rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden">
-          {loading && <div className="p-3 text-sm text-gray-500">Searching...</div>}
-          {!loading && results.map((svc) => (
-            // --- THE FIX: Use snake_case `company_id` to match Supabase data ---
+          {/* Mobile "For business" Banner / Button */}
+          <div className="pt-2 border-t border-slate-100">
             <Link
-              href={`/booking/${svc.id}?companyId=${svc.company_id}`}
-              key={`${svc.company_id}-${svc.id}`} // Also update the key
-              className="block px-3 py-2 hover:bg-gray-50"
-              onClick={() => {
-                setOpen(false);
-                closeSearch?.();
-              }}
+              href="/for-business"
+              onClick={() => setMobileMenuOpen(false)}
+              className={`flex items-center justify-between w-full px-4 py-3 rounded-2xl text-white shadow-sm font-bold text-sm ${
+                pathname === '/for-business'
+                  ? 'bg-amber-500'
+                  : 'bg-gradient-to-r from-tertiary to-slate-800'
+              }`}
             >
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-sm font-medium text-gray-900 truncate">{svc.name}</div>
-                  {/* The company object is now nested, which is great */}
-                  <div className="text-xs text-gray-500 truncate">{svc.company?.name || 'Unknown company'}</div>
-                </div>
-                <div className="text-xs font-mono text-gray-600 bg-gray-100 px-2 py-1 rounded">{svc.code}</div>
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-2 w-2 relative">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                </span>
+                <span>For business / List salon</span>
               </div>
+              <Icon icon="solar:arrow-right-up-linear" className="w-4 h-4 text-amber-400" />
             </Link>
-          ))}
-          {!loading && results.length === 0 && <div className="p-3 text-sm text-gray-500">No matches</div>}
+          </div>
         </div>
       )}
-    </div>
+    </header>
   );
 };
+
+export default NavSection;

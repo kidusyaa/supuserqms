@@ -1232,6 +1232,7 @@ export async function getDiscountedServices(): Promise<Service[]> {
         )
       `)
       .eq('status', 'active')
+      .or('is_package.is.null,is_package.eq.false')
       .not('discount_type', 'is', null) // Ensure there is a discount
       .not('discount_value', 'is', null);
 
@@ -1240,12 +1241,14 @@ export async function getDiscountedServices(): Promise<Service[]> {
       return [];
     }
 
-    const services: Service[] = (data || []).map((raw: any) => ({
-      ...mapToService(raw),
-      company: raw.company,
-      service_photos: raw.service_photos || [],
-      photo: raw.service_photos?.[0]?.url || raw.photo || null,
-    }));
+    const services: Service[] = (data || [])
+      .filter((raw: any) => !raw.is_package)
+      .map((raw: any) => ({
+        ...mapToService(raw),
+        company: raw.company,
+        service_photos: raw.service_photos || [],
+        photo: raw.service_photos?.[0]?.url || raw.photo || null,
+      }));
 
     await enrichServicesWithCategories(services);
 
@@ -3392,6 +3395,7 @@ export async function getAllPackages(): Promise<Service[]> {
               ...mapToService(sub),
               photo: sub.service_photos?.[0]?.url || sub.photo || null,
             }));
+            await enrichServicesWithCategories(pkg.included_services);
           }
         } catch (err) {
           console.error(`Error resolving included services for package ${pkg.id}:`, err);
@@ -3485,9 +3489,133 @@ export async function getPackageById(packageId: string): Promise<Service | null>
   }
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+// USER FAVORITES / SAVED SERVICES (public.user_favorites table)
+// ══════════════════════════════════════════════════════════════════════════
 
+/**
+ * Fetch all saved services for the currently authenticated user
+ */
+export async function getMySavedServices(): Promise<Service[]> {
+  try {
+    const { data: { user }, error: authErr } = await supabase.auth.getUser();
+    if (authErr || !user) return [];
 
+    const { data: favorites, error: favErr } = await supabase
+      .from('user_favorites')
+      .select('service_id, created_at')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
 
+    if (favErr || !favorites || favorites.length === 0) {
+      return [];
+    }
 
+    const serviceIds = favorites.map((f: any) => f.service_id);
 
-//fix the issue overla the join queue and other
+    const { data: servicesData, error: servicesErr } = await supabase
+      .from('services')
+      .select(`
+        *,
+        company:companies (
+          id,
+          name,
+          logo,
+          phone,
+          email,
+          address,
+          location_text
+        ),
+        service_photos ( url )
+      `)
+      .in('id', serviceIds);
+
+    if (servicesErr || !servicesData) {
+      console.error('Error fetching saved services details:', servicesErr);
+      return [];
+    }
+
+    const formattedServices: Service[] = servicesData.map((raw: any) => {
+      const photoUrl = raw.service_photos?.[0]?.url || raw.photo || null;
+      return {
+        ...mapToService(raw),
+        photo: photoUrl,
+        service_photos: raw.service_photos || [],
+        company: raw.company,
+      };
+    });
+
+    await enrichServicesWithCategories(formattedServices);
+
+    return formattedServices;
+  } catch (error) {
+    console.error('Error in getMySavedServices:', error);
+    return [];
+  }
+}
+
+/**
+ * Get array of favorited service IDs for the current user
+ */
+export async function getMyFavoriteServiceIds(): Promise<string[]> {
+  try {
+    const { data: { user }, error: authErr } = await supabase.auth.getUser();
+    if (authErr || !user) return [];
+
+    const { data: favorites, error: favErr } = await supabase
+      .from('user_favorites')
+      .select('service_id')
+      .eq('user_id', user.id);
+
+    if (favErr || !favorites) return [];
+
+    return favorites.map((f: any) => f.service_id);
+  } catch (error) {
+    console.error('Error in getMyFavoriteServiceIds:', error);
+    return [];
+  }
+}
+
+/**
+ * Toggle favorite status for a service.
+ * Returns { isFavorited: boolean }
+ */
+export async function toggleServiceFavorite(serviceId: string): Promise<{ isFavorited: boolean }> {
+  const { data: { user }, error: authErr } = await supabase.auth.getUser();
+  if (authErr || !user) {
+    const err: any = new Error("Please sign in to save services to your favorites.");
+    err.code = "AUTH_REQUIRED";
+    throw err;
+  }
+
+  // Check if favorite already exists
+  const { data: existing, error: checkErr } = await supabase
+    .from('user_favorites')
+    .select('service_id')
+    .eq('user_id', user.id)
+    .eq('service_id', serviceId)
+    .maybeSingle();
+
+  if (existing) {
+    // Remove from favorites
+    const { error: delErr } = await supabase
+      .from('user_favorites')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('service_id', serviceId);
+
+    if (delErr) throw delErr;
+    return { isFavorited: false };
+  } else {
+    // Add to favorites
+    const { error: insErr } = await supabase
+      .from('user_favorites')
+      .insert({
+        user_id: user.id,
+        service_id: serviceId,
+      });
+
+    if (insErr) throw insErr;
+    return { isFavorited: true };
+  }
+}

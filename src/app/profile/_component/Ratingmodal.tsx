@@ -1,16 +1,17 @@
-// profile/_components/RatingModal.tsx
 "use client";
-import { useState } from "react";
+
+import React, { useState } from "react";
 import {
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
-import { Button }   from "@/components/ui/button";
-import { Label }    from "@/components/ui/label";
-// import { Textarea } from "@/components/ui/textarea";
 import { StarRating, RATING_LABELS } from "./Starrating";
 import type { CompanyRating, RatingSourceType } from "../hook/Useratings";
-
 import type { UpsertRatingPayload } from "../_api/rating";
+import { Icon } from "@iconify/react";
 
 export interface RatingModalState {
   open: boolean;
@@ -28,7 +29,7 @@ interface Props {
 }
 
 export function RatingModal({ state, onClose, saveRating }: Props) {
-  const [stars, setStars]   = useState(state.existing?.stars ?? 0);
+  const [stars, setStars] = useState(state.existing?.stars ?? 0);
   const [review, setReview] = useState(state.existing?.review ?? "");
   const [saving, setSaving] = useState(false);
   const label = RATING_LABELS[stars];
@@ -37,7 +38,13 @@ export function RatingModal({ state, onClose, saveRating }: Props) {
     if (stars === 0) return;
     setSaving(true);
     const ok = await saveRating(
-      { company_id: state.companyId, source_type: state.sourceType, source_id: state.sourceId, stars, review },
+      {
+        company_id: state.companyId,
+        source_type: state.sourceType,
+        source_id: state.sourceId,
+        stars,
+        review: review.trim(),
+      },
       state.existing
     );
     setSaving(false);
@@ -46,21 +53,29 @@ export function RatingModal({ state, onClose, saveRating }: Props) {
 
   return (
     <Dialog open={state.open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-md rounded-2xl border-0 shadow-2xl bg-white p-0 overflow-hidden">
-        {/* Warm header */}
-        <div className="bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 px-6 pt-6 pb-4">
+      <DialogContent className="sm:max-w-md rounded-3xl border border-slate-100 dark:border-slate-800 shadow-2xl bg-white dark:bg-slate-900 p-0 overflow-hidden">
+        
+        {/* Header */}
+        <div className="bg-gradient-to-b from-amber-50/80 via-orange-50/30 to-white dark:from-slate-800 dark:to-slate-900 px-6 pt-6 pb-4 text-center">
           <DialogHeader>
-            <DialogTitle className="text-xl font-bold text-gray-900">Rate your experience</DialogTitle>
-            <DialogDescription className="text-sm text-gray-500 mt-0.5">
+            <DialogTitle className="font-serif font-bold text-xl sm:text-2xl text-slate-900 dark:text-white">
+              Rate your experience
+            </DialogTitle>
+            <DialogDescription className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
               How was your visit to{" "}
-              <span className="font-semibold text-gray-700">{state.companyName}</span>?
+              <span className="font-bold text-slate-800 dark:text-slate-200">
+                {state.companyName}
+              </span>
+              ?
             </DialogDescription>
           </DialogHeader>
-          <div className="mt-4 flex flex-col items-center gap-2 py-2">
+
+          {/* Stars */}
+          <div className="mt-5 flex flex-col items-center gap-2">
             <StarRating value={stars} onChange={setStars} size="lg" />
-            <div className="h-6 flex items-center">
+            <div className="h-6 flex items-center justify-center">
               {stars > 0 && (
-                <span className={`text-sm font-semibold tracking-wide uppercase ${label?.color}`}>
+                <span className={`text-xs font-black tracking-wider uppercase ${label?.color || "text-amber-600"}`}>
                   {label?.label}
                 </span>
               )}
@@ -68,36 +83,56 @@ export function RatingModal({ state, onClose, saveRating }: Props) {
           </div>
         </div>
 
-        {/* Body */}
-        {/* <div className="px-6 pb-6 pt-4 space-y-4">
-          <div className="space-y-1.5">
-            <Label className="text-sm text-gray-600">
-              Write a review <span className="text-gray-400 font-normal">(optional)</span>
-            </Label>
-            <Textarea
+        {/* Form Body */}
+        <div className="px-6 pb-6 pt-2 space-y-4 text-left">
+          {/* Review Textarea */}
+          <div>
+            <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1.5">
+              Write a review <span className="text-slate-400 font-normal">(optional)</span>
+            </label>
+            <textarea
               value={review}
               onChange={(e) => setReview(e.target.value)}
-              placeholder="Share details about your experience…"
+              placeholder="Share details about the service, ambiance, or staff..."
               rows={3}
               maxLength={500}
-              className="resize-none rounded-xl border-gray-200 focus:border-amber-400 focus:ring-amber-400/20 text-sm"
+              className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-3 text-xs sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 resize-none transition-all"
             />
-            <p className="text-xs text-gray-400 text-right">{review.length}/500</p>
+            <p className="text-[11px] text-slate-400 text-right mt-1">
+              {review.length}/500
+            </p>
           </div>
 
-          <div className="flex gap-2">
-            <Button
+          {/* Action Buttons */}
+          <div className="flex items-center gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-3 px-4 rounded-full border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
               onClick={handleSubmit}
               disabled={saving || stars === 0}
-              className="flex-1 rounded-xl bg-gradient-to-r from-amber-400 to-orange-400 hover:from-amber-500 hover:to-orange-500 text-white font-semibold border-0 shadow-md shadow-amber-200"
+              className="flex-2 bg-[#FBA819] hover:bg-amber-500 active:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed text-slate-950 py-3 px-6 rounded-full font-bold text-xs sm:text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
-              {saving ? "Saving…" : state.existing ? "Update Rating" : "Submit Rating"}
-            </Button>
-            <Button variant="outline" onClick={onClose} className="rounded-xl border-gray-200">
-              Cancel
-            </Button>
+              {saving ? (
+                <>
+                  <div className="w-4 h-4 rounded-full border-2 border-slate-950 border-t-transparent animate-spin" />
+                  <span>Sending…</span>
+                </>
+              ) : (
+                <>
+                  <span>{state.existing ? "Update Rating" : "Send Rating"}</span>
+                  <Icon icon="solar:star-fall-2-bold" className="w-4 h-4 text-slate-950" />
+                </>
+              )}
+            </button>
           </div>
-        </div> */}
+        </div>
+
       </DialogContent>
     </Dialog>
   );

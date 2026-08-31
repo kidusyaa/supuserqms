@@ -31,26 +31,25 @@ export default function PackagesSection() {
   }
 
   return (
-    <section className="py-10 bg-slate-50/50">
+    <section className="py-10 bg-white dark:bg-slate-950">
       <div className="max-w-6xl mx-auto px-4">
         {/* Section Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 flex items-center gap-2.5">
-              <Package className="w-7 h-7 text-amber-500" />
+            <h2 className="text-2xl sm:text-3xl font-serif font-bold text-slate-900 dark:text-white tracking-tight">
               Special Package Deals
             </h2>
-            <p className="text-sm text-slate-500 mt-1">
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
               Save more with combined service packages
             </p>
           </div>
 
           <Link
             href="/packages"
-            className="inline-flex items-center text-sm font-bold text-amber-600 hover:text-amber-700 transition-colors group"
+            className="inline-flex items-center text-sm font-semibold text-amber-600 hover:text-amber-700 transition-colors group"
           >
-            <span>View All Packages</span>
-            <ArrowRight className="w-4 h-4 ml-1 transition-transform group-hover:translate-x-1" />
+            <span>See all</span>
+            <span className="ml-1 transition-transform group-hover:translate-x-0.5">&gt;</span>
           </Link>
         </div>
 

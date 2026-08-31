@@ -1,11 +1,13 @@
-// profile/_components/ProfileHero.tsx
 "use client";
+
+import React from "react";
 import Image from "next/image";
-import { Pencil, CalendarCheck, Clock3, Star } from "lucide-react";
+import { Icon } from "@iconify/react";
 
 interface Props {
   name: string;
   email: string | null;
+  createdAt?: string | null;
   avatarUrl: string | null;
   totalBookings: number;
   totalQueue: number;
@@ -14,81 +16,116 @@ interface Props {
 }
 
 export function ProfileHero({
-  name, email, avatarUrl,
-  totalBookings, totalQueue, totalRatings,
+  name,
+  email,
+  createdAt,
+  avatarUrl,
+  totalBookings,
+  totalQueue,
+  totalRatings,
   onEditClick,
 }: Props) {
+  // Initials
   const initials = name
-    ? name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase()
-    : "?";
+    ? name
+        .split(" ")
+        .map((w) => w[0])
+        .slice(0, 2)
+        .join("")
+        .toUpperCase()
+    : "ST";
+
+  // Member join date formatted
+  const memberSince = createdAt
+    ? `Member since ${new Date(createdAt).toLocaleDateString("en-US", { month: "short", year: "numeric" })}`
+    : "Member since Jan 2026";
 
   return (
-    <div className="relative rounded-3xl overflow-hidden">
-      {/* Gradient background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-amber-400 via-orange-400 to-rose-400" />
+    <div className="relative rounded-3xl overflow-hidden bg-[#0B3B48] shadow-lg p-5 sm:p-7 text-white">
+      {/* Decorative subtle background overlay shapes */}
+      <div className="absolute inset-0 bg-gradient-to-tr from-[#06242D] via-[#0B3B48] to-[#124D5E] pointer-events-none" />
+      <div className="absolute -top-16 -right-16 w-52 h-52 bg-white/5 rounded-full blur-2xl pointer-events-none" />
+      <div className="absolute -bottom-16 -left-16 w-52 h-52 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
 
-      {/* Dot-grid texture */}
-      <div
-        className="absolute inset-0 opacity-10"
-        style={{
-          backgroundImage: "radial-gradient(circle at 1px 1px, white 1px, transparent 0)",
-          backgroundSize: "22px 22px",
-        }}
-      />
-
-      {/* Decorative blobs */}
-      <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-2xl" />
-      <div className="absolute -bottom-8 -left-8 w-32 h-32 bg-white/10 rounded-full blur-2xl" />
-
-      <div className="relative px-6 pt-8 pb-6">
-        {/* Edit button */}
-        <button
-          onClick={onEditClick}
-          className="absolute top-5 right-5 w-9 h-9 rounded-full bg-white/20 hover:bg-white/35 backdrop-blur-sm flex items-center justify-center transition-all border border-white/30"
-          aria-label="Edit profile"
-        >
-          <Pencil className="w-4 h-4 text-white" />
-        </button>
-
-        {/* Avatar + identity */}
-        <div className="flex flex-col sm:flex-row items-center sm:items-end gap-4">
-          <div className="relative shrink-0">
-            <div className="w-24 h-24 rounded-2xl overflow-hidden border-4 border-white/40 shadow-2xl bg-white/20 flex items-center justify-center">
-              {avatarUrl ? (
-                <Image
-                  src={avatarUrl} alt={name}
-                  width={96} height={96}
-                  className="object-cover w-full h-full"
-                />
-              ) : (
-                <span className="text-3xl font-bold text-white">{initials}</span>
-              )}
+      <div className="relative z-10">
+        {/* Top Row: Avatar, Name/Info & Edit Button */}
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-center gap-4">
+            {/* Avatar Squircle */}
+            <div className="relative shrink-0">
+              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden bg-[#FBA819] flex items-center justify-center shadow-md">
+                {avatarUrl ? (
+                  <Image
+                    src={avatarUrl}
+                    alt={name}
+                    width={80}
+                    height={80}
+                    className="object-cover w-full h-full"
+                  />
+                ) : (
+                  <span className="font-serif font-black text-2xl sm:text-3xl text-slate-950">
+                    {initials}
+                  </span>
+                )}
+              </div>
+              {/* Edit Icon Badge */}
+              <button
+                type="button"
+                onClick={onEditClick}
+                className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#FBA819] hover:bg-amber-400 text-slate-950 flex items-center justify-center shadow-xs border-2 border-[#0B3B48] transition-transform active:scale-95 cursor-pointer"
+                title="Change avatar"
+              >
+                <Icon icon="solar:pen-2-bold" className="w-3 h-3 text-slate-950" />
+              </button>
             </div>
-            {/* Online dot */}
-            <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-400 rounded-full border-2 border-white shadow-sm" />
+
+            {/* Name & Subtitle */}
+            <div>
+              <h1 className="font-serif font-bold text-xl sm:text-2xl text-white tracking-tight leading-snug">
+                {name || email?.split("@")[0] || "User Profile"}
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-300 font-normal mt-0.5">
+                {memberSince}
+              </p>
+            </div>
           </div>
 
-          <div className="text-center sm:text-left pb-1">
-            <h1 className="text-2xl font-bold text-white tracking-tight">
-              {name || "Set your name"}
-            </h1>
-            {email && <p className="text-white/70 text-sm mt-0.5">{email}</p>}
-          </div>
+          {/* Edit Profile Button */}
+          <button
+            type="button"
+            onClick={onEditClick}
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/25 text-white text-xs font-semibold backdrop-blur-md transition-all active:scale-95 cursor-pointer shrink-0 shadow-xs"
+          >
+            <Icon icon="solar:pen-linear" className="w-3.5 h-3.5 text-white" />
+            <span>Edit</span>
+          </button>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-3 mt-6">
-          {[
-            { icon: CalendarCheck, label: "Bookings", value: totalBookings },
-            { icon: Clock3,        label: "Queues",   value: totalQueue    },
-            { icon: Star,          label: "Ratings",  value: totalRatings  },
-          ].map(({ icon: Icon, label, value }) => (
-            <div key={label} className="bg-white/15 backdrop-blur-sm rounded-2xl px-3 py-3 text-center border border-white/20">
-              <Icon className="w-4 h-4 text-white/80 mx-auto mb-1" />
-              <p className="text-xl font-bold text-white leading-none">{value}</p>
-              <p className="text-white/70 text-[11px] mt-0.5 font-medium">{label}</p>
-            </div>
-          ))}
+        {/* Bottom Row: 3 Stats Cards (Bookings, In queue, Reviews) */}
+        <div className="grid grid-cols-3 gap-2.5 sm:gap-4 mt-6">
+          {/* Bookings */}
+          <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3 sm:p-4 text-center border border-white/10">
+            <p className="font-serif font-extrabold text-xl sm:text-2xl text-[#FBA819] leading-none">
+              {totalBookings}
+            </p>
+            <p className="text-[11px] sm:text-xs text-slate-300 font-medium mt-1">Bookings</p>
+          </div>
+
+          {/* In queue */}
+          <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3 sm:p-4 text-center border border-white/10">
+            <p className="font-serif font-extrabold text-xl sm:text-2xl text-[#FBA819] leading-none">
+              {totalQueue}
+            </p>
+            <p className="text-[11px] sm:text-xs text-slate-300 font-medium mt-1">In queue</p>
+          </div>
+
+          {/* Reviews */}
+          <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3 sm:p-4 text-center border border-white/10">
+            <p className="font-serif font-extrabold text-xl sm:text-2xl text-[#FBA819] leading-none">
+              {totalRatings}
+            </p>
+            <p className="text-[11px] sm:text-xs text-slate-300 font-medium mt-1">Reviews</p>
+          </div>
         </div>
       </div>
     </div>

@@ -1,34 +1,32 @@
 "use client";
-import React, { useEffect, useState } from 'react'; // Import useState
-import Link from 'next/link';
-import DivCenter from './divCenter';
-import { Button } from './ui/button';
-import NavSection from './navsection';
-import FeaturedServices from './Featuredservice';
-import Footer from './footer';
+import React from 'react';
 import HeroSection from './herosection';
-import StatsSection from './StatsSection';
-import CompanyTypesPage from './company-types';
 import DiscountedServices from './discountedServices';
 import PackagesSection from './PackagesSection';
-import PartnersCarousel from './PartnersCarousel';
 import RecentlyJoinedCompanies from './RecentlyJoinedCompanies';
+import TopRatedServices from './TopRatedServices';
+import StatsSection from './StatsSection';
+
 export default function Homepage() {
-  const SERVICES_SECTION_ID = "services-list";
-  // State to store the height of the HeroSection
-  const [heroSectionHeight, setHeroSectionHeight] = useState(0);
-
   return (
-    <div>
-
+    <div className="space-y-2 bg-white dark:bg-slate-950">
+      {/* 1. Hero Section */}
       <HeroSection />
-      <PackagesSection />
+
+      {/* 2. Special Offers & Discounts */}
       <DiscountedServices />
-      <PartnersCarousel />
+
+      {/* 3. Package Deals */}
+      <PackagesSection />
+
+      {/* 4. New on Gize Book */}
       <RecentlyJoinedCompanies />
+
+      {/* 5. Top Rated Services (9 Services Grid) */}
+      <TopRatedServices />
+
+      {/* 6. Stats & Register Beauty Salon CTA */}
       <StatsSection />
-
-
     </div>
   );
 }

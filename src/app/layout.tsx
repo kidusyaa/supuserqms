@@ -72,7 +72,7 @@ export default function RootLayout({
         <link rel="icon" href="/images/logopro.png" />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased`}
       >
         <NavSection servicesSectionId={SERVICES_SECTION_ID} />
 

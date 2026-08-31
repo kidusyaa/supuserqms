@@ -1,139 +1,145 @@
-// components/Filterherosection.tsx
 "use client";
+
 import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
+import { Icon } from "@iconify/react";
 import {
-  Search,
-  SlidersHorizontal,
-  MapPin,
-  Check,
-  Building,
   Scissors,
   Sparkles,
   HeartHandshake,
   Paintbrush,
   Smile,
   X,
-  LayoutGrid,
-  Filter,
-  CheckCircle2,
-  ArrowLeft,
-  ArrowRight,
+  Search,
+  Check,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { FilterState, LocationOption, CompanyType, Location as AppLocation } from "@/type";
 import { getLocations } from "@/lib/api";
-import { getCompanyOptions, getAllCompanyTypes } from "@/lib/supabase-utils";
+import { getAllCompanyTypes } from "@/lib/supabase-utils";
+import type { CompanyType, Location as AppLocation } from "@/type";
 
-const initialFilterState: FilterState = {
-  searchTerm: "",
-  locations: [],
-  categoryId: null,
-  companyIds: [],
-  companyTypeIds: [],
-};
+export interface HeroLocationOption {
+  id: string;
+  label: string; // e.g. "Addis Ababa — Bole"
+  value: string; // e.g. "Bole, Addis Ababa"
+  neighborhood: string; // e.g. "Bole"
+}
 
-// 5 Main Categories
-const mainCategories = [
-  {
-    id: "barber",
-    name: "Barber",
-    typeSearch: "barber",
-    icon: Scissors,
-  },
-  {
-    id: "hair_salon",
-    name: "Hair Salon",
-    typeSearch: "beauty",
-    icon: Sparkles,
-  },
-  {
-    id: "massage",
-    name: "Massage",
-    typeSearch: "massage",
-    icon: HeartHandshake,
-  },
-  {
-    id: "nail",
-    name: "Nails",
-    typeSearch: "nail",
-    icon: Paintbrush,
-  },
-  {
-    id: "skincare",
-    name: "Skincare",
-    typeSearch: "skin",
-    icon: Smile,
-  },
+import { DATABASE_CATEGORIES } from "@/lib/categoryIcons";
+
+// Price presets for quick selection
+const pricePresets = [
+  { id: "all", label: "Any price", min: "", max: "" },
+  { id: "under_500", label: "Under 500 ETB", min: "0", max: "500" },
+  { id: "500_1500", label: "500 – 1,500 ETB", min: "500", max: "1500" },
+  { id: "1500_3000", label: "1,500 – 3,000 ETB", min: "1500", max: "3000" },
+  { id: "3000_plus", label: "3,000+ ETB", min: "3000", max: "" },
 ];
 
 export default function Filterherosection() {
   const router = useRouter();
 
-  const [filters, setFilters] = useState<FilterState>(initialFilterState);
-  const [dataLoading, setDataLoading] = useState(true);
-  const [dropdownOpen, setDropdownOpen] = useState(false);
+  // Search & Filter state
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedLocation, setSelectedLocation] = useState<HeroLocationOption | null>(null);
+  const [selectedCompanyTypeIds, setSelectedCompanyTypeIds] = useState<string[]>([]);
+  const [selectedPricePreset, setSelectedPricePreset] = useState<string>("all");
+  const [minPrice, setMinPrice] = useState("");
+  const [maxPrice, setMaxPrice] = useState("");
   const [displayMethod, setDisplayMethod] = useState<string>("all");
+
+  // Modals / Drawers state
+  const [locationOpen, setLocationOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [locationSearchQuery, setLocationSearchQuery] = useState("");
+  const [dataLoading, setDataLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
 
+  // Options fetched from DB
   const [companyTypes, setCompanyTypes] = useState<CompanyType[]>([]);
-  const [locationOptions, setLocationOptions] = useState<LocationOption[]>([]);
+  const [locationOptions, setLocationOptions] = useState<HeroLocationOption[]>([]);
 
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const mobilePortalRef = useRef<HTMLDivElement>(null);
+  // Desktop popover refs
+  const locationRef = useRef<HTMLDivElement>(null);
+  const filtersRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Close desktop/mobile dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (dropdownRef.current && dropdownRef.current.contains(target)) {
-        return;
-      }
-      if (mobilePortalRef.current && mobilePortalRef.current.contains(target)) {
-        return;
-      }
-      setDropdownOpen(false);
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  // Prevent background scrolling when mobile full screen filter is open
-  useEffect(() => {
-    if (dropdownOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "unset";
-    }
-    return () => {
-      document.body.style.overflow = "unset";
-    };
-  }, [dropdownOpen]);
-
-  // Fetch data
+  // Fetch company types and locations
   useEffect(() => {
     const fetchData = async () => {
       setDataLoading(true);
       try {
-        const [fetchedCompanyTypes, fetchedLocations] = await Promise.all([
+        const [fetchedTypes, fetchedLocations] = await Promise.all([
           getAllCompanyTypes(),
           getLocations(),
         ]);
 
-        const formattedLocations: LocationOption[] = fetchedLocations.map(
-          (location: AppLocation) => ({
-            id: location.id,
-            value: `${location.place}, ${location.city}`,
-            label: `${location.place}, ${location.city}`,
-          })
-        );
+        setCompanyTypes(fetchedTypes || []);
 
-        setCompanyTypes(fetchedCompanyTypes);
-        setLocationOptions(formattedLocations);
+        // Fallback default neighborhoods
+        const defaultNeighborhoods = [
+          "Bole",
+          "Kazanchis",
+          "CMC",
+          "Sarbet",
+          "Piassa",
+          "Mexico",
+          "Gerji",
+          "Summit",
+          "Megenagna",
+          "22 Mazoria",
+        ];
+
+        let formatted: HeroLocationOption[] = [];
+        if (fetchedLocations && fetchedLocations.length > 0) {
+          const uniquePlaces = new Set<string>();
+          fetchedLocations.forEach((loc: AppLocation) => {
+            const neighborhood = (loc.place || loc.city || "").trim();
+            if (neighborhood && !uniquePlaces.has(neighborhood.toLowerCase())) {
+              uniquePlaces.add(neighborhood.toLowerCase());
+              formatted.push({
+                id: loc.id,
+                label: `Addis Ababa — ${neighborhood}`,
+                value: `${neighborhood}, Addis Ababa`,
+                neighborhood,
+              });
+            }
+          });
+        }
+
+        if (formatted.length === 0) {
+          const defaultNeighborhoods = [
+            "Bole",
+            "Kazanchis",
+            "CMC",
+            "Sarbet",
+            "Piassa",
+            "Bethel",
+            "Mexico",
+            "Gerji",
+            "Summit",
+            "Megenagna",
+          ];
+          formatted = defaultNeighborhoods.map((name, idx) => ({
+            id: `loc-${idx}`,
+            label: `Addis Ababa — ${name}`,
+            value: `${name}, Addis Ababa`,
+            neighborhood: name,
+          }));
+        }
+
+        // Add "Addis Ababa" as all areas option at the top
+        formatted.unshift({
+          id: "all-addis",
+          label: "Addis Ababa",
+          value: "Addis Ababa",
+          neighborhood: "All areas",
+        });
+
+        setLocationOptions(formatted);
       } catch (error) {
         console.error("Failed to load filter data:", error);
       } finally {
@@ -143,361 +149,699 @@ export default function Filterherosection() {
     fetchData();
   }, []);
 
-  const handleLocationToggle = (location: LocationOption) => {
-    setFilters((prev) => {
-      const isSelected = prev.locations.some((l) => l.value === location.value);
-      if (isSelected) {
-        return {
-          ...prev,
-          locations: prev.locations.filter((l) => l.value !== location.value),
-        };
-      } else {
-        return { ...prev, locations: [...prev.locations, location] };
+  // Close desktop dropdowns on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (locationRef.current && !locationRef.current.contains(target)) {
+        // Only close if window width is desktop
+        if (window.innerWidth >= 640) {
+          setLocationOpen(false);
+        }
       }
-    });
-  };
+      if (filtersRef.current && !filtersRef.current.contains(target)) {
+        if (window.innerWidth >= 640) {
+          setFiltersOpen(false);
+        }
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
-  const handleCompanyTypeToggle = (typeId: string) => {
-    setFilters((prev) => {
-      const newTypeIds = prev.companyTypeIds.includes(typeId)
-        ? prev.companyTypeIds.filter((id) => id !== typeId)
-        : [...prev.companyTypeIds, typeId];
-      return { ...prev, companyTypeIds: newTypeIds };
-    });
-  };
+  // Lock body scroll when mobile drawer is open
+  useEffect(() => {
+    const isAnyMobileOpen = (locationOpen || filtersOpen) && window.innerWidth < 640;
+    if (isAnyMobileOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [locationOpen, filtersOpen]);
 
-  const handleSearch = (overrides?: Partial<FilterState>) => {
-    const activeFilters = { ...filters, ...overrides };
+  // Handle Search Submission
+  const handleSearchSubmit = (overrides?: {
+    searchTerm?: string;
+    location?: HeroLocationOption | null;
+    companyTypeIds?: string[];
+    minPrice?: string;
+    maxPrice?: string;
+    displayMethod?: string;
+  }) => {
+    const term = overrides?.searchTerm !== undefined ? overrides.searchTerm : searchTerm;
+    const loc = overrides?.location !== undefined ? overrides.location : selectedLocation;
+    const typeIds = overrides?.companyTypeIds !== undefined ? overrides.companyTypeIds : selectedCompanyTypeIds;
+    const minP = overrides?.minPrice !== undefined ? overrides.minPrice : minPrice;
+    const maxP = overrides?.maxPrice !== undefined ? overrides.maxPrice : maxPrice;
+    const method = overrides?.displayMethod !== undefined ? overrides.displayMethod : displayMethod;
+
     const queryParams = new URLSearchParams();
 
-    if (activeFilters.searchTerm) {
-      queryParams.set("searchTerm", activeFilters.searchTerm);
+    if (term.trim()) {
+      queryParams.set("searchTerm", term.trim());
     }
-    if (activeFilters.companyTypeIds.length > 0) {
-      queryParams.set("companyTypeIds", activeFilters.companyTypeIds.join(","));
+    if (loc && loc.value !== "Addis Ababa") {
+      queryParams.set("locations", loc.value);
     }
-    if (activeFilters.companyIds.length > 0) {
-      queryParams.set("companyIds", activeFilters.companyIds.join(","));
+    if (typeIds.length > 0) {
+      queryParams.set("companyTypeIds", typeIds.join(","));
     }
-    if (activeFilters.locations.length > 0) {
-      queryParams.set(
-        "locations",
-        activeFilters.locations.map((loc) => loc.value).join(";")
-      );
+    if (minP) {
+      queryParams.set("minPrice", minP);
     }
-    if (displayMethod && displayMethod !== "all") {
-      queryParams.set("displayMethod", displayMethod);
+    if (maxP) {
+      queryParams.set("maxPrice", maxP);
+    }
+    if (method && method !== "all") {
+      queryParams.set("displayMethod", method);
     }
 
-    setDropdownOpen(false);
+    setLocationOpen(false);
+    setFiltersOpen(false);
     router.push(`/services?${queryParams.toString()}`);
   };
 
-  const handleCategoryClick = (cat: typeof mainCategories[0]) => {
-    const matchedType = companyTypes.find((ct) =>
-      ct.name.toLowerCase().includes(cat.typeSearch.toLowerCase())
-    );
+  // Select location handler
+  const handleLocationSelect = (loc: HeroLocationOption) => {
+    setSelectedLocation(loc.value === "Addis Ababa" ? null : loc);
+    setLocationOpen(false);
+  };
 
+  // Toggle company type
+  const handleTypeToggle = (typeId: string) => {
+    setSelectedCompanyTypeIds((prev) =>
+      prev.includes(typeId) ? prev.filter((id) => id !== typeId) : [...prev, typeId]
+    );
+  };
+
+  // Price preset change
+  const handlePricePresetSelect = (preset: typeof pricePresets[0]) => {
+    setSelectedPricePreset(preset.id);
+    setMinPrice(preset.min);
+    setMaxPrice(preset.max);
+  };
+
+  // Category quick click
+  const handleCategoryClick = (cat: typeof DATABASE_CATEGORIES[0]) => {
+    const matchedType = companyTypes.find(
+      (ct) =>
+        ct.id === cat.id ||
+        ct.name.toLowerCase().includes(cat.search.toLowerCase()) ||
+        cat.name.toLowerCase().includes(ct.name.toLowerCase())
+    );
     if (matchedType) {
-      handleSearch({ companyTypeIds: [matchedType.id] });
+      handleSearchSubmit({ companyTypeIds: [matchedType.id] });
     } else {
-      handleSearch({ searchTerm: cat.name });
+      handleSearchSubmit({ searchTerm: cat.name });
     }
   };
 
-  const activeFilterCount =
-    filters.locations.length +
-    filters.companyTypeIds.length +
-    (filters.searchTerm ? 1 : 0) +
-    (displayMethod !== "all" ? 1 : 0);
-
-  const FilterBodyContent = () => (
-    <div className="space-y-6">
-      {/* Location Filter */}
-      <div>
-        <label className="text-xs font-extrabold text-slate-800 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-          <MapPin className="w-4 h-4 text-amber-500" />
-          Select Location
-        </label>
-        {dataLoading ? (
-          <p className="text-xs text-slate-400 py-2">Loading locations...</p>
-        ) : (
-          <div className="flex flex-wrap gap-2 max-h-36 overflow-y-auto pt-1">
-            {locationOptions.map((loc) => {
-              const isSelected = filters.locations.some((l) => l.value === loc.value);
-              return (
-                <button
-                  key={loc.value}
-                  type="button"
-                  onClick={() => handleLocationToggle(loc)}
-                  className={`px-3.5 py-2 rounded-full text-xs font-semibold transition-all border flex items-center gap-1.5 ${
-                    isSelected
-                      ? "bg-amber-50 border-amber-500 text-amber-700 shadow-xs"
-                      : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
-                  }`}
-                >
-                  {isSelected && <Check className="w-3.5 h-3.5 text-amber-600" />}
-                  {loc.label}
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Business Category Types Filter */}
-      <div>
-        <label className="text-xs font-extrabold text-slate-800 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-          <Building className="w-4 h-4 text-amber-500" />
-          Business Category
-        </label>
-        <div className="flex flex-wrap gap-2">
-          {companyTypes.map((type) => {
-            const isSelected = filters.companyTypeIds.includes(type.id);
-            return (
-              <button
-                key={type.id}
-                type="button"
-                onClick={() => handleCompanyTypeToggle(type.id)}
-                className={`px-3.5 py-2 rounded-full text-xs font-semibold transition-all border flex items-center gap-1.5 ${
-                  isSelected
-                    ? "bg-amber-500 border-amber-500 text-white shadow-xs"
-                    : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
-                }`}
-              >
-                {isSelected && <Check className="w-3.5 h-3.5 text-white" />}
-                {type.name}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Method of Displaying Services */}
-      <div>
-        <label className="text-xs font-extrabold text-slate-800 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-          <LayoutGrid className="w-4 h-4 text-amber-500" />
-          Display Services By
-        </label>
-        <div className="grid grid-cols-2 gap-2">
-          {[
-            { id: "all", label: "All Services" },
-            { id: "popular", label: "Most Popular" },
-            { id: "discounted", label: "Special Offers / Discounts" },
-            { id: "nearest", label: "Nearest to Me" },
-          ].map((method) => {
-            const isSelected = displayMethod === method.id;
-            return (
-              <button
-                key={method.id}
-                type="button"
-                onClick={() => setDisplayMethod(method.id)}
-                className={`px-3.5 py-2.5 rounded-xl text-xs font-semibold border text-left transition-all flex items-center justify-between ${
-                  isSelected
-                    ? "bg-slate-900 border-slate-900 text-white"
-                    : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
-                }`}
-              >
-                <span>{method.label}</span>
-                {isSelected && <CheckCircle2 className="w-4 h-4 text-amber-400" />}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    </div>
+  // Filtered locations based on drawer search input
+  const filteredLocations = locationOptions.filter((loc) =>
+    loc.label.toLowerCase().includes(locationSearchQuery.toLowerCase()) ||
+    loc.neighborhood.toLowerCase().includes(locationSearchQuery.toLowerCase())
   );
 
+  const activeFiltersCount =
+    (selectedLocation ? 1 : 0) +
+    selectedCompanyTypeIds.length +
+    (selectedPricePreset !== "all" || minPrice || maxPrice ? 1 : 0) +
+    (displayMethod !== "all" ? 1 : 0);
+
   return (
-    <div className="w-full max-w-3xl mx-auto px-2 sm:px-4" ref={dropdownRef}>
-      {/* Unified Search Bar */}
-      <div className="relative z-30">
-        <div className="bg-white border border-slate-200 shadow-xl rounded-2xl md:rounded-full p-2 flex items-center gap-2 transition-all hover:border-amber-400 focus-within:border-amber-500 focus-within:ring-4 focus-within:ring-amber-500/10">
-          <div className="pl-3 text-slate-400">
-            <Search className="w-5 h-5" />
-          </div>
+    <div className="w-full max-w-4xl mx-auto px-2 sm:px-4">
+      {/* ── SEARCH CARD CONTAINER ── */}
+      <div className="max-w-xl mx-auto space-y-3">
+
+        {/* 1. Large Rounded Search Bar */}
+        <div className="relative flex items-center bg-white rounded-full px-4 py-3 sm:py-3.5 shadow-xl border border-slate-200 focus-within:border-amber-500 focus-within:ring-4 focus-within:ring-amber-500/15 transition-all">
+          <Search className="w-5 h-5 text-slate-400 mr-3 shrink-0" />
           <input
             type="search"
             inputMode="search"
-            value={filters.searchTerm}
-            onChange={(e) => setFilters((prev) => ({ ...prev, searchTerm: e.target.value }))}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();
-                handleSearch();
+                handleSearchSubmit();
               }
             }}
-            placeholder="Search services, businesses, or location..."
-            className="flex-1 bg-transparent border-none outline-none text-slate-800 placeholder-slate-400 text-sm sm:text-base py-2.5 px-2"
+            placeholder="Search services or businesses"
+            className="w-full bg-transparent border-none outline-none text-slate-900 placeholder-slate-400 text-sm sm:text-base font-medium"
           />
-          {filters.searchTerm && (
+          {searchTerm && (
             <button
-              onClick={() => setFilters((prev) => ({ ...prev, searchTerm: "" }))}
-              className="p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+              type="button"
+              onClick={() => setSearchTerm("")}
+              className="p-1 rounded-full text-slate-400 hover:text-slate-600 mr-1"
             >
               <X className="w-4 h-4" />
             </button>
           )}
-
-          {/* Filter Button */}
-          <button
-            type="button"
-            onClick={() => setDropdownOpen(!dropdownOpen)}
-            className={`p-3 rounded-xl md:rounded-full transition-all flex items-center justify-center relative cursor-pointer ${
-              dropdownOpen || activeFilterCount > 0
-                ? "bg-amber-500 text-white shadow-sm"
-                : "bg-slate-100 text-slate-700 hover:bg-amber-500 hover:text-white"
-            }`}
-            title="Filter services"
-          >
-            <SlidersHorizontal className="w-5 h-5" />
-            {activeFilterCount > 0 && !dropdownOpen && (
-              <span className="absolute -top-1 -right-1 bg-amber-600 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center border-2 border-white">
-                {activeFilterCount}
-              </span>
-            )}
-          </button>
         </div>
 
-        {/* 1. DESKTOP FILTER POPOVER (Hidden on Mobile) */}
-        {dropdownOpen && (
-          <div className="hidden sm:block absolute top-full left-0 right-0 mt-3 bg-white rounded-2xl shadow-2xl border border-slate-200 p-5 z-50 animate-in fade-in slide-in-from-top-2 duration-200 text-left">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
-              <div className="flex items-center gap-2">
-                <Filter className="w-5 h-5 text-amber-500" />
-                <h3 className="font-bold text-slate-900 text-base">Filter Services</h3>
+        {/* 2. Two Pills Row: Location Pill + Filters Pill */}
+        <div className="flex items-center gap-2.5">
+
+          {/* 📍 Location Pill */}
+          <div className="relative flex-1" ref={locationRef}>
+            <button
+              type="button"
+              onClick={() => {
+                setFiltersOpen(false);
+                setLocationOpen(!locationOpen);
+              }}
+              className="w-full bg-slate-900/80 hover:bg-slate-900/95 backdrop-blur-md border border-slate-700/60 rounded-full py-2.5 px-4 text-white text-xs sm:text-sm font-semibold flex items-center justify-between transition-all group cursor-pointer shadow-sm"
+            >
+              <div className="flex items-center gap-2 truncate">
+                <Icon icon="solar:map-point-bold" className="w-4 h-4 text-amber-400 shrink-0" />
+                <span className="truncate">
+                  {selectedLocation ? selectedLocation.neighborhood : "Addis Ababa"}
+                </span>
               </div>
-              <button
-                onClick={() => setDropdownOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-100"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+              <Icon
+                icon="solar:alt-arrow-right-linear"
+                className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 group-hover:text-white transition-all shrink-0 ml-1.5"
+              />
+            </button>
 
-            <FilterBodyContent />
-
-            <div className="flex items-center justify-between pt-4 mt-4 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => {
-                  setFilters(initialFilterState);
-                  setDisplayMethod("all");
-                }}
-                className="text-xs text-slate-500 hover:text-slate-800 font-medium underline"
-              >
-                Clear all filters
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSearch()}
-                className="bg-amber-500 hover:bg-amber-600 text-white px-5 py-2 rounded-xl font-semibold text-xs sm:text-sm shadow-md transition-all flex items-center gap-2"
-              >
-                <Search className="w-4 h-4" />
-                Go & Filter Services
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* 2. MOBILE FULL SCREEN FILTER OVERLAY (Portaled directly to body with z-[99999]) */}
-        {dropdownOpen && mounted && createPortal(
-          <div ref={mobilePortalRef} className="fixed inset-0 z-[99999] bg-white flex flex-col justify-between overflow-hidden sm:hidden animate-in fade-in duration-200">
-            {/* Top Bar with Back Button */}
-            <div className="flex items-center justify-between px-4 py-3.5 border-b border-slate-200 bg-white sticky top-0 z-20 shadow-xs">
-              <button
-                type="button"
-                onClick={() => setDropdownOpen(false)}
-                className="flex items-center gap-2 text-slate-900 font-bold text-base hover:text-amber-600 active:scale-95 transition-all"
-              >
-                <ArrowLeft className="w-6 h-6 text-amber-500" />
-                <span>Back</span>
-              </button>
-              <span className="font-extrabold text-slate-900 text-base">Filter Services</span>
-              <button
-                type="button"
-                onClick={() => {
-                  setFilters(initialFilterState);
-                  setDisplayMethod("all");
-                }}
-                className="text-xs font-bold text-amber-600 hover:underline px-2 py-1"
-              >
-                Reset
-              </button>
-            </div>
-
-            {/* Search Input Bar Inside Mobile Filter View */}
-            <div className="px-4 pt-3 pb-2 bg-slate-50/80 border-b border-slate-100">
-              <label className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider mb-1 block text-left">
-                Search Keyword
-              </label>
-              <div className="relative flex items-center bg-white rounded-full px-3.5 py-2.5 border border-slate-200 focus-within:border-amber-500 focus-within:ring-2 focus-within:ring-amber-500/20 transition-all shadow-xs">
-                <Search className="w-5 h-5 text-amber-500 mr-2 flex-shrink-0" />
-                <input
-                  type="search"
-                  inputMode="search"
-                  value={filters.searchTerm}
-                  onChange={(e) => setFilters((prev) => ({ ...prev, searchTerm: e.target.value }))}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      handleSearch();
-                    }
-                  }}
-                  placeholder="Search services, businesses, or location..."
-                  className="w-full bg-transparent text-sm text-slate-900 placeholder-slate-400 outline-none border-none font-medium"
-                />
-                {filters.searchTerm && (
+            {/* Desktop Location Popover Dropdown */}
+            {locationOpen && (
+              <div className="hidden sm:block absolute top-full left-0 mt-2.5 w-80 bg-white rounded-3xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.35)] border border-slate-200 p-4.5 z-[100] animate-in fade-in slide-in-from-top-2 duration-200 text-left">
+                <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100">
+                  <h4 className="font-serif font-bold text-slate-900 text-sm">Choose location</h4>
                   <button
-                    type="button"
-                    onClick={() => setFilters((prev) => ({ ...prev, searchTerm: "" }))}
-                    className="p-1 rounded-full text-slate-400 hover:text-slate-600"
+                    onClick={() => setLocationOpen(false)}
+                    className="p-1 text-slate-400 hover:text-slate-600 rounded-full cursor-pointer"
                   >
                     <X className="w-4 h-4" />
                   </button>
-                )}
+                </div>
+
+                {/* Search input inside popover */}
+                <div className="relative flex items-center bg-slate-50 rounded-2xl px-3 py-2 border border-slate-200 mb-3">
+                  <Search className="w-4 h-4 text-slate-400 mr-2 shrink-0" />
+                  <input
+                    type="text"
+                    value={locationSearchQuery}
+                    onChange={(e) => setLocationSearchQuery(e.target.value)}
+                    placeholder="Search a neighborhood..."
+                    className="w-full bg-transparent text-xs text-slate-800 placeholder-slate-400 outline-none"
+                  />
+                  {locationSearchQuery && (
+                    <button onClick={() => setLocationSearchQuery("")} className="cursor-pointer">
+                      <X className="w-3.5 h-3.5 text-slate-400" />
+                    </button>
+                  )}
+                </div>
+
+                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                  Popular areas
+                </div>
+
+                <div className="max-h-60 overflow-y-auto space-y-1 pr-1">
+                  {filteredLocations.map((loc) => {
+                    const isSelected =
+                      (selectedLocation === null && loc.value === "Addis Ababa") ||
+                      selectedLocation?.id === loc.id;
+                    return (
+                      <button
+                        key={loc.id}
+                        type="button"
+                        onClick={() => handleLocationSelect(loc)}
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-colors text-left cursor-pointer ${isSelected
+                            ? "bg-amber-50 text-amber-700 font-bold"
+                            : "text-slate-700 hover:bg-slate-50"
+                          }`}
+                      >
+                        <div className="flex items-center gap-2 truncate">
+                          <Icon
+                            icon="solar:map-point-linear"
+                            className={`w-4 h-4 ${isSelected ? "text-amber-500" : "text-slate-400"}`}
+                          />
+                          <span className="truncate">{loc.label}</span>
+                        </div>
+                        {isSelected && <Check className="w-3.5 h-3.5 text-amber-600 shrink-0" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 🎛 Filters Pill */}
+          <div className="relative shrink-0" ref={filtersRef}>
+            <button
+              type="button"
+              onClick={() => {
+                setLocationOpen(false);
+                setFiltersOpen(!filtersOpen);
+              }}
+              className={`bg-slate-900/80 hover:bg-slate-900/95 backdrop-blur-md border border-slate-700/60 rounded-full py-2.5 px-4 text-white text-xs sm:text-sm font-semibold flex items-center gap-2 transition-all cursor-pointer shadow-sm ${filtersOpen || activeFiltersCount > 0 ? "ring-2 ring-amber-400/50" : ""
+                }`}
+            >
+              <Icon icon="solar:tuning-2-linear" className="w-4 h-4 text-amber-400" />
+              <span>Filters</span>
+              {activeFiltersCount > 0 && (
+                <span className="w-4 h-4 rounded-full bg-amber-500 text-black text-[10px] font-black flex items-center justify-center">
+                  {activeFiltersCount}
+                </span>
+              )}
+            </button>
+
+            {/* Desktop Filters Popover Dropdown */}
+            {filtersOpen && (
+              <div className="hidden sm:block absolute top-full right-0 mt-2.5 w-96 bg-white rounded-3xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.35)] border border-slate-200 p-5 z-[100] animate-in fade-in slide-in-from-top-2 duration-200 text-left">
+                <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <Icon icon="solar:tuning-2-bold" className="w-4 h-4 text-amber-500" />
+                    <h4 className="font-serif font-bold text-slate-900 text-sm">Filter Services</h4>
+                  </div>
+                  <button
+                    onClick={() => setFiltersOpen(false)}
+                    className="p-1 text-slate-400 hover:text-slate-600 rounded-full cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="space-y-4 max-h-[380px] overflow-y-auto pr-1">
+                  {/* Categories */}
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2 block">
+                      Categories
+                    </label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {companyTypes.map((type) => {
+                        const isSelected = selectedCompanyTypeIds.includes(type.id);
+                        return (
+                          <button
+                            key={type.id}
+                            type="button"
+                            onClick={() => handleTypeToggle(type.id)}
+                            className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${isSelected
+                                ? "bg-amber-500 border-amber-500 text-white shadow-xs"
+                                : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
+                              }`}
+                          >
+                            {type.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Price Range Presets */}
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2 block">
+                      Price Range
+                    </label>
+                    <div className="flex flex-wrap gap-1.5 mb-2.5">
+                      {pricePresets.map((preset) => {
+                        const isSelected = selectedPricePreset === preset.id;
+                        return (
+                          <button
+                            key={preset.id}
+                            type="button"
+                            onClick={() => handlePricePresetSelect(preset)}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${isSelected
+                                ? "bg-slate-900 border-slate-900 text-white"
+                                : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                              }`}
+                          >
+                            {preset.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Custom Min / Max Inputs */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="flex items-center bg-slate-50 rounded-xl px-2.5 py-1.5 border border-slate-200">
+                        <span className="text-slate-400 text-xs mr-1.5">Min</span>
+                        <input
+                          type="number"
+                          value={minPrice}
+                          onChange={(e) => {
+                            setMinPrice(e.target.value);
+                            setSelectedPricePreset("custom");
+                          }}
+                          placeholder="0"
+                          className="w-full bg-transparent text-xs text-slate-800 outline-none"
+                        />
+                        <span className="text-slate-400 text-[10px]">ETB</span>
+                      </div>
+                      <div className="flex items-center bg-slate-50 rounded-xl px-2.5 py-1.5 border border-slate-200">
+                        <span className="text-slate-400 text-xs mr-1.5">Max</span>
+                        <input
+                          type="number"
+                          value={maxPrice}
+                          onChange={(e) => {
+                            setMaxPrice(e.target.value);
+                            setSelectedPricePreset("custom");
+                          }}
+                          placeholder="5000"
+                          className="w-full bg-transparent text-xs text-slate-800 outline-none"
+                        />
+                        <span className="text-slate-400 text-[10px]">ETB</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Sort / Display By */}
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2 block">
+                      Sort By
+                    </label>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {[
+                        { id: "all", label: "All" },
+                        { id: "popular", label: "Popular" },
+                        { id: "discounted", label: "Discounts" },
+                      ].map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => setDisplayMethod(item.id)}
+                          className={`py-1.5 px-2 rounded-lg text-xs font-semibold border transition-all text-center ${displayMethod === item.id
+                              ? "bg-amber-500 border-amber-500 text-white"
+                              : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
+                            }`}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex items-center justify-between pt-3 mt-3 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedCompanyTypeIds([]);
+                      setSelectedPricePreset("all");
+                      setMinPrice("");
+                      setMaxPrice("");
+                      setDisplayMethod("all");
+                    }}
+                    className="text-xs text-slate-500 hover:text-slate-800 font-medium underline"
+                  >
+                    Reset
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSearchSubmit()}
+                    className="bg-amber-500 hover:bg-amber-600 text-white px-5 py-2 rounded-full font-bold text-xs shadow-md transition-all flex items-center gap-1.5"
+                  >
+                    <span>Apply Filters</span>
+                    <Icon icon="solar:arrow-right-linear" className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+        </div>
+      </div>
+
+      {/* ── MOBILE: LOCATION BOTTOM SHEET DRAWER (Slides up from bottom) ── */}
+      {locationOpen && mounted && createPortal(
+        <div className="sm:hidden fixed inset-0 z-[99999] flex flex-col justify-end">
+          {/* Backdrop overlay */}
+          <div
+            className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200"
+            onClick={() => setLocationOpen(false)}
+          />
+
+          {/* Bottom Sheet Modal */}
+          <div className="relative bg-white rounded-t-3xl p-5 shadow-2xl z-10 max-h-[82vh] flex flex-col animate-in slide-in-from-bottom duration-300">
+            {/* Drag handle */}
+            <div className="w-12 h-1.5 rounded-full bg-slate-200 mx-auto mb-3" />
+
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
+              <h3 className="font-serif font-bold text-xl text-slate-900 tracking-tight">
+                Choose location
+              </h3>
+              <button
+                type="button"
+                onClick={() => setLocationOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-800"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Search a neighborhood Input */}
+            <div className="relative flex items-center bg-white rounded-2xl px-3.5 py-3 border border-slate-200 mb-4 shadow-2xs">
+              <Search className="w-5 h-5 text-slate-400 mr-2.5 shrink-0" />
+              <input
+                type="text"
+                value={locationSearchQuery}
+                onChange={(e) => setLocationSearchQuery(e.target.value)}
+                placeholder="Search a neighborhood"
+                className="w-full bg-transparent text-sm text-slate-900 placeholder-slate-400 outline-none font-medium"
+              />
+              {locationSearchQuery && (
+                <button onClick={() => setLocationSearchQuery("")}>
+                  <X className="w-4 h-4 text-slate-400" />
+                </button>
+              )}
+            </div>
+
+            {/* Location List Header */}
+            <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 text-left">
+              Popular areas
+            </div>
+
+            {/* List */}
+            <div className="flex-1 overflow-y-auto divide-y divide-slate-100 text-left">
+              {filteredLocations.map((loc) => {
+                const isSelected =
+                  (selectedLocation === null && loc.value === "Addis Ababa") ||
+                  selectedLocation?.id === loc.id;
+                return (
+                  <button
+                    key={loc.id}
+                    type="button"
+                    onClick={() => handleLocationSelect(loc)}
+                    className="w-full py-3.5 flex items-center justify-between text-left transition-colors active:bg-slate-50"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Icon
+                        icon="solar:map-point-linear"
+                        className={`w-5 h-5 ${isSelected ? "text-amber-600" : "text-slate-400"}`}
+                      />
+                      <span className={`text-sm ${isSelected ? "text-amber-600 font-bold" : "text-slate-800 font-medium"}`}>
+                        {loc.label}
+                      </span>
+                    </div>
+                    {isSelected && <Check className="w-4 h-4 text-amber-600 shrink-0" />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ── MOBILE: FILTERS BOTTOM SHEET DRAWER (Slides up from bottom) ── */}
+      {filtersOpen && mounted && createPortal(
+        <div className="sm:hidden fixed inset-0 z-[99999] flex flex-col justify-end">
+          {/* Backdrop overlay */}
+          <div
+            className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200"
+            onClick={() => setFiltersOpen(false)}
+          />
+
+          {/* Bottom Sheet Modal */}
+          <div className="relative bg-white rounded-t-3xl p-5 shadow-2xl z-10 max-h-[85vh] flex flex-col animate-in slide-in-from-bottom duration-300">
+            {/* Drag handle */}
+            <div className="w-12 h-1.5 rounded-full bg-slate-200 mx-auto mb-3" />
+
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
+              <h3 className="font-serif font-bold text-xl text-slate-900 tracking-tight">
+                Filters
+              </h3>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedCompanyTypeIds([]);
+                    setSelectedPricePreset("all");
+                    setMinPrice("");
+                    setMaxPrice("");
+                    setDisplayMethod("all");
+                  }}
+                  className="text-xs font-bold text-amber-600 hover:underline px-2 py-1"
+                >
+                  Reset
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFiltersOpen(false)}
+                  className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-800"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
             </div>
 
-            {/* Scrollable Filter Options Body */}
-            <div className="flex-1 overflow-y-auto p-4 text-left">
-              <FilterBodyContent />
+            {/* Scrollable Filters Content */}
+            <div className="flex-1 overflow-y-auto space-y-5 text-left py-2">
+
+              {/* Business Categories */}
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2.5 block">
+                  Service Categories
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {companyTypes.map((type) => {
+                    const isSelected = selectedCompanyTypeIds.includes(type.id);
+                    return (
+                      <button
+                        key={type.id}
+                        type="button"
+                        onClick={() => handleTypeToggle(type.id)}
+                        className={`px-3.5 py-2 rounded-full text-xs font-semibold border transition-all ${isSelected
+                            ? "bg-amber-500 border-amber-500 text-white shadow-xs"
+                            : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
+                          }`}
+                      >
+                        {type.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Price Range */}
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">
+                  Price Range
+                </label>
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {pricePresets.map((preset) => {
+                    const isSelected = selectedPricePreset === preset.id;
+                    return (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        onClick={() => handlePricePresetSelect(preset)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${isSelected
+                            ? "bg-slate-900 border-slate-900 text-white"
+                            : "bg-slate-50 border-slate-200 text-slate-700"
+                          }`}
+                      >
+                        {preset.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div className="flex items-center bg-slate-50 rounded-xl px-3 py-2 border border-slate-200">
+                    <span className="text-slate-400 text-xs mr-2">Min</span>
+                    <input
+                      type="number"
+                      value={minPrice}
+                      onChange={(e) => {
+                        setMinPrice(e.target.value);
+                        setSelectedPricePreset("custom");
+                      }}
+                      placeholder="0"
+                      className="w-full bg-transparent text-sm text-slate-800 outline-none"
+                    />
+                    <span className="text-slate-400 text-xs">ETB</span>
+                  </div>
+                  <div className="flex items-center bg-slate-50 rounded-xl px-3 py-2 border border-slate-200">
+                    <span className="text-slate-400 text-xs mr-2">Max</span>
+                    <input
+                      type="number"
+                      value={maxPrice}
+                      onChange={(e) => {
+                        setMaxPrice(e.target.value);
+                        setSelectedPricePreset("custom");
+                      }}
+                      placeholder="5000"
+                      className="w-full bg-transparent text-sm text-slate-800 outline-none"
+                    />
+                    <span className="text-slate-400 text-xs">ETB</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Sort By */}
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">
+                  Sort By
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: "all", label: "All Services" },
+                    { id: "popular", label: "Popular" },
+                    { id: "discounted", label: "Discounts" },
+                  ].map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setDisplayMethod(item.id)}
+                      className={`py-2 px-2.5 rounded-xl text-xs font-semibold border transition-all text-center ${displayMethod === item.id
+                          ? "bg-amber-500 border-amber-500 text-white"
+                          : "bg-slate-50 border-slate-200 text-slate-700"
+                        }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
             </div>
 
-            {/* Bottom Action Bar with "Go & Filter Services" Button */}
-            <div className="p-4 border-t border-slate-200 bg-white shadow-2xl sticky bottom-0 z-20">
+            {/* Bottom Apply Button */}
+            <div className="pt-3 border-t border-slate-100">
               <button
                 type="button"
-                onClick={() => handleSearch()}
-                className="w-full bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white py-3.5 px-6 rounded-full font-extrabold text-base shadow-lg transition-all flex items-center justify-center gap-2"
+                onClick={() => handleSearchSubmit()}
+                className="w-full bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white py-3.5 rounded-full font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2"
               >
-                <span>Go & Filter Services</span>
-                <ArrowRight className="w-5 h-5" />
+                <span>Apply Filters</span>
+                <Icon icon="solar:arrow-right-linear" className="w-4 h-4" />
               </button>
             </div>
-          </div>,
-          document.body
-        )}
-      </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
-      {/* 5 Main Category Icons with Tertiary Background Opacity & Bottom Radius */}
+      {/* ── 6 DATABASE CATEGORY ICONS UNDERNEATH ── */}
       <div className="mt-8 sm:mt-10">
-        <div className="grid grid-cols-5 gap-2 sm:gap-4 max-w-2xl mx-auto">
-          {mainCategories.map((cat) => {
-            const CatIcon = cat.icon;
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 sm:gap-4 max-w-4xl mx-auto">
+          {DATABASE_CATEGORIES.map((cat) => {
             return (
               <button
                 key={cat.id}
                 type="button"
                 onClick={() => handleCategoryClick(cat)}
-                className="group flex flex-col items-center justify-center p-1.5 transition-all duration-200 focus:outline-none"
+                className="group flex flex-col items-center justify-center p-1 transition-all duration-200 focus:outline-none cursor-pointer"
               >
-                {/* Icon container with tertiary opacity background and bottom radius */}
-                <div className="w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 bg-tertiary/10 text-tertiary hover:bg-amber-100 hover:text-amber-700 shadow-xs border border-tertiary/10 rounded-b-2xl rounded-t-lg flex items-center justify-center group-hover:scale-105 group-hover:shadow-md transition-all duration-200">
-                  <CatIcon className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 text-tertiary group-hover:text-amber-700 transition-colors" />
+                <div className="w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 bg-white/95 hover:bg-amber-500 text-amber-600 hover:text-white shadow-md border border-white/30 rounded-2xl flex items-center justify-center group-hover:scale-105 group-hover:shadow-lg transition-all duration-200">
+                  <Icon
+                    icon={cat.icon}
+                    className="w-7 h-7 sm:w-8 sm:h-8 md:w-9 md:h-9 text-amber-600 group-hover:text-white transition-colors"
+                  />
                 </div>
-                {/* Centered label below icon */}
-                <span className="text-xs sm:text-sm font-semibold text-slate-700 group-hover:text-amber-600 text-center mt-2 transition-colors line-clamp-1">
+                <span className="text-[11px] sm:text-xs md:text-sm font-bold text-white drop-shadow-md group-hover:text-amber-300 text-center mt-2 transition-colors whitespace-nowrap">
                   {cat.name}
                 </span>
               </button>
@@ -505,6 +849,7 @@ export default function Filterherosection() {
           })}
         </div>
       </div>
+
     </div>
   );
 }

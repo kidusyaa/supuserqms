@@ -1,27 +1,11 @@
-// profile/_components/BookingCard.tsx
 "use client";
+
+import React from "react";
 import { useRouter } from "next/navigation";
-import { Badge }  from "@/components/ui/badge";
-import { Calendar, Building2, ChevronRight } from "lucide-react";
-import { MiniStars, GhostStars } from "./Starrating";
+import { Icon } from "@iconify/react";
 import type { CompanyRating, RatingSourceType } from "../hook/Useratings";
 import type { Booking } from "@/type";
-
-function statusConfig(s?: string) {
-  switch (s) {
-    case "confirmed":  return { variant: "default"     as const, bar: "bg-blue-400",    bg: "bg-blue-50"    };
-    case "pending":    return { variant: "secondary"   as const, bar: "bg-yellow-400",  bg: "bg-yellow-50"  };
-    case "cancelled":  return { variant: "destructive" as const, bar: "bg-red-400",     bg: "bg-red-50"     };
-    case "completed":  return { variant: "outline"     as const, bar: "bg-emerald-400", bg: "bg-emerald-50" };
-    default:           return { variant: "secondary"   as const, bar: "bg-gray-300",    bg: "bg-gray-50"    };
-  }
-}
-
-// Cast to string so TS doesn't complain about literal union overlap
-function isRatable(status: unknown): boolean {
-  const s = status as string;
-  return s === "completed" || s === "served";
-}
+import { getCategoryIconInfo } from "@/lib/categoryIcons";
 
 interface Props {
   booking: Booking;
@@ -33,73 +17,174 @@ interface Props {
     companyName: string,
     existing: CompanyRating | null
   ) => void;
+  onCancelClick?: (bookingId: string) => void;
 }
 
-export function BookingCard({ booking: b, rating, onRateClick }: Props) {
-  const router      = useRouter();
-  const companyName = b.company?.name || "Company";
-  const canRate     = isRatable(b.status);
-  const cfg         = statusConfig(b.status as string);
+export function BookingCard({ booking: b, rating, onRateClick, onCancelClick }: Props) {
+  const router = useRouter();
+  const companyName = b.company?.name || "Cedar & Co. Barbershop";
+  const serviceName = b.service?.name || "Haircut + Beard Trim";
+  const status = (b.status || "confirmed").toLowerCase();
+
+  const isCompleted = status === "completed" || status === "served";
+  const isCancelled = status === "cancelled";
+  const isUpcoming = !isCompleted && !isCancelled;
+
+  // Format date and time
+  const startDate = new Date(b.start_time || Date.now());
+  const now = new Date();
+  const isTomorrow =
+    startDate.getDate() === now.getDate() + 1 &&
+    startDate.getMonth() === now.getMonth() &&
+    startDate.getFullYear() === now.getFullYear();
+
+  let formattedDate = "";
+  if (isTomorrow) {
+    formattedDate = `Tomorrow · ${startDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })}`;
+  } else {
+    formattedDate = `${startDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })} · ${startDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })}`;
+  }
+
+  const locationText = b.company?.location_text?.split(",")?.[0]?.trim() || 
+                       b.company?.address?.split(",")?.[0]?.trim() || 
+                       "Bole";
+
+  const price = b.service?.price || (b as any).price || "420";
+  const iconConfig = getCategoryIconInfo(
+    serviceName,
+    (b.service as any)?.service_category?.name || (b.service as any)?.category?.name,
+    b.company?.company_types?.[0]?.name
+  );
 
   return (
-    <div className="group rounded-2xl border border-gray-100 bg-white shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 overflow-hidden">
-      <div className={`h-1 w-full ${cfg.bar}`} />
-
-      <div className="p-4">
-        <div className="flex items-start gap-3">
-          <div className={`w-10 h-10 rounded-xl ${cfg.bg} flex items-center justify-center shrink-0`}>
-            <Calendar className="w-5 h-5 text-gray-600" />
+    <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 p-4 sm:p-5 shadow-2xs hover:shadow-md transition-all">
+      {/* ── Top Details Row ── */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3.5">
+          {/* Category Icon */}
+          <div
+            className={`w-11 h-11 sm:w-12 sm:h-12 rounded-2xl ${iconConfig.bg} flex items-center justify-center shrink-0 shadow-2xs`}
+          >
+            <Icon icon={iconConfig.icon} className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
 
-          <div className="flex-1 min-w-0">
-            <p className="font-semibold text-gray-900 truncate text-sm">{b.service?.name || "Service"}</p>
-            <div className="flex items-center gap-1 mt-0.5">
-              <Building2 className="w-3 h-3 text-gray-400 shrink-0" />
-              <p className="text-xs text-gray-500 truncate">{companyName}</p>
-            </div>
-            <p className="text-xs text-gray-400 mt-1">{new Date(b.start_time).toLocaleString()}</p>
-          </div>
-
-          <div className="flex flex-col items-end gap-2 shrink-0">
-            <Badge variant={cfg.variant} className="text-[10px] px-2">{b.status}</Badge>
-            <button
-              onClick={() => router.push(`/booking/confirmation/${b.id}`)}
-              className="flex items-center gap-0.5 text-xs text-gray-400 hover:text-amber-500 transition-colors"
-            >
-              View <ChevronRight className="w-3 h-3" />
-            </button>
+          {/* Name, Service & Time Info */}
+          <div>
+            <h3 className="font-bold text-sm sm:text-base text-slate-900 dark:text-white leading-tight">
+              {companyName}
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-400 dark:text-slate-400 font-normal mt-0.5">
+              {serviceName}
+            </p>
+            <p className="text-xs text-slate-400 font-normal mt-1">
+              {formattedDate} &nbsp;{locationText ? `${locationText}` : ""}
+            </p>
           </div>
         </div>
 
-        {canRate && (
-          <div className="mt-3 pt-3 border-t border-dashed border-gray-100">
-            {rating ? (
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <MiniStars stars={rating.stars} />
-                  <span className="text-xs text-gray-400">Your rating</span>
-                  {rating.review && (
-                    <span className="text-xs text-gray-400 truncate max-w-[100px]">· "{rating.review}"</span>
-                  )}
-                </div>
-                <button
-                  onClick={() => onRateClick("booking", b.id, b.company_id, companyName, rating)}
-                  className="text-xs text-amber-500 hover:text-amber-600 font-medium"
-                >
-                  Edit
-                </button>
-              </div>
-            ) : (
+        {/* Status Badge */}
+        <div className="shrink-0">
+          {isUpcoming && (
+            <span className="bg-amber-100/70 text-amber-800 text-xs font-bold px-3.5 py-1 rounded-full">
+              Upcoming
+            </span>
+          )}
+          {isCompleted && (
+            <span className="bg-slate-100 text-slate-600 text-xs font-bold px-3.5 py-1 rounded-full">
+              Completed
+            </span>
+          )}
+          {isCancelled && (
+            <span className="bg-slate-100 text-slate-400 text-xs font-bold px-3.5 py-1 rounded-full">
+              Cancelled
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* ── Dotted Separator Line ── */}
+      <div className="border-t border-dashed border-slate-200 dark:border-slate-800 my-3.5" />
+
+      {/* ── Bottom Row: Price & Actions ── */}
+      <div className="flex items-center justify-between gap-2">
+        {/* Price */}
+        <div>
+          {isCancelled ? (
+            <span className="line-through text-slate-400 font-black text-base">
+              {price} ETB
+            </span>
+          ) : (
+            <span className="font-black text-base text-slate-900 dark:text-white">
+              {price} ETB
+            </span>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center gap-2">
+          {isUpcoming && (
+            <>
               <button
-                onClick={() => onRateClick("booking", b.id, b.company_id, companyName, null)}
-                className="flex items-center gap-2 text-xs text-amber-600 hover:text-amber-700 font-medium group/r"
+                type="button"
+                onClick={() => {
+                  if (onCancelClick) onCancelClick(b.id);
+                  else router.push(`/booking/confirmation/${b.id}`);
+                }}
+                className="border border-rose-200 dark:border-rose-900/60 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-rose-800 dark:text-rose-400 font-bold text-xs px-5 py-2 rounded-2xl transition-colors cursor-pointer"
               >
-                <GhostStars />
-                Rate {companyName}
+                Cancel
               </button>
-            )}
-          </div>
-        )}
+              <button
+                type="button"
+                onClick={() => router.push(`/booking/confirmation/${b.id}`)}
+                className="border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-[#0B3B48] dark:text-teal-300 font-bold text-xs px-5 py-2 rounded-2xl transition-colors cursor-pointer"
+              >
+                Details
+              </button>
+            </>
+          )}
+
+          {isCompleted && (
+            <>
+              {rating ? (
+                <div className="flex items-center gap-1">
+                  {[...Array(5)].map((_, i) => (
+                    <Icon
+                      key={i}
+                      icon="solar:star-bold"
+                      className={`w-4 h-4 ${i < rating.stars ? "text-amber-500" : "text-slate-200"}`}
+                    />
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => onRateClick("booking", b.id, b.company_id, companyName, rating)}
+                    className="ml-1 text-[11px] text-slate-400 hover:text-slate-600 font-medium underline cursor-pointer"
+                  >
+                    Edit
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => onRateClick("booking", b.id, b.company_id, companyName, null)}
+                  className="bg-[#FBA819] hover:bg-amber-500 text-slate-950 font-bold text-xs px-5 py-2 rounded-2xl shadow-xs transition-all cursor-pointer"
+                >
+                  Rate service
+                </button>
+              )}
+            </>
+          )}
+
+          {isCancelled && (
+            <button
+              type="button"
+              onClick={() => router.push("/services")}
+              className="border border-slate-200 dark:border-slate-700 hover:bg-slate-100 text-slate-700 dark:text-slate-300 font-bold text-xs px-5 py-2 rounded-2xl transition-colors cursor-pointer"
+            >
+              Book again
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

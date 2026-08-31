@@ -1,9 +1,10 @@
-// profile/ProfileClient.tsx  — orchestration shell only
 "use client";
 
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Icon } from "@iconify/react";
 import { toast } from "sonner";
+import { supabase } from "@/lib/supabaseClient";
 
 import {
   getAuthUserOrNull,
@@ -11,6 +12,8 @@ import {
   getMyBookings,
   getMyProfileOrNull,
   getMyQueueEntries,
+  getMySavedServices,
+  toggleServiceFavorite,
   isProfileComplete,
   upsertMyProfile,
   type UserProfile,
@@ -20,25 +23,28 @@ import { useRatings, type RatingSourceType, type CompanyRating } from "../hook/U
 import { ActivityTabs } from "./Activitytabs";
 import { ProfileEditDrawer } from "./Profileeditdrawer";
 import { ProfileHero } from "./Profilehero";
+import { SavedServicesDrawer } from "./SavedServicesDrawer";
 import { RatingModal, type RatingModalState } from "./Ratingmodal";
-import type { Booking, QueueItem } from "@/type";
+import type { Booking, QueueItem, Service } from "@/type";
 
 export default function ProfileClient() {
-  const router       = useRouter();
+  const router = useRouter();
   const searchParams = useSearchParams();
-  const nextUrl      = useMemo(() => searchParams.get("next") || "/", [searchParams]);
+  const nextUrl = useMemo(() => searchParams.get("next") || "/", [searchParams]);
 
   // ── State ────────────────────────────────────────────────────────
-  const [loading, setLoading]         = useState(true);
-  const [saving, setSaving]           = useState(false);
-  const [drawerOpen, setDrawerOpen]   = useState(false);
-  const [profile, setProfile]         = useState<UserProfile | null>(null);
-  const [name, setName]               = useState("");
-  const [phone, setPhone]             = useState("");
-  const [avatarId, setAvatarId]       = useState<string | null>(null);
-  const [avatars, setAvatars]         = useState<{ id: string; url: string }[]>([]);
-  const [bookings, setBookings]       = useState<Booking[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [savedDrawerOpen, setSavedDrawerOpen] = useState(false);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [avatarId, setAvatarId] = useState<string | null>(null);
+  const [avatars, setAvatars] = useState<{ id: string; url: string }[]>([]);
+  const [bookings, setBookings] = useState<Booking[]>([]);
   const [queueEntries, setQueueEntries] = useState<QueueItem[]>([]);
+  const [savedServices, setSavedServices] = useState<Service[]>([]);
   const [ratingModal, setRatingModal] = useState<RatingModalState | null>(null);
 
   const { ratingsMap, loadRatings, saveRating } = useRatings();
@@ -46,9 +52,11 @@ export default function ProfileClient() {
   // ── Derived ──────────────────────────────────────────────────────
   const avatarUrl = useMemo(() => {
     if (!avatarId) return null;
-    return avatars.find((a) => a.id === avatarId)?.url
-        ?? avatars.find((a) => a.url?.endsWith(`/avatars/${avatarId}`))?.url
-        ?? null;
+    return (
+      avatars.find((a) => a.id === avatarId)?.url ??
+      avatars.find((a) => a.url?.endsWith(`/avatars/${avatarId}`))?.url ??
+      null
+    );
   }, [avatarId, avatars]);
 
   const totalRatings = useMemo(() => Object.keys(ratingsMap).length, [ratingsMap]);
@@ -60,7 +68,9 @@ export default function ProfileClient() {
       try {
         const user = await getAuthUserOrNull();
         if (!user) {
-          router.push(`/auth?next=${encodeURIComponent("/profile?next=" + encodeURIComponent(nextUrl))}`);
+          router.push(
+            `/auth?next=${encodeURIComponent("/profile?next=" + encodeURIComponent(nextUrl))}`
+          );
           return;
         }
         const [p, a] = await Promise.all([getMyProfileOrNull(), getAvatars()]);
@@ -72,9 +82,14 @@ export default function ProfileClient() {
           setAvatarId(p.avatar_id || null);
         }
         try {
-          const [b, q] = await Promise.all([getMyBookings(), getMyQueueEntries()]);
+          const [b, q, saved] = await Promise.all([
+            getMyBookings(),
+            getMyQueueEntries(),
+            getMySavedServices(),
+          ]);
           setBookings(b);
           setQueueEntries(q);
+          setSavedServices(saved);
           await loadRatings();
         } catch (e: any) {
           console.warn("Activity load error:", e?.message);
@@ -85,6 +100,17 @@ export default function ProfileClient() {
     };
     load();
   }, [router, nextUrl, loadRatings]);
+
+  // ── Remove Saved Service ──────────────────────────────────────────
+  const handleRemoveSaved = async (serviceId: string) => {
+    try {
+      await toggleServiceFavorite(serviceId);
+      setSavedServices((prev) => prev.filter((s) => s.id !== serviceId));
+      toast.success("Removed from saved services");
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to remove saved service");
+    }
+  };
 
   // ── Save profile ─────────────────────────────────────────────────
   const handleSave = async () => {
@@ -103,7 +129,9 @@ export default function ProfileClient() {
       }
     } catch (e: any) {
       if (e?.code === "AUTH_REQUIRED") {
-        router.push(`/auth?next=${encodeURIComponent("/profile?next=" + encodeURIComponent(nextUrl))}`);
+        router.push(
+          `/auth?next=${encodeURIComponent("/profile?next=" + encodeURIComponent(nextUrl))}`
+        );
         return;
       }
       toast.error(e?.message || "Failed to update profile.");
@@ -112,24 +140,39 @@ export default function ProfileClient() {
     }
   };
 
+  // ── Sign out ─────────────────────────────────────────────────────
+  const handleSignOut = async () => {
+    try {
+      await supabase.auth.signOut();
+      toast.success("Signed out successfully");
+      router.push("/");
+      router.refresh();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to sign out");
+    }
+  };
+
   // ── Rating modal ─────────────────────────────────────────────────
-  const handleRateClick = useCallback((
-    sourceType: RatingSourceType,
-    sourceId: string,
-    companyId: string,
-    companyName: string,
-    existing: CompanyRating | null,
-  ) => {
-    setRatingModal({ open: true, sourceType, sourceId, companyId, companyName, existing });
-  }, []);
+  const handleRateClick = useCallback(
+    (
+      sourceType: RatingSourceType,
+      sourceId: string,
+      companyId: string,
+      companyName: string,
+      existing: CompanyRating | null
+    ) => {
+      setRatingModal({ open: true, sourceType, sourceId, companyId, companyName, existing });
+    },
+    []
+  );
 
   // ── Loading ───────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-[80vh] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 rounded-full border-2 border-amber-400 border-t-transparent animate-spin" />
-          <p className="text-sm text-gray-400">Loading profile…</p>
+          <p className="text-sm text-slate-400">Loading profile…</p>
         </div>
       </div>
     );
@@ -137,13 +180,14 @@ export default function ProfileClient() {
 
   return (
     <>
-      <div className="min-h-screen bg-gradient-to-b from-amber-50/30 via-white to-white">
-        <div className="container mx-auto px-4 py-6 max-w-2xl space-y-5">
+      <div className="min-h-screen bg-slate-50/50 dark:bg-slate-950 py-6 sm:py-10">
+        <div className="max-w-6xl mx-auto px-4 space-y-6 sm:space-y-8">
 
-          {/* ── Hero ── */}
+          {/* ── 1. Hero Profile Banner ── */}
           <ProfileHero
             name={name || profile?.name || ""}
             email={profile?.email ?? null}
+            createdAt={profile?.created_at}
             avatarUrl={avatarUrl}
             totalBookings={bookings.length}
             totalQueue={queueEntries.length}
@@ -151,11 +195,92 @@ export default function ProfileClient() {
             onEditClick={() => setDrawerOpen(true)}
           />
 
-          {/* ── Activity ── */}
-          <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="h-1 bg-gradient-to-r from-sky-400 via-violet-400 to-purple-400" />
-            <div className="px-5 py-4">
-              <h2 className="text-base font-bold text-gray-900 mb-4">My Activity</h2>
+          {/* ── 2. Content Layout: Desktop (Account on Left, Activity on Right), Mobile (flex-col-reverse: Activity on Top, Account on Bottom) ── */}
+          <div className="flex flex-col-reverse lg:flex-row items-start gap-6 sm:gap-8">
+
+            {/* Left Column (Desktop) / Bottom (Mobile): Account Section */}
+            <div className="w-full lg:w-[320px] shrink-0">
+              <h2 className="font-serif font-bold text-xl sm:text-2xl text-slate-900 dark:text-white tracking-tight mb-3">
+                Account
+              </h2>
+
+              <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800 shadow-2xs overflow-hidden">
+
+                {/* Personal Details */}
+                <button
+                  type="button"
+                  onClick={() => setDrawerOpen(true)}
+                  className="w-full p-4 sm:p-4.5 flex items-center justify-between hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors text-left group cursor-pointer"
+                >
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-10 h-10 rounded-2xl bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center shrink-0">
+                      <Icon icon="solar:user-linear" className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-sm text-slate-900 dark:text-white">
+                        Personal details
+                      </h4>
+                      <p className="text-xs text-slate-400 mt-0.5">Name, phone, avatar</p>
+                    </div>
+                  </div>
+                  <Icon
+                    icon="solar:alt-arrow-right-linear"
+                    className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform"
+                  />
+                </button>
+
+                {/* Saved Services */}
+                <button
+                  type="button"
+                  onClick={() => setSavedDrawerOpen(true)}
+                  className="w-full p-4 sm:p-4.5 flex items-center justify-between hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors text-left group cursor-pointer"
+                >
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-10 h-10 rounded-2xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 flex items-center justify-center shrink-0">
+                      <Icon icon="solar:bookmark-linear" className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-sm text-slate-900 dark:text-white">
+                        Saved services
+                      </h4>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        {savedServices.length} {savedServices.length === 1 ? "service" : "services"} saved
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {savedServices.length > 0 && (
+                      <span className="text-[11px] font-bold bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-full">
+                        {savedServices.length}
+                      </span>
+                    )}
+                    <Icon
+                      icon="solar:alt-arrow-right-linear"
+                      className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform"
+                    />
+                  </div>
+                </button>
+                {/* Sign Out */}
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  className="w-full p-4 sm:p-4.5 flex items-center justify-between hover:bg-rose-50/50 dark:hover:bg-rose-950/20 transition-colors text-left group cursor-pointer"
+                >
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-10 h-10 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+                      <Icon icon="solar:logout-2-linear" className="w-5 h-5" />
+                    </div>
+                    <h4 className="font-semibold text-sm text-rose-600">
+                      Sign out
+                    </h4>
+                  </div>
+                </button>
+
+              </div>
+            </div>
+
+            {/* Right Column (Desktop with more width) / Top (Mobile): My Activity Section */}
+            <div className="w-full lg:flex-1">
               <ActivityTabs
                 bookings={bookings}
                 queueEntries={queueEntries}
@@ -163,10 +288,19 @@ export default function ProfileClient() {
                 onRateClick={handleRateClick}
               />
             </div>
+
           </div>
 
         </div>
       </div>
+
+      {/* ── Saved Services Drawer ── */}
+      <SavedServicesDrawer
+        open={savedDrawerOpen}
+        onClose={() => setSavedDrawerOpen(false)}
+        savedServices={savedServices}
+        onRemove={handleRemoveSaved}
+      />
 
       {/* ── Edit drawer ── */}
       <ProfileEditDrawer

@@ -311,7 +311,7 @@ export const getAllServices = async (): Promise<Service[]> => {
       return [];
     }
 
-    return (data || []).map((service: any) => {
+    const formatted = (data || []).map((service: any) => {
       const photoUrl = service.service_photos?.[0]?.url || service.photo || null;
       return {
         ...service,
@@ -333,6 +333,25 @@ export const getAllServices = async (): Promise<Service[]> => {
           : []
       } as Service;
     });
+
+    // Populate service_category names from service_categories table
+    const catIds = Array.from(new Set(formatted.map((s: any) => s.category_id).filter(Boolean)));
+    if (catIds.length > 0) {
+      const { data: catData } = await supabase
+        .from('service_categories')
+        .select('id, name')
+        .in('id', catIds);
+      if (catData) {
+        const catMap = new Map(catData.map((c: any) => [c.id, c.name]));
+        formatted.forEach((s: any) => {
+          if (s.category_id && catMap.has(s.category_id)) {
+            s.service_category = { name: catMap.get(s.category_id) };
+          }
+        });
+      }
+    }
+
+    return formatted;
   } catch (error) {
     console.error('Error getting all services:', error);
     return [];

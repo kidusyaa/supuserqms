@@ -24,7 +24,7 @@ export default function MobileBottomNav() {
 
   const items = [
     { name: "Home", href: "/", icon: "material-symbols:home-outline" },
-    { name: "Services", href: "/services", icon: "solar:hand-stars-linear" },
+    { name: "Explore", href: "/services", icon: "basil:explore-outline" },
     { name: "Companies", href: "/company", icon: "iconoir:shop-four-tiles" },
     {
       name: "Profile",

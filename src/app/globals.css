@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..900&family=Inter:wght@300;400;500;600;700;800&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -40,6 +41,8 @@
 }
 
 :root {
+  --ink-50: #f8fafc;
+  --ink-900: #0f172a;
   /* Define your core palette colors using OKLCH */
   --color-dark-base: oklch(31.021% 0.05876 232.702);
   /* #1B3A47 */
@@ -125,6 +128,8 @@
 }
 
 .dark {
+  --ink-50: #0b1120;
+  --ink-900: #f8fafc;
   /* Dark Mode Palette with your new assignments */
   --background: var(--color-dark-base);
   /* #1B3A47 as main background */
@@ -199,7 +204,8 @@
 }
 
 @theme inline {
-  --font-sans: var(--font-geist-sans);
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-serif: 'Fraunces', serif;
   --font-mono: var(--font-geist-mono);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -237,42 +243,54 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
-  --color-tertiary: var(--color-dark-base)
-}
-
-.bg-pattern {
-  background-color: #f8fafc;
-  /* light mode fallback */
-  background-image: radial-gradient(circle at 1px 1px, #d1d5db 1px, transparent 0);
-  background-size: 24px 24px;
-}
-
-.dark .bg-pattern {
-  background-color: #020617;
-  /* dark mode fallback */
-  background-image: radial-gradient(circle at 1px 1px, #1e293b 1px, transparent 0);
-  background-size: 24px 24px;
-}
-
-/* 2. Custom Styles for the Sticky Privacy Sidebar Navigation */
-.privacy-nav-link {
-  @apply flex items-center gap-3 rounded-md px-3 py-2 text-slate-600 transition-all duration-150;
-  @apply hover:bg-slate-200 hover:text-slate-900;
-  @apply dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white;
-}
-
-.privacy-nav-link.active {
-  @apply bg-amber-100 font-semibold text-amber-700;
-  @apply dark:bg-amber-500/10 dark:text-amber-400;
+  --color-tertiary: var(--color-dark-base);
 }
 
 @layer base {
   * {
+    box-sizing: border-box;
     @apply border-border outline-ring/50;
   }
 
+  html,
   body {
-    @apply bg-background text-foreground;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    background: var(--ink-50);
+    font-family: 'Inter', sans-serif;
+    color: var(--ink-900);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: 'Fraunces', serif;
+    font-weight: 560;
+    margin: 0;
+    color: var(--ink-900);
+    letter-spacing: -0.01em;
+  }
+
+  p {
+    margin: 0;
+  }
+
+  button {
+    font-family: inherit;
+    cursor: pointer;
+  }
+
+  input {
+    font-family: inherit;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
   }
 }
 

@@ -1,16 +1,13 @@
-// components/company-componets/CompaniesClientPage.tsx
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Search, MapPin, Clock, Building } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Icon } from "@iconify/react";
+import { Search, X, Check, MapPin, Clock, Phone, Building2 } from "lucide-react";
 import type { Company, LocationOption, CompanyType, WorkingHoursForDay } from "@/type";
-import DivCenter from "../divCenter";
+import { DATABASE_CATEGORIES, getCategoryIconInfo } from "@/lib/categoryIcons";
+import { cn } from "@/lib/utils";
 
 interface CompaniesClientPageProps {
   initialCompanies: Company[];
@@ -19,18 +16,19 @@ interface CompaniesClientPageProps {
   initialCompanyTypeId?: string;
 }
 
-// Helper to format working hours from your JSONB structure
-const formatWorkingHours = (hours: { [key: number]: WorkingHoursForDay[] } | null | undefined): string => {
+// Format working hours from JSONB
+const formatWorkingHours = (
+  hours: { [key: number]: WorkingHoursForDay[] } | null | undefined
+): string => {
   if (!hours || Object.keys(hours).length === 0) {
-    return "Hours not available";
+    return "Hours on request";
   }
-  // Try to find today's hours or the first available day
   const today = new Date().getDay(); // 0=Sun, 1=Mon...
-  const weekOrder = [today, 1, 2, 3, 4, 5, 6, 0].filter((v, i, a) => a.indexOf(v) === i); // Get unique days starting with today
+  const weekOrder = [today, 1, 2, 3, 4, 5, 6, 0].filter((v, i, a) => a.indexOf(v) === i);
   let dayKey: number | undefined;
 
   for (const day of weekOrder) {
-    if (hours[day]) {
+    if (hours[day] && hours[day].length > 0) {
       dayKey = day;
       break;
     }
@@ -40,16 +38,15 @@ const formatWorkingHours = (hours: { [key: number]: WorkingHoursForDay[] } | nul
     dayKey = parseInt(Object.keys(hours)[0]);
   }
 
-  if (dayKey === undefined) return "Hours not available";
+  if (dayKey === undefined) return "Hours on request";
 
-  const dayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dayKey];
+  const dayName = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][dayKey];
   const dayHours = hours[dayKey]?.[0];
 
-  if (!dayHours) return "Hours not available";
+  if (!dayHours) return "Hours on request";
 
-  return `${dayName}: ${dayHours.start} - ${dayHours.end}`;
+  return `${dayName}: ${dayHours.start} – ${dayHours.end}`;
 };
-
 
 export default function CompaniesClientPage({
   initialCompanies,
@@ -57,161 +54,560 @@ export default function CompaniesClientPage({
   initialCompanyTypes,
   initialCompanyTypeId,
 }: CompaniesClientPageProps) {
+  // ── States ───────────────────────────────────────────────────────
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCompanyType, setSelectedCompanyType] = useState<string>(initialCompanyTypeId || "");
+  const [selectedCategoryChip, setSelectedCategoryChip] = useState<string>(
+    initialCompanyTypeId || "all"
+  );
+  const [selectedLocation, setSelectedLocation] = useState<string>("");
+  const [sortBy, setSortBy] = useState<"recommended" | "name_asc" | "name_desc">("recommended");
 
+  // Dropdown Popover States
+  const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
+  const [locationDropdownOpen, setLocationDropdownOpen] = useState(false);
+  const [sortDropdownOpen, setSortDropdownOpen] = useState(false);
+
+  // Search inside popovers
+  const [categorySearchQuery, setCategorySearchQuery] = useState("");
+  const [locationSearchQuery, setLocationSearchQuery] = useState("");
+
+  const filterBarRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdowns on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (filterBarRef.current && !filterBarRef.current.contains(e.target as Node)) {
+        setCategoryDropdownOpen(false);
+        setLocationDropdownOpen(false);
+        setSortDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // ── Filtering Logic ──────────────────────────────────────────────
   const filteredCompanies = useMemo(() => {
-    let filtered = initialCompanies;
+    let result = [...initialCompanies];
 
-    // Filter by search query (name, location, or company type name)
-    if (searchTerm) {
+    // 1. Search filter (Name, phone, address, location, or type)
+    if (searchTerm.trim()) {
       const lower = searchTerm.toLowerCase();
-      filtered = filtered.filter(
-        (company) =>
-          company.name.toLowerCase().includes(lower) ||
-          (company.location_text && company.location_text.toLowerCase().includes(lower)) ||
-          company.company_types?.some(type => type.name.toLowerCase().includes(lower))
-      );
+      result = result.filter((comp) => {
+        const name = comp.name?.toLowerCase() || "";
+        const loc = comp.location_text?.toLowerCase() || "";
+        const addr = comp.address?.toLowerCase() || "";
+        const types = (comp.company_types || []).map((t) => t.name.toLowerCase()).join(" ");
+        return name.includes(lower) || loc.includes(lower) || addr.includes(lower) || types.includes(lower);
+      });
     }
 
-    // Filter by selected company type
-    if (selectedCompanyType) {
-      filtered = filtered.filter((company) =>
-        company.company_types?.some(type => type.id === selectedCompanyType)
-      );
+    // 2. Category / Company Type filter
+    if (selectedCategoryChip && selectedCategoryChip !== "all") {
+      result = result.filter((comp) => {
+        const typeNames = (comp.company_types || []).map((t) => t.name).join(" ");
+        const catInfo = getCategoryIconInfo("", "", typeNames || comp.name);
+        const hasDirectId = (comp.company_types || []).some((t) => t.id === selectedCategoryChip);
+        return catInfo.id === selectedCategoryChip || hasDirectId;
+      });
     }
 
-    return filtered;
-  }, [initialCompanies, searchTerm, selectedCompanyType]);
+    // 3. Location filter
+    if (selectedLocation) {
+      const locLower = selectedLocation.toLowerCase();
+      result = result.filter((comp) => {
+        const fullLoc = `${comp.location_text || ""} ${comp.address || ""}`.toLowerCase();
+        return fullLoc.includes(locLower);
+      });
+    }
+
+    // 4. Sorting
+    if (sortBy === "name_asc") {
+      result.sort((a, b) => a.name.localeCompare(b.name));
+    } else if (sortBy === "name_desc") {
+      result.sort((a, b) => b.name.localeCompare(a.name));
+    }
+
+    return result;
+  }, [initialCompanies, searchTerm, selectedCategoryChip, selectedLocation, sortBy]);
+
+  // Selected Category Info
+  const selectedCategoryObj = DATABASE_CATEGORIES.find((c) => c.id === selectedCategoryChip);
+
+  // Filtered dropdown categories
+  const filteredCategoriesList = DATABASE_CATEGORIES.filter((cat) =>
+    cat.name.toLowerCase().includes(categorySearchQuery.toLowerCase())
+  );
+
+  // Filtered dropdown locations
+  const filteredLocationsList = initialLocationOptions.filter((loc) =>
+    loc.label.toLowerCase().includes(locationSearchQuery.toLowerCase())
+  );
+
+  const clearAllFilters = () => {
+    setSearchTerm("");
+    setSelectedCategoryChip("all");
+    setSelectedLocation("");
+    setSortBy("recommended");
+  };
+
+  const hasActiveFilters =
+    searchTerm || selectedCategoryChip !== "all" || selectedLocation;
 
   return (
-    <main className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Header Section */}
-      <div className="bg-tertiary mx-auto p-2">
-        <DivCenter>
-          <div className="md:min-w-[800px] w-full">
-            <div className="px-4 pt-6 pb-4 flex flex-col items-center ">
-              <h1 className="md:text-4xl text-2xl  font-bold text-white  mb-2">Discover Your Favorites</h1>
-              <p className="text-gray-200  ">Find & Book Trusted ServicesEffortlessly</p>
-            </div>
-
-            {/* Search and Filters */}
-            <div className="flex items-center "></div>
-            <div className=" px-4 pb-6 space-y-4 sticky top-0  dark:bg-gray-900/80 backdrop-blur-sm z-10 py-2">
-              {/* Search Bar */}
-              <div className="relative w-full max-w-[800px]">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                <Input
-                  placeholder="Search companies, types, or locations..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 h-12 text-base rounded-full border-gray-500 bg-white"
-                />
-              </div>
-
-              {/* Filter Buttons */}
-              <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4">
-                <Button
-                  variant={selectedCompanyType === "" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setSelectedCompanyType("")}
-                  className="whitespace-nowrap rounded-full"
-                >
-                  All Types
-                </Button>
-                {initialCompanyTypes.map((type) => (
-                  <Button
-                    key={type.id}
-                    variant={selectedCompanyType === type.id ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setSelectedCompanyType(type.id)}
-                    className="whitespace-nowrap rounded-full"
-                  >
-                    {type.name}
-                  </Button>
-                ))}
-              </div>
-            </div>
+    <div className="min-h-screen bg-white dark:bg-slate-950 font-sans">
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-8">
+        
+        {/* ── 1. Page Header ── */}
+        <div className="space-y-2.5">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 text-xs font-bold uppercase tracking-wider border border-amber-200/60 dark:border-amber-900/40">
+            <Icon icon="solar:shop-2-bold" className="w-3.5 h-3.5 text-amber-600" />
+            <span>Verified Salons &amp; Clinics</span>
           </div>
-        </DivCenter>
-      </div> {/* ✨ FIX: Added the missing closing tag for the header section */}
 
-      {/* Main Content: Results Section */}
-      <DivCenter>
-        {/* Results Count */}
-        <div className="px-4 py-8">
-          <p className="text-sm text-primary font-medium">
-            {filteredCompanies.length} {filteredCompanies.length === 1 ? "company" : "companies"} found
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-serif font-bold text-slate-900 dark:text-white tracking-tight leading-tight">
+            Top beauty, salon &amp; wellness centers
+          </h1>
+
+          <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 max-w-2xl font-normal">
+            Explore verified barbershops, nail studios, beauty salons, skincare clinics and wellness centers in Addis Ababa.
           </p>
         </div>
 
-        {/* Companies Grid */}
-        <div className="px-4 pb-24 " >
-          {filteredCompanies.length > 0 ? (
-            <div className="grid xl:grid-cols-4  lg:grid-cols-3 grid-cols-1  gap-4">
-              {filteredCompanies.map((company) => (
+        {/* ── 2. Unified Search & Filter Card (Clean White, No Shadows, 1px Border) ── */}
+        <div
+          ref={filterBarRef}
+          className="relative z-30 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-2.5 sm:p-3 overflow-visible"
+        >
+          <div className="flex flex-col md:flex-row md:items-center gap-2.5">
+            {/* Search Input on the Left */}
+            <div className="flex-1 flex items-center bg-slate-50/90 dark:bg-slate-800/60 rounded-2xl px-4 py-2.5 border border-slate-200/80 dark:border-slate-700/60 focus-within:border-amber-400 focus-within:bg-white dark:focus-within:bg-slate-800 transition-all">
+              <Search className="w-4 h-4 text-slate-400 shrink-0 mr-3" />
+              <input
+                type="text"
+                placeholder="Search salons, clinics, spas or areas..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full bg-transparent text-sm text-slate-900 dark:text-white placeholder-slate-400 outline-none"
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm("")}
+                  className="p-1 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Filter Pills on the Right */}
+            <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 overflow-visible">
+              
+              {/* Category Dropdown Pill */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLocationDropdownOpen(false);
+                    setSortDropdownOpen(false);
+                    setCategoryDropdownOpen(!categoryDropdownOpen);
+                  }}
+                  className={cn(
+                    "px-3.5 py-2.5 rounded-2xl text-xs sm:text-sm font-semibold border transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap",
+                    selectedCategoryChip !== "all"
+                      ? "bg-[#0f2937] text-white border-[#0f2937]"
+                      : "bg-white dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50"
+                  )}
+                >
+                  <Icon icon="solar:widget-2-linear" className="w-4 h-4 text-amber-500" />
+                  <span>
+                    {selectedCategoryChip !== "all"
+                      ? selectedCategoryObj?.name || "Category"
+                      : "Category"}
+                  </span>
+                  <Icon icon="solar:alt-arrow-down-linear" className="w-3.5 h-3.5 opacity-60" />
+                </button>
+
+                {/* Category Dropdown Popover */}
+                {categoryDropdownOpen && (
+                  <div className="absolute top-full left-0 mt-2 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-3 shadow-2xl z-[999] animate-in fade-in zoom-in-95 duration-150 text-left">
+                    {/* Search inside categories */}
+                    <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800 rounded-xl px-3 py-1.5 mb-2 border border-slate-100 dark:border-slate-700">
+                      <Search className="w-3.5 h-3.5 text-slate-400" />
+                      <input
+                        type="text"
+                        placeholder="Search category..."
+                        value={categorySearchQuery}
+                        onChange={(e) => setCategorySearchQuery(e.target.value)}
+                        className="w-full bg-transparent text-xs text-slate-900 dark:text-white placeholder-slate-400 outline-none"
+                      />
+                    </div>
+
+                    <div className="max-h-56 overflow-y-auto space-y-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedCategoryChip("all");
+                          setCategoryDropdownOpen(false);
+                        }}
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold text-left transition-colors cursor-pointer ${
+                          selectedCategoryChip === "all"
+                            ? "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 font-bold"
+                            : "text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                        }`}
+                      >
+                        <span>All Categories</span>
+                        {selectedCategoryChip === "all" && <Check className="w-3.5 h-3.5" />}
+                      </button>
+
+                      {filteredCategoriesList.map((cat) => {
+                        const isSelected = selectedCategoryChip === cat.id;
+                        return (
+                          <button
+                            key={cat.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedCategoryChip(cat.id);
+                              setCategoryDropdownOpen(false);
+                            }}
+                            className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold text-left transition-colors cursor-pointer ${
+                              isSelected
+                                ? "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 font-bold"
+                                : "text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 truncate">
+                              <Icon icon={cat.icon} className="w-4 h-4 text-amber-500 shrink-0" />
+                              <span className="truncate">{cat.name}</span>
+                            </div>
+                            {isSelected && <Check className="w-3.5 h-3.5" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Location Dropdown Pill */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCategoryDropdownOpen(false);
+                    setSortDropdownOpen(false);
+                    setLocationDropdownOpen(!locationDropdownOpen);
+                  }}
+                  className={cn(
+                    "px-3.5 py-2.5 rounded-2xl text-xs sm:text-sm font-semibold border transition-all flex items-center gap-2 cursor-pointer shadow-2xs whitespace-nowrap",
+                    selectedLocation
+                      ? "bg-[#0f2937] text-white border-[#0f2937]"
+                      : "bg-slate-50 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100"
+                  )}
+                >
+                  <Icon icon="solar:map-point-linear" className="w-4 h-4 text-amber-500" />
+                  <span>{selectedLocation ? selectedLocation.split(",")[0] : "Location"}</span>
+                  <Icon icon="solar:alt-arrow-down-linear" className="w-3.5 h-3.5 opacity-60" />
+                </button>
+
+                {/* Location Dropdown Popover */}
+                {locationDropdownOpen && (
+                  <div className="absolute top-full left-0 mt-2 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-3 shadow-2xl z-[999] animate-in fade-in zoom-in-95 duration-150 text-left">
+                    <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800 rounded-xl px-3 py-1.5 mb-2 border border-slate-100 dark:border-slate-700">
+                      <Search className="w-3.5 h-3.5 text-slate-400" />
+                      <input
+                        type="text"
+                        placeholder="Search area (e.g. Bole)..."
+                        value={locationSearchQuery}
+                        onChange={(e) => setLocationSearchQuery(e.target.value)}
+                        className="w-full bg-transparent text-xs text-slate-900 dark:text-white placeholder-slate-400 outline-none"
+                      />
+                    </div>
+
+                    <div className="max-h-56 overflow-y-auto space-y-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedLocation("");
+                          setLocationDropdownOpen(false);
+                        }}
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold text-left transition-colors cursor-pointer ${
+                          !selectedLocation
+                            ? "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 font-bold"
+                            : "text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                        }`}
+                      >
+                        <span>All Locations</span>
+                        {!selectedLocation && <Check className="w-3.5 h-3.5" />}
+                      </button>
+
+                      {filteredLocationsList.map((loc) => {
+                        const isSelected = selectedLocation === loc.value;
+                        return (
+                          <button
+                            key={loc.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedLocation(loc.value);
+                              setLocationDropdownOpen(false);
+                            }}
+                            className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold text-left transition-colors cursor-pointer ${
+                              isSelected
+                                ? "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 font-bold"
+                                : "text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                            }`}
+                          >
+                            <span className="truncate">{loc.label}</span>
+                            {isSelected && <Check className="w-3.5 h-3.5" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Reset Filters Pill */}
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={clearAllFilters}
+                  className="px-3 py-2.5 rounded-2xl text-xs font-semibold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors flex items-center gap-1 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  <span>Clear</span>
+                </button>
+              )}
+
+            </div>
+          </div>
+        </div>
+
+        {/* ── 3. Category Types Chips Row (Matching Services Page) ── */}
+        <div className="flex items-center gap-2 sm:gap-2.5 overflow-x-auto pb-1 no-scrollbar">
+          <button
+            type="button"
+            onClick={() => setSelectedCategoryChip("all")}
+            className={cn(
+              "px-4 py-2 rounded-full text-xs sm:text-sm font-semibold border transition-all cursor-pointer shrink-0 shadow-2xs",
+              selectedCategoryChip === "all"
+                ? "bg-[#0f2937] text-white border-[#0f2937]"
+                : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50"
+            )}
+          >
+            All
+          </button>
+
+          {DATABASE_CATEGORIES.map((cat) => {
+            const isSelected = selectedCategoryChip === cat.id;
+            return (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => setSelectedCategoryChip(cat.id)}
+                className={cn(
+                  "px-4 py-2 rounded-full text-xs sm:text-sm font-semibold border transition-all flex items-center gap-2 cursor-pointer shrink-0 shadow-2xs",
+                  isSelected
+                    ? "bg-[#0f2937] text-white border-[#0f2937]"
+                    : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50"
+                )}
+              >
+                <Icon
+                  icon={cat.icon}
+                  className={cn(
+                    "w-4 h-4 shrink-0 transition-colors",
+                    isSelected ? "text-amber-400" : "text-slate-600 dark:text-slate-400"
+                  )}
+                />
+                <span>{cat.name}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* ── 4. Stats & Sorting Header ── */}
+        <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 dark:border-slate-800/60">
+          <p className="text-xs sm:text-sm font-bold text-slate-700 dark:text-slate-300">
+            {filteredCompanies.length} {filteredCompanies.length === 1 ? "business" : "businesses"} found
+          </p>
+
+          {/* Sort Dropdown */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setSortDropdownOpen(!sortDropdownOpen)}
+              className="text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 flex items-center gap-1.5 cursor-pointer"
+            >
+              <span>Sort: {sortBy === "recommended" ? "Recommended" : sortBy === "name_asc" ? "Name (A–Z)" : "Name (Z–A)"}</span>
+              <Icon icon="solar:alt-arrow-down-linear" className="w-3.5 h-3.5 opacity-60" />
+            </button>
+
+            {sortDropdownOpen && (
+              <div className="absolute right-0 top-full mt-2 w-44 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-1.5 shadow-xl z-50 animate-in fade-in duration-150">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSortBy("recommended");
+                    setSortDropdownOpen(false);
+                  }}
+                  className={`w-full px-3 py-2 rounded-xl text-xs font-semibold text-left transition-colors cursor-pointer ${
+                    sortBy === "recommended" ? "bg-amber-50 text-amber-700 font-bold" : "hover:bg-slate-50 text-slate-700"
+                  }`}
+                >
+                  Recommended
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSortBy("name_asc");
+                    setSortDropdownOpen(false);
+                  }}
+                  className={`w-full px-3 py-2 rounded-xl text-xs font-semibold text-left transition-colors cursor-pointer ${
+                    sortBy === "name_asc" ? "bg-amber-50 text-amber-700 font-bold" : "hover:bg-slate-50 text-slate-700"
+                  }`}
+                >
+                  Name (A–Z)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSortBy("name_desc");
+                    setSortDropdownOpen(false);
+                  }}
+                  className={`w-full px-3 py-2 rounded-xl text-xs font-semibold text-left transition-colors cursor-pointer ${
+                    sortBy === "name_desc" ? "bg-amber-50 text-amber-700 font-bold" : "hover:bg-slate-50 text-slate-700"
+                  }`}
+                >
+                  Name (Z–A)
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── 5. Premium Businesses Grid (Clean White, No Shadows, 1-2px Border) ── */}
+        {filteredCompanies.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 sm:gap-6">
+            {filteredCompanies.map((company) => {
+              const companySlugOrId = company.slug
+                ? encodeURIComponent(company.slug.replace(/^\/+|\/+$/g, ""))
+                : company.id;
+
+              const companyTypeName = company.company_types?.[0]?.name || "Beauty Salon";
+              const locationText =
+                company.location_text?.split(",")?.[0]?.trim() ||
+                company.address?.split(",")?.[0]?.trim() ||
+                "Addis Ababa";
+              const hoursText = formatWorkingHours(company.working_hours);
+
+              const initials = company.name
+                .split(" ")
+                .map((word) => word[0])
+                .join("")
+                .toUpperCase()
+                .slice(0, 2);
+
+              return (
                 <Link
                   key={company.id}
-                  href={`/company/${company.slug ? encodeURIComponent(company.slug.replace(/^\/+|\/+$/g, "")) : company.id}`}
-                  passHref
+                  href={`/company/${companySlugOrId}`}
+                  className="group relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 sm:p-6 shadow-none hover:shadow-none hover:border-slate-300 dark:hover:border-slate-700 transition-colors flex flex-col justify-between"
                 >
-                  <Card className="hover:shadow-lg transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] border-none shadow-md h-full">
-                    <CardContent className="p-4">
-                      <div className="flex gap-4 items-start">
-                        {/* Company Logo */}
-                        <div className="flex-shrink-0">
-                          <div className="w-20 h-20 rounded-lg overflow-hidden bg-muted flex items-center justify-center">
-                            {company.logo ? (
-                              <Image
-                                src={company.logo}
-                                alt={`${company.name} logo`}
-                                width={80}
-                                height={80}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <Building className="w-8 h-8 text-muted-foreground" />
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Company Info */}
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold text-foreground text-lg leading-tight truncate">{company.name}</h3>
-                          <p className="text-sm text-muted-foreground truncate">
-                            {company.company_types?.[0]?.name || 'Business'}
-                          </p>
-                          <div className="space-y-1.5 mt-2">
-                            {company.location_text && (
-                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                <MapPin className="h-4 w-4 flex-shrink-0" />
-                                <span className="truncate">{company.location_text}</span>
-                              </div>
-                            )}
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <Clock className="h-4 w-4 flex-shrink-0" />
-                              <span className="truncate">{formatWorkingHours(company.working_hours)}</span>
-                            </div>
-                          </div>
-                        </div>
+                  <div>
+                    {/* Top Row: Logo & Category Squircle */}
+                    <div className="flex items-start justify-between gap-3 mb-4">
+                      {/* Logo or Initials */}
+                      <div className="relative w-16 h-16 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center shrink-0 overflow-hidden shadow-none group-hover:scale-102 transition-transform">
+                        {company.logo ? (
+                          <Image
+                            src={company.logo}
+                            alt={company.name}
+                            fill
+                            className="object-cover"
+                            sizes="64px"
+                          />
+                        ) : (
+                          <span className="text-lg font-serif font-black text-slate-800 dark:text-slate-200">
+                            {initials}
+                          </span>
+                        )}
                       </div>
-                    </CardContent>
-                  </Card>
+
+                      {/* Verified & Type Badge */}
+                      <div className="flex flex-col items-end gap-1">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-teal-50 dark:bg-teal-950/50 border border-teal-200 text-teal-800 dark:text-teal-300 text-[10px] font-bold">
+                          <Icon icon="solar:verified-check-bold" className="w-3 h-3 text-teal-600" />
+                          <span>Verified</span>
+                        </span>
+                        <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400 tracking-tight">
+                          {companyTypeName}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Company Name */}
+                    <h3 className="font-bold text-base sm:text-lg text-slate-900 dark:text-white group-hover:text-amber-600 transition-colors line-clamp-1 leading-snug">
+                      {company.name}
+                    </h3>
+
+                    {/* Meta Details: Location & Hours */}
+                    <div className="space-y-2 text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-3">
+                      <div className="flex items-center gap-2">
+                        <Icon icon="solar:map-point-linear" className="w-4 h-4 text-slate-400 shrink-0" />
+                        <span className="truncate">{locationText}</span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <Icon icon="solar:clock-circle-linear" className="w-4 h-4 text-slate-400 shrink-0" />
+                        <span className="truncate">{hoursText}</span>
+                      </div>
+
+                      {company.phone && (
+                        <div className="flex items-center gap-2">
+                          <Icon icon="solar:phone-linear" className="w-4 h-4 text-slate-400 shrink-0" />
+                          <span className="truncate">{company.phone}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Bottom Action Footer */}
+                  <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-amber-600 transition-colors">
+                      View Profile &amp; Services
+                    </span>
+                    <div className="w-7 h-7 rounded-full bg-slate-50 dark:bg-slate-800 group-hover:bg-[#0f2937] text-slate-500 group-hover:text-white flex items-center justify-center transition-colors">
+                      <Icon icon="solar:arrow-right-linear" className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+                    </div>
+                  </div>
                 </Link>
-              ))}
+              );
+            })}
+          </div>
+        ) : (
+          /* ── 6. Empty State ── */
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-12 text-center max-w-lg mx-auto shadow-none">
+            <div className="w-16 h-16 rounded-3xl bg-amber-50 dark:bg-slate-800 text-amber-600 flex items-center justify-center mx-auto mb-4 border border-amber-200/60">
+              <Building2 className="w-8 h-8" />
             </div>
-          ) : (
-            // No Results State
-            <div className="text-center py-12">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
-                <Search className="h-8 w-8 text-muted-foreground" />
-              </div>
-              <h3 className="text-lg font-semibold text-foreground mb-2">No companies found</h3>
-              <p className="text-muted-foreground">Try adjusting your search or filters.</p>
-            </div>
-          )}
-        </div>
-      </DivCenter>
-    </main>
+            <h3 className="font-serif font-bold text-xl text-slate-900 dark:text-white mb-2">
+              No businesses found
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-400 max-w-sm mx-auto mb-6">
+              Try adjusting your search terms, changing the category, or selecting another location in Addis Ababa.
+            </p>
+            <button
+              type="button"
+              onClick={clearAllFilters}
+              className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-black font-bold text-xs px-6 py-3 rounded-full transition-all cursor-pointer shadow-none border border-slate-900 dark:border-white"
+            >
+              Clear all filters
+            </button>
+          </div>
+        )}
+
+      </div>
+    </div>
   );
 }
