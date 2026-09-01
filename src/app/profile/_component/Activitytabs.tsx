@@ -19,6 +19,7 @@ interface Props {
   ) => void;
   onCancelBooking?: (booking: Booking) => void;
   onLeaveQueue?: (entry: QueueItem) => void;
+  onReuploadProof?: (booking: Booking) => void;
 }
 
 export function ActivityTabs({
@@ -28,6 +29,7 @@ export function ActivityTabs({
   onRateClick,
   onCancelBooking,
   onLeaveQueue,
+  onReuploadProof,
 }: Props) {
   const [activeTab, setActiveTab] = useState<"bookings" | "queue">("bookings");
 
@@ -108,6 +110,7 @@ export function ActivityTabs({
                 rating={ratingsMap[`booking:${b.id}`] ?? null}
                 onRateClick={onRateClick}
                 onCancelClick={onCancelBooking}
+                onReuploadProof={onReuploadProof}
               />
             ))
           )}

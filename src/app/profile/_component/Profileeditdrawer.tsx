@@ -109,7 +109,7 @@ export function ProfileEditDrawer({
                     }`}
                   >
                     <div className="relative aspect-square rounded-lg overflow-hidden bg-gray-50">
-                      <Image src={a.url} alt={a.id} fill className="object-cover" sizes="64px" width={1000} height={1000} />
+                      <Image src={a.url} alt={a.id} fill className="object-cover" sizes="64px" />
                     </div>
                     {avatarId === a.id && (
                       <div className="absolute -top-1 -right-1 w-4 h-4 bg-amber-400 rounded-full flex items-center justify-center shadow-sm">

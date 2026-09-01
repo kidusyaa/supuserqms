@@ -1,5 +1,6 @@
 export type UserRole = "company" | "user";
 export type BookingStatus = "pending" | "confirmed" | "completed" | "cancelled";
+export type PaymentStatus = "not_required" | "pending" | "approved" | "rejected";
 
 export type QueueTypeStatus = 'walk_in' | 'online' | 'scheduled' | 'other'; // Adjust 'other' as needed for your DB enum values
 
@@ -125,6 +126,7 @@ export interface Booking {
   start_time: string;
   end_time: string;
   status: BookingStatus;
+  payment_status?: PaymentStatus;
   created_at: string;
   notes: string | null;
   payment_proof?: string | null;

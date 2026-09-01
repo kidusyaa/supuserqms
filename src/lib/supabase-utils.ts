@@ -22,6 +22,8 @@ import type {
 
   BookingStatus, 
 
+  PaymentStatus,
+
   QueueEntryStatus,
 
   MessageTemplate, 
@@ -298,6 +300,13 @@ export async function cancelBooking(bookingId: string): Promise<void> {
     console.error("Error cancelling booking:", error);
     throw new Error(error.message || "Failed to cancel booking.");
   }
+
+  // Release the reserved slot immediately so it becomes available for others
+  await supabase
+    .from("provider_reservations")
+    .delete()
+    .eq("source_type", "booking")
+    .eq("source_row_id", bookingId);
 }
 
 
@@ -2367,41 +2376,85 @@ export function getCompanyWorkingHours(
  */
 
 export async function getProviderOccupiedSlots(
-
   providerId: string,
-
   startDate: Date,
-
   endDate: Date
-
 ): Promise<{ start_time: string; end_time: string }[]> {
-
-  const { data, error } = await supabase
-
-    .from('provider_reservations')
-
-    .select('start_time, end_time')
-
+  // 1. Fetch active bookings (ignoring cancelled or payment-rejected bookings)
+  const { data: activeBookings, error: bookingErr } = await supabase
+    .from('bookings')
+    .select('start_time, end_time, status, payment_status')
     .eq('provider_id', providerId)
-
     .gte('start_time', startDate.toISOString())
-
     .lt('end_time', endDate.toISOString())
+    .neq('status', 'cancelled')
+    .neq('payment_status', 'rejected');
 
-    .order('start_time', { ascending: true });
-
-
-
-  if (error) {
-
-    console.error('Error fetching provider occupied slots:', error);
-
-    throw error;
-
+  if (bookingErr) {
+    console.error('Error fetching provider active bookings:', bookingErr);
   }
 
-  return data || [];
+  // 2. Fetch active queue entries (waiting or serving) for this provider
+  const { data: activeQueues, error: queueErr } = await supabase
+    .from('queue_entries')
+    .select('projected_start_time, projected_end_time, status')
+    .eq('provider_id', providerId)
+    .in('status', ['waiting', 'serving'])
+    .gte('projected_start_time', startDate.toISOString())
+    .lt('projected_end_time', endDate.toISOString());
 
+  if (queueErr) {
+    console.error('Error fetching provider active queues:', queueErr);
+  }
+
+  // 3. Fetch provider reservations (manual blocked hours or non-booking blocks)
+  const { data: resData, error: resError } = await supabase
+    .from('provider_reservations')
+    .select('start_time, end_time, source_type, source_row_id')
+    .eq('provider_id', providerId)
+    .gte('start_time', startDate.toISOString())
+    .lt('end_time', endDate.toISOString())
+    .order('start_time', { ascending: true });
+
+  if (resError) {
+    console.error('Error fetching provider occupied slots:', resError);
+  }
+
+  const occupiedMap = new Map<string, { start_time: string; end_time: string }>();
+
+  // Add active bookings
+  (activeBookings || []).forEach((b) => {
+    if (b.start_time && b.end_time) {
+      occupiedMap.set(`${b.start_time}_${b.end_time}`, {
+        start_time: b.start_time,
+        end_time: b.end_time,
+      });
+    }
+  });
+
+  // Add active queues
+  (activeQueues || []).forEach((q) => {
+    if (q.projected_start_time && q.projected_end_time) {
+      occupiedMap.set(`${q.projected_start_time}_${q.projected_end_time}`, {
+        start_time: q.projected_start_time,
+        end_time: q.projected_end_time,
+      });
+    }
+  });
+
+  // Add manual/other reservations (e.g. business blocked hours)
+  (resData || []).forEach((r) => {
+    if (r.source_type !== 'booking' && r.source_type !== 'queue' && r.start_time && r.end_time) {
+      occupiedMap.set(`${r.start_time}_${r.end_time}`, {
+        start_time: r.start_time,
+        end_time: r.end_time,
+      });
+    }
+  });
+
+  return Array.from(occupiedMap.values()).sort(
+    (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+  );
 }
 
 /**
@@ -2614,7 +2667,10 @@ export async function joinQueue(payload: CreateQueuePayload): Promise<AugmentedQ
 
 
 export async function createBooking(
-  bookingData: Omit<Booking, 'id' | 'created_at' | 'status'> & { status?: BookingStatus }
+  bookingData: Omit<Booking, 'id' | 'created_at' | 'status'> & { 
+    status?: BookingStatus;
+    payment_status?: PaymentStatus;
+  }
 ): Promise<Booking> {
   let { provider_id, service_id, start_time, end_time, user_id } = bookingData;
 
@@ -2694,6 +2750,7 @@ export async function createBooking(
           .insert({
               ...bookingData,
               status: bookingData.status || 'pending',
+              payment_status: bookingData.payment_status || 'not_required',
           })
           .select()
           .single();

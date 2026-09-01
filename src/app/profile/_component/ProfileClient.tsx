@@ -28,6 +28,7 @@ import { ProfileHero } from "./Profilehero";
 import { SavedServicesDrawer } from "./SavedServicesDrawer";
 import { RatingModal, type RatingModalState } from "./Ratingmodal";
 import { ConfirmModal, type ConfirmModalState } from "./ConfirmModal";
+import PaymentVerificationModal from "@/components/book/_componet/PaymentVerificationModal";
 import type { Booking, QueueItem, Service } from "@/type";
 
 export default function ProfileClient() {
@@ -51,6 +52,8 @@ export default function ProfileClient() {
   const [ratingModal, setRatingModal] = useState<RatingModalState | null>(null);
   const [confirmModal, setConfirmModal] = useState<ConfirmModalState | null>(null);
   const [confirmLoading, setConfirmLoading] = useState(false);
+  const [paymentModalBooking, setPaymentModalBooking] = useState<Booking | null>(null);
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
 
   const { ratingsMap, loadRatings, saveRating } = useRatings();
 
@@ -355,6 +358,10 @@ export default function ProfileClient() {
                 onRateClick={handleRateClick}
                 onCancelBooking={handleCancelBookingRequest}
                 onLeaveQueue={handleLeaveQueueRequest}
+                onReuploadProof={(b) => {
+                  setPaymentModalBooking(b);
+                  setPaymentModalOpen(true);
+                }}
               />
             </div>
 
@@ -402,6 +409,30 @@ export default function ProfileClient() {
           loading={confirmLoading}
           onClose={() => !confirmLoading && setConfirmModal(null)}
           onConfirm={handleConfirmModalAction}
+        />
+      )}
+
+      {/* ── Payment / Prepayment Verification Modal ── */}
+      {paymentModalBooking && paymentModalBooking.service && paymentModalBooking.company && (
+        <PaymentVerificationModal
+          open={paymentModalOpen}
+          onOpenChange={setPaymentModalOpen}
+          booking={paymentModalBooking}
+          service={paymentModalBooking.service}
+          company={paymentModalBooking.company}
+          selectedProvider={
+            paymentModalBooking.provider || {
+              id: paymentModalBooking.provider_id || "provider",
+              name: "Assigned Specialist",
+              specialization: null,
+              is_active: true,
+              created_at: new Date().toISOString(),
+              company_id: paymentModalBooking.company_id,
+            }
+          }
+          onSuccess={() => {
+            getMyBookings().then(setBookings);
+          }}
         />
       )}
     </>

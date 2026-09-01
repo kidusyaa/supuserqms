@@ -9,6 +9,7 @@ import type {
   Company,
   QueueItem,
   AvailableSlot,
+  Booking,
 } from "@/type";
 import { ANY_PROVIDER_ID } from "@/type";
 import {
@@ -29,6 +30,7 @@ import {
   isToday,
 } from "date-fns";
 import BookServiceDialog from "@/components/book/_componet/BookServiceDialog";
+import PaymentVerificationModal from "@/components/book/_componet/PaymentVerificationModal";
 import { JoinQueueDialog } from "@/components/book/_componet/JoinQueueDialog";
 import { QueueConfirmationDialog } from "@/components/book/_componet/QueueConfirmationDialog";
 import { toast } from "sonner";
@@ -60,6 +62,8 @@ export default function BookingPage() {
   // Dialogs
   const [joinQueueDialogOpen, setJoinQueueDialogOpen] = useState(false);
   const [bookServiceDialogOpen, setBookServiceDialogOpen] = useState(false);
+  const [paymentVerificationModalOpen, setPaymentVerificationModalOpen] = useState(false);
+  const [pendingBookingForPayment, setPendingBookingForPayment] = useState<Booking | null>(null);
   const [queueConfirmationDialogOpen, setQueueConfirmationDialogOpen] = useState(false);
   const [confirmedQueueEntry, setConfirmedQueueEntry] = useState<ConfirmedQueueItem | null>(null);
 
@@ -536,6 +540,19 @@ export default function BookingPage() {
             company={company}
             selectedProvider={selectedProvider}
             selectedSlot={selectedSlot}
+            onPrepaymentRequired={(createdBooking) => {
+              setPendingBookingForPayment(createdBooking);
+              setPaymentVerificationModalOpen(true);
+            }}
+          />
+
+          <PaymentVerificationModal
+            open={paymentVerificationModalOpen}
+            onOpenChange={setPaymentVerificationModalOpen}
+            booking={pendingBookingForPayment}
+            service={service}
+            company={company}
+            selectedProvider={selectedProvider}
           />
 
           <JoinQueueDialog

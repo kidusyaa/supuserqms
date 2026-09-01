@@ -18,9 +18,16 @@ interface Props {
     existing: CompanyRating | null
   ) => void;
   onCancelClick?: (booking: Booking) => void;
+  onReuploadProof?: (booking: Booking) => void;
 }
 
-export function BookingCard({ booking: b, rating, onRateClick, onCancelClick }: Props) {
+export function BookingCard({
+  booking: b,
+  rating,
+  onRateClick,
+  onCancelClick,
+  onReuploadProof,
+}: Props) {
   const router = useRouter();
   const companyName = b.company?.name || "Cedar & Co. Barbershop";
   const serviceName = b.service?.name || "Haircut + Beard Trim";
@@ -88,7 +95,22 @@ export function BookingCard({ booking: b, rating, onRateClick, onCancelClick }: 
         </div>
 
         {/* Status Badge */}
-        <div className="shrink-0">
+        <div className="shrink-0 flex items-center gap-1.5 flex-wrap justify-end">
+          {b.payment_status === "pending" && (
+            <span className="bg-amber-500/10 text-amber-600 border border-amber-500/20 text-[11px] font-bold px-2.5 py-0.5 rounded-full">
+              Payment Pending
+            </span>
+          )}
+          {b.payment_status === "rejected" && (
+            <span className="bg-rose-500/10 text-rose-600 border border-rose-500/20 text-[11px] font-bold px-2.5 py-0.5 rounded-full">
+              Payment Rejected
+            </span>
+          )}
+          {b.payment_status === "approved" && (
+            <span className="bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[11px] font-bold px-2.5 py-0.5 rounded-full">
+              Deposit Paid
+            </span>
+          )}
           {isUpcoming && (
             <span className="bg-amber-100/70 text-amber-800 text-xs font-bold px-3.5 py-1 rounded-full">
               Upcoming
@@ -126,7 +148,29 @@ export function BookingCard({ booking: b, rating, onRateClick, onCancelClick }: 
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+          {b.payment_status === "rejected" && (
+            <button
+              type="button"
+              onClick={() => onReuploadProof && onReuploadProof(b)}
+              className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs px-4 py-2 rounded-2xl flex items-center gap-1.5 shadow-xs transition-all cursor-pointer"
+            >
+              <Icon icon="solar:restart-bold" className="w-3.5 h-3.5" />
+              <span>Re-upload Receipt</span>
+            </button>
+          )}
+
+          {b.payment_status === "pending" && (
+            <button
+              type="button"
+              onClick={() => onReuploadProof && onReuploadProof(b)}
+              className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs px-4 py-2 rounded-2xl flex items-center gap-1.5 shadow-xs transition-all cursor-pointer"
+            >
+              <Icon icon="solar:camera-bold" className="w-3.5 h-3.5" />
+              <span>Verify Payment</span>
+            </button>
+          )}
+
           {isUpcoming && (
             <>
               <button
