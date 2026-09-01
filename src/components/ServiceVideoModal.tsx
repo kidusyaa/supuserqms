@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { X, Video, ExternalLink, Maximize2, Minimize2 } from "lucide-react";
 import { parseVideoUrl } from "@/lib/videoUtils";
 
@@ -39,6 +39,10 @@ export default function ServiceVideoModal({
             : "max-w-5xl w-[95vw] h-[85vh] max-h-[90vh] rounded-2xl"
         }`}
       >
+        <DialogDescription className="sr-only">
+          {serviceName} showcase video player
+        </DialogDescription>
+
         {/* Header Bar with Single Clean Close & Fullscreen Toggle */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800/80 bg-slate-900/90 backdrop-blur-md z-20 shrink-0">
           <div className="flex items-center gap-2.5 min-w-0 pr-2">
@@ -46,7 +50,9 @@ export default function ServiceVideoModal({
               <Video className="w-4 h-4" />
             </div>
             <div className="min-w-0">
-              <h3 className="font-extrabold text-xs sm:text-sm text-slate-100 truncate">{serviceName}</h3>
+              <DialogTitle className="font-extrabold text-xs sm:text-sm text-slate-100 truncate">
+                {serviceName}
+              </DialogTitle>
               <p className="text-[10px] text-amber-400 font-semibold tracking-wide">
                 {isPortrait ? "Short Treatment Video" : "Treatment Demonstration Video"}
               </p>

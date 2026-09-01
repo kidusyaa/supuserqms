@@ -495,11 +495,20 @@ export default function CompaniesClientPage({
                 : company.id;
 
               const companyTypeName = company.company_types?.[0]?.name || "Beauty Salon";
+              const categoryIconInfo = getCategoryIconInfo("", "", companyTypeName);
               const locationText =
                 company.location_text?.split(",")?.[0]?.trim() ||
                 company.address?.split(",")?.[0]?.trim() ||
                 "Addis Ababa";
               const hoursText = formatWorkingHours(company.working_hours);
+              const servicesCount = company.services?.length || 0;
+
+              const coverImage =
+                company.company_photos?.find((p) => p.type === "venue" || p.type === "gallery")?.url ||
+                company.company_photos?.[0]?.url ||
+                company.services?.find((s) => Boolean(s.photo))?.photo ||
+                company.logo ||
+                null;
 
               const initials = company.name
                 .split(" ")
@@ -512,73 +521,90 @@ export default function CompaniesClientPage({
                 <Link
                   key={company.id}
                   href={`/company/${companySlugOrId}`}
-                  className="group relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 sm:p-6 shadow-none hover:shadow-none hover:border-slate-300 dark:hover:border-slate-700 transition-colors flex flex-col justify-between"
+                  className="group relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-5 shadow-[0_2px_12px_rgba(0,0,0,0.03)] hover:shadow-lg hover:border-slate-300 dark:hover:border-slate-700 transition-all flex flex-col justify-between"
                 >
                   <div>
-                    {/* Top Row: Logo & Category Squircle */}
-                    <div className="flex items-start justify-between gap-3 mb-4">
-                      {/* Logo or Initials */}
-                      <div className="relative w-16 h-16 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center shrink-0 overflow-hidden shadow-none group-hover:scale-102 transition-transform">
+                    {/* Top Cover Image Banner with Overlapping Badges and Logo */}
+                    <div className="relative w-full h-44 sm:h-48 rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-800 mb-3.5 shrink-0">
+                      {coverImage ? (
+                        <Image
+                          src={coverImage}
+                          alt={company.name}
+                          fill
+                          className="object-cover group-hover:scale-105 transition-transform duration-500"
+                          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                        />
+                      ) : (
+                        <div className={`w-full h-full ${categoryIconInfo.bg} flex items-center justify-center`}>
+                          <Icon icon={categoryIconInfo.icon} className="w-12 h-12 opacity-30 text-slate-800" />
+                        </div>
+                      )}
+
+                      {/* Gradient Overlay for readable badges */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/25" />
+
+                      {/* Floating Badges on Cover Image */}
+                      <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between pointer-events-none">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-black/60 backdrop-blur-md text-white text-[10px] sm:text-[11px] font-bold uppercase tracking-wider">
+                          {companyTypeName}
+                        </span>
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-teal-200/50 text-teal-800 dark:text-teal-300 text-[10px] font-bold shadow-xs">
+                          <Icon icon="solar:verified-check-bold" className="w-3 h-3 text-teal-600" />
+                          <span>Verified</span>
+                        </span>
+                      </div>
+
+                      {/* Company Logo Squircle (Bottom-Left) */}
+                      <div className="absolute bottom-2.5 left-2.5 w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-white dark:bg-slate-900 border-2 border-white dark:border-slate-700 shadow-md flex items-center justify-center overflow-hidden shrink-0">
                         {company.logo ? (
                           <Image
                             src={company.logo}
                             alt={company.name}
                             fill
                             className="object-cover"
-                            sizes="64px"
+                            sizes="48px"
                           />
                         ) : (
-                          <span className="text-lg font-serif font-black text-slate-800 dark:text-slate-200">
+                          <span className="text-sm font-serif font-black text-slate-800 dark:text-slate-200">
                             {initials}
                           </span>
                         )}
                       </div>
-
-                      {/* Verified & Type Badge */}
-                      <div className="flex flex-col items-end gap-1">
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-teal-50 dark:bg-teal-950/50 border border-teal-200 text-teal-800 dark:text-teal-300 text-[10px] font-bold">
-                          <Icon icon="solar:verified-check-bold" className="w-3 h-3 text-teal-600" />
-                          <span>Verified</span>
-                        </span>
-                        <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400 tracking-tight">
-                          {companyTypeName}
-                        </span>
-                      </div>
                     </div>
 
-                    {/* Company Name */}
-                    <h3 className="font-bold text-base sm:text-lg text-slate-900 dark:text-white group-hover:text-amber-600 transition-colors line-clamp-1 leading-snug">
-                      {company.name}
-                    </h3>
+                    {/* Company Name & Category */}
+                    <div>
+                      <h3 className="font-bold text-base sm:text-lg text-slate-900 dark:text-white group-hover:text-amber-600 transition-colors line-clamp-1 leading-snug">
+                        {company.name}
+                      </h3>
+                      <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 mt-0.5">
+                        {companyTypeName}
+                      </p>
+                    </div>
 
-                    {/* Meta Details: Location & Hours */}
-                    <div className="space-y-2 text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-3">
-                      <div className="flex items-center gap-2">
-                        <Icon icon="solar:map-point-linear" className="w-4 h-4 text-slate-400 shrink-0" />
+                    {/* Location & Services Count */}
+                    <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800/80">
+                      <div className="flex items-center gap-1.5 truncate">
+                        <Icon icon="solar:map-point-linear" className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                         <span className="truncate">{locationText}</span>
                       </div>
-
-                      <div className="flex items-center gap-2">
-                        <Icon icon="solar:clock-circle-linear" className="w-4 h-4 text-slate-400 shrink-0" />
-                        <span className="truncate">{hoursText}</span>
-                      </div>
-
-                      {company.phone && (
-                        <div className="flex items-center gap-2">
-                          <Icon icon="solar:phone-linear" className="w-4 h-4 text-slate-400 shrink-0" />
-                          <span className="truncate">{company.phone}</span>
-                        </div>
+                      {servicesCount > 0 ? (
+                        <span className="font-bold text-slate-900 dark:text-white shrink-0 ml-2">
+                          {servicesCount} {servicesCount === 1 ? "service" : "services"}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 shrink-0 ml-2 text-[11px] truncate">{hoursText}</span>
                       )}
                     </div>
                   </div>
 
-                  {/* Bottom Action Footer */}
-                  <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                  {/* Bottom Action Footer (Hold current one) */}
+                  <div className="pt-3.5 mt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
                     <span className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-amber-600 transition-colors">
                       View Profile &amp; Services
                     </span>
-                    <div className="w-7 h-7 rounded-full bg-slate-50 dark:bg-slate-800 group-hover:bg-[#0f2937] text-slate-500 group-hover:text-white flex items-center justify-center transition-colors">
-                      <Icon icon="solar:arrow-right-linear" className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+                    <div className="w-8 h-8 rounded-full bg-slate-50 dark:bg-slate-800 group-hover:bg-[#0f2937] text-slate-500 group-hover:text-white flex items-center justify-center transition-colors shadow-2xs">
+                      <Icon icon="solar:arrow-right-linear" className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
                     </div>
                   </div>
                 </Link>

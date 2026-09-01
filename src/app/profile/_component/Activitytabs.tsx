@@ -17,7 +17,8 @@ interface Props {
     companyName: string,
     existing: CompanyRating | null
   ) => void;
-  onCancelBooking?: (bookingId: string) => void;
+  onCancelBooking?: (booking: Booking) => void;
+  onLeaveQueue?: (entry: QueueItem) => void;
 }
 
 export function ActivityTabs({
@@ -26,6 +27,7 @@ export function ActivityTabs({
   ratingsMap,
   onRateClick,
   onCancelBooking,
+  onLeaveQueue,
 }: Props) {
   const [activeTab, setActiveTab] = useState<"bookings" | "queue">("bookings");
 
@@ -131,6 +133,7 @@ export function ActivityTabs({
                 entry={q}
                 rating={ratingsMap[`queue:${String(q.id)}`] ?? null}
                 onRateClick={onRateClick}
+                onLeaveQueue={onLeaveQueue}
               />
             ))
           )}

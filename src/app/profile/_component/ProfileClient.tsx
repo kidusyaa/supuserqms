@@ -16,6 +16,8 @@ import {
   toggleServiceFavorite,
   isProfileComplete,
   upsertMyProfile,
+  leaveQueue,
+  cancelBooking,
   type UserProfile,
 } from "@/lib/supabase-utils";
 
@@ -25,6 +27,7 @@ import { ProfileEditDrawer } from "./Profileeditdrawer";
 import { ProfileHero } from "./Profilehero";
 import { SavedServicesDrawer } from "./SavedServicesDrawer";
 import { RatingModal, type RatingModalState } from "./Ratingmodal";
+import { ConfirmModal, type ConfirmModalState } from "./ConfirmModal";
 import type { Booking, QueueItem, Service } from "@/type";
 
 export default function ProfileClient() {
@@ -46,6 +49,8 @@ export default function ProfileClient() {
   const [queueEntries, setQueueEntries] = useState<QueueItem[]>([]);
   const [savedServices, setSavedServices] = useState<Service[]>([]);
   const [ratingModal, setRatingModal] = useState<RatingModalState | null>(null);
+  const [confirmModal, setConfirmModal] = useState<ConfirmModalState | null>(null);
+  const [confirmLoading, setConfirmLoading] = useState(false);
 
   const { ratingsMap, loadRatings, saveRating } = useRatings();
 
@@ -165,6 +170,68 @@ export default function ProfileClient() {
     },
     []
   );
+
+  // ── Leave Queue Request Modal ─────────────────────────────────────
+  const handleLeaveQueueRequest = useCallback((entry: QueueItem) => {
+    const qAny = entry as any;
+    const companyName = qAny.company?.name || qAny.service?.company?.name || "Service";
+    const serviceName = qAny.service?.name || "Walk-in";
+    const pos = entry.position ? `#${entry.position}` : "your spot";
+
+    setConfirmModal({
+      open: true,
+      type: "leave_queue",
+      id: entry.id,
+      title: "Leave the Queue?",
+      subtitle: `${companyName} · ${serviceName}`,
+      description: `Are you sure you want to leave the queue? You will give up ${pos} in line.`,
+      confirmLabel: "Yes, Leave Queue",
+      cancelLabel: "Keep My Spot",
+    });
+  }, []);
+
+  // ── Cancel Booking Request Modal ──────────────────────────────────
+  const handleCancelBookingRequest = useCallback((booking: Booking) => {
+    const companyName = booking.company?.name || "Company";
+    const serviceName = booking.service?.name || "Appointment";
+
+    setConfirmModal({
+      open: true,
+      type: "cancel_booking",
+      id: booking.id,
+      title: "Cancel Booking?",
+      subtitle: `${companyName} · ${serviceName}`,
+      description: "Are you sure you want to cancel this booking appointment? This action cannot be undone.",
+      confirmLabel: "Yes, Cancel Booking",
+      cancelLabel: "Keep Booking",
+    });
+  }, []);
+
+  // ── Execute Confirmation Action ───────────────────────────────────
+  const handleConfirmModalAction = async () => {
+    if (!confirmModal) return;
+    setConfirmLoading(true);
+    try {
+      if (confirmModal.type === "leave_queue") {
+        await leaveQueue(confirmModal.id);
+        setQueueEntries((prev) =>
+          prev.map((q) => (q.id === confirmModal.id ? { ...q, status: "noshow" } : q))
+        );
+        toast.success("You have left the queue.");
+      } else if (confirmModal.type === "cancel_booking") {
+        await cancelBooking(String(confirmModal.id));
+        setBookings((prev) =>
+          prev.map((b) => (b.id === String(confirmModal.id) ? { ...b, status: "cancelled" } : b))
+        );
+        toast.success("Booking cancelled successfully.");
+      }
+      setConfirmModal(null);
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to update status.");
+    } finally {
+      setConfirmLoading(false);
+    }
+  };
 
   // ── Loading ───────────────────────────────────────────────────────
   if (loading) {
@@ -286,6 +353,8 @@ export default function ProfileClient() {
                 queueEntries={queueEntries}
                 ratingsMap={ratingsMap}
                 onRateClick={handleRateClick}
+                onCancelBooking={handleCancelBookingRequest}
+                onLeaveQueue={handleLeaveQueueRequest}
               />
             </div>
 
@@ -323,6 +392,16 @@ export default function ProfileClient() {
           state={ratingModal}
           onClose={() => setRatingModal(null)}
           saveRating={saveRating}
+        />
+      )}
+
+      {/* ── Confirm Leave Queue / Cancel Booking Modal ── */}
+      {confirmModal && (
+        <ConfirmModal
+          state={confirmModal}
+          loading={confirmLoading}
+          onClose={() => !confirmLoading && setConfirmModal(null)}
+          onConfirm={handleConfirmModalAction}
         />
       )}
     </>

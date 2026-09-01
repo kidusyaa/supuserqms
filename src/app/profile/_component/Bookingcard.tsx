@@ -17,13 +17,18 @@ interface Props {
     companyName: string,
     existing: CompanyRating | null
   ) => void;
-  onCancelClick?: (bookingId: string) => void;
+  onCancelClick?: (booking: Booking) => void;
 }
 
 export function BookingCard({ booking: b, rating, onRateClick, onCancelClick }: Props) {
   const router = useRouter();
   const companyName = b.company?.name || "Cedar & Co. Barbershop";
   const serviceName = b.service?.name || "Haircut + Beard Trim";
+  const companyId = b.company_id || (b.service as any)?.company_id || (b.company as any)?.id || "";
+  const serviceId = b.service_id || (b.service as any)?.id;
+  const targetHref = serviceId
+    ? `/booking/${serviceId}${companyId ? `?companyId=${companyId}` : ""}`
+    : "/services";
   const status = (b.status || "confirmed").toLowerCase();
 
   const isCompleted = status === "completed" || status === "served";
@@ -127,8 +132,7 @@ export function BookingCard({ booking: b, rating, onRateClick, onCancelClick }: 
               <button
                 type="button"
                 onClick={() => {
-                  if (onCancelClick) onCancelClick(b.id);
-                  else router.push(`/booking/confirmation/${b.id}`);
+                  if (onCancelClick) onCancelClick(b);
                 }}
                 className="border border-rose-200 dark:border-rose-900/60 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-rose-800 dark:text-rose-400 font-bold text-xs px-5 py-2 rounded-2xl transition-colors cursor-pointer"
               >
@@ -178,7 +182,7 @@ export function BookingCard({ booking: b, rating, onRateClick, onCancelClick }: 
           {isCancelled && (
             <button
               type="button"
-              onClick={() => router.push("/services")}
+              onClick={() => router.push(targetHref)}
               className="border border-slate-200 dark:border-slate-700 hover:bg-slate-100 text-slate-700 dark:text-slate-300 font-bold text-xs px-5 py-2 rounded-2xl transition-colors cursor-pointer"
             >
               Book again

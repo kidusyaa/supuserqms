@@ -102,14 +102,14 @@ export function ProfileEditDrawer({
                   <button
                     key={a.id} type="button"
                     onClick={() => onAvatarChange(a.id)}
-                    className={`relative rounded-xl p-1 transition-all duration-150 ${
+                    className={`relative rounded-xl p-1 transition-all duration-150  ${
                       avatarId === a.id
                         ? "ring-2 ring-amber-400 ring-offset-1 scale-105"
                         : "ring-1 ring-gray-200 hover:ring-amber-300"
                     }`}
                   >
                     <div className="relative aspect-square rounded-lg overflow-hidden bg-gray-50">
-                      <Image src={a.url} alt={a.id} fill className="object-cover" sizes="64px" />
+                      <Image src={a.url} alt={a.id} fill className="object-cover" sizes="64px" width={1000} height={1000} />
                     </div>
                     {avatarId === a.id && (
                       <div className="absolute -top-1 -right-1 w-4 h-4 bg-amber-400 rounded-full flex items-center justify-center shadow-sm">

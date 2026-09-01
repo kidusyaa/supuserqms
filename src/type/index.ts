@@ -4,7 +4,7 @@ export type BookingStatus = "pending" | "confirmed" | "completed" | "cancelled";
 export type QueueTypeStatus = 'walk_in' | 'online' | 'scheduled' | 'other'; // Adjust 'other' as needed for your DB enum values
 
 // --- Ensure your QueueEntryStatus for the 'status' column is also correct ---
-export type QueueEntryStatus = 'waiting' | 'serving' | 'completed' | 'cancelled';
+export type QueueEntryStatus = 'waiting' | 'serving' | 'served' | 'noshow' | 'cancelled';
 export type BankAccount = {
   id: string;
   account_type: string;
@@ -97,7 +97,7 @@ export type QueueItem = {
   provider_id: string | null;
   user_name: string;
   phone_number: string | null;
-  status: 'waiting' | 'serving' | 'served' | 'cancelled'; // or your USER-DEFINED enum
+  status: 'waiting' | 'serving' | 'served' | 'noshow' | 'cancelled'; // or your USER-DEFINED enum
   position: number | null;
   queue_type: 'walk-in' | 'booking' | null; // or your USER-DEFINED enum
   notes: string | null;

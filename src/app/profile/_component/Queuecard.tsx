@@ -17,7 +17,7 @@ interface Props {
     companyName: string,
     existing: CompanyRating | null
   ) => void;
-  onLeaveQueue?: (queueId: string | number) => void;
+  onLeaveQueue?: (entry: QueueItem) => void;
 }
 
 export function QueueCard({ entry: q, rating, onRateClick, onLeaveQueue }: Props) {
@@ -28,12 +28,16 @@ export function QueueCard({ entry: q, rating, onRateClick, onLeaveQueue }: Props
   const categoryName = qAny.service?.service_category?.name || qAny.service?.category?.name;
   const companyTypeName = qAny.company?.company_types?.[0]?.name;
   const companyId = qAny.service?.company_id || qAny.service?.company?.id || "";
+  const serviceId = q.service_id || qAny.service?.id;
+  const targetHref = serviceId
+    ? `/booking/${serviceId}${companyId ? `?companyId=${companyId}` : ""}`
+    : "/services";
   const sourceId = String(q.id);
   const status = (q.status || "waiting").toLowerCase();
 
   const isLive = status === "waiting" || status === "serving";
   const isCompleted = status === "served" || status === "completed";
-  const isCancelled = status === "cancelled";
+  const isCancelled = status === "cancelled" || status === "noshow" || status === "left";
 
   const position = q.position ?? 3;
   const totalInLine = qAny.total_in_line ?? (position + 5);
@@ -125,8 +129,7 @@ export function QueueCard({ entry: q, rating, onRateClick, onLeaveQueue }: Props
             <button
               type="button"
               onClick={() => {
-                if (onLeaveQueue) onLeaveQueue(q.id);
-                else router.push(`/queue/${q.id}`);
+                if (onLeaveQueue) onLeaveQueue(q);
               }}
               className="border border-rose-200 dark:border-rose-900/60 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-rose-800 dark:text-rose-400 font-bold text-xs px-5 py-2 rounded-2xl transition-colors cursor-pointer"
             >
@@ -168,7 +171,7 @@ export function QueueCard({ entry: q, rating, onRateClick, onLeaveQueue }: Props
           {isCancelled && (
             <button
               type="button"
-              onClick={() => router.push("/services")}
+              onClick={() => router.push(targetHref)}
               className="border border-slate-200 dark:border-slate-700 hover:bg-slate-100 text-slate-700 dark:text-slate-300 font-bold text-xs px-5 py-2 rounded-2xl transition-colors cursor-pointer"
             >
               Join again

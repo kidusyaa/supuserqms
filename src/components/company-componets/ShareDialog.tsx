@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState } from 'react';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Share2, Copy, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { Icon } from "@iconify/react";
@@ -80,11 +80,16 @@ export default function ShareDialog({ open, onOpenChange, companyUrl, companyNam
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-sm p-6">
+        <DialogDescription className="sr-only">
+          Share {companyName} on social media or copy link
+        </DialogDescription>
         <div className="space-y-4">
           {/* Header */}
           <div className="flex items-center gap-2 text-gray-700">
             <Share2 className="h-5 w-5" />
-            <span className="font-medium">share</span>
+            <DialogTitle className="font-medium text-base text-slate-900 dark:text-white">
+              Share
+            </DialogTitle>
           </div>
           
           {/* Social Media Icons */}

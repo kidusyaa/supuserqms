@@ -261,6 +261,46 @@ export async function getMyQueueEntries(): Promise<QueueItem[]> {
   return (data || []) as QueueItem[];
 }
 
+export async function leaveQueue(queueId: string | number): Promise<void> {
+  const user = await getAuthUserOrNull();
+  if (!user) throw new AuthRequiredError();
+
+  const { error } = await supabase
+    .from("queue_entries")
+    .update({ status: "noshow" })
+    .eq("id", queueId)
+    .eq("user_id", user.id);
+
+  if (error) {
+    console.error("Error leaving queue:", error);
+    throw new Error(error.message || "Failed to leave queue.");
+  }
+
+  // Also remove any provider reservations associated with this queue entry
+  await supabase
+    .from("provider_reservations")
+    .delete()
+    .eq("source_type", "queue")
+    .eq("source_row_id", queueId);
+}
+
+export async function cancelBooking(bookingId: string): Promise<void> {
+  const user = await getAuthUserOrNull();
+  if (!user) throw new AuthRequiredError();
+
+  const { error } = await supabase
+    .from("bookings")
+    .update({ status: "cancelled" })
+    .eq("id", bookingId)
+    .eq("user_id", user.id);
+
+  if (error) {
+    console.error("Error cancelling booking:", error);
+    throw new Error(error.message || "Failed to cancel booking.");
+  }
+}
+
+
 
 
   // The main function to create a new queue entry
@@ -1330,21 +1370,21 @@ export const getAllCompanies = async (): Promise<Company[]> => {
       .from('companies')
 
       .select(`
-
         *,
-
-        company_types (*)
-
+        company_types (*),
+        company_photos (*),
+        services (id, name, price, photo, status)
       `);
 
-
-
     if (error) {
-
       console.error('Error getting all companies with types:', error?.message);
-
-      return [];
-
+      const { data: fallbackData } = await supabase
+        .from('companies')
+        .select(`
+          *,
+          company_types (*)
+        `);
+      return (fallbackData || []) as Company[];
     }
 
 
@@ -1911,40 +1951,68 @@ export const getCategoryWithServices = async (categoryId: string): Promise<Categ
 
 
 
-export const getCurrentQueueCount = async (serviceId: string): Promise<number> => {
-
+export const getCurrentQueueCount = async (serviceId: string, providerId?: string): Promise<number> => {
   try {
+    if (providerId && providerId !== 'ANY_PROVIDER' && providerId !== ANY_PROVIDER_ID) {
+      const { count, error } = await supabase
+        .from('queue_entries')
+        .select('*', { count: 'exact', head: true })
+        .eq('service_id', serviceId)
+        .eq('provider_id', providerId)
+        .eq('status', 'waiting');
 
-    const { count, error } = await supabase
-
-      .from('queue_entries')
-
-      .select('*', { count: 'exact', head: true })
-
-      .eq('service_id', serviceId)
-
-      .eq('status', 'waiting'); // Only count those who are actually waiting
-
-
-
-    if (error) {
-
-      console.error('Error getting queue count:', error);
-
-      return 0;
-
+      if (error) {
+        console.error('Error getting queue count:', error);
+        return 0;
+      }
+      return count || 0;
     }
 
-    return count || 0;
+    // For ANY_PROVIDER or service overall: find the least queue among active service providers
+    const { data: spData } = await supabase
+      .from('service_providers')
+      .select('provider_id')
+      .eq('service_id', serviceId);
 
+    const providerIds = (spData || []).map((sp: any) => sp.provider_id).filter(Boolean);
+
+    if (providerIds.length === 0) {
+      const { count } = await supabase
+        .from('queue_entries')
+        .select('*', { count: 'exact', head: true })
+        .eq('service_id', serviceId)
+        .eq('status', 'waiting');
+      return count || 0;
+    }
+
+    if (providerIds.length === 1) {
+      const { count } = await supabase
+        .from('queue_entries')
+        .select('*', { count: 'exact', head: true })
+        .eq('service_id', serviceId)
+        .eq('provider_id', providerIds[0])
+        .eq('status', 'waiting');
+      return count || 0;
+    }
+
+    // Multiple providers: calculate minimum queue length
+    const counts = await Promise.all(
+      providerIds.map(async (pid: string) => {
+        const { count } = await supabase
+          .from('queue_entries')
+          .select('*', { count: 'exact', head: true })
+          .eq('service_id', serviceId)
+          .eq('provider_id', pid)
+          .eq('status', 'waiting');
+        return count || 0;
+      })
+    );
+
+    return Math.min(...counts);
   } catch (error) {
-
     console.error('Error in getCurrentQueueCount function:', error);
-
     return 0;
-
   }
-
 };
 
 
@@ -2345,63 +2413,61 @@ export async function getProviderOccupiedSlots(
  */
 
 export async function getLatestAvailableTimeForProvider(
-
   company: Company,
-
   providerId: string,
-
   serviceId: string
-
 ): Promise<Date | null> {
+  const now = new Date();
 
-    const now = new Date();
+  // If ANY_PROVIDER or empty, calculate the earliest available start time across all service providers
+  if (!providerId || providerId === ANY_PROVIDER_ID || providerId === 'ANY_PROVIDER') {
+    const { data: spData } = await supabase
+      .from('service_providers')
+      .select('provider_id, providers(id, is_active)')
+      .eq('service_id', serviceId);
 
-    const { start: dayStart, end: dayEnd } = getDayRange(now);
+    const activeProviders = (spData || [])
+      .map((sp: any) => sp.providers)
+      .filter((p: any) => p && p.is_active);
 
-
-
-    const occupiedSlots = await getProviderOccupiedSlots(providerId, dayStart, dayEnd);
-
-    
-
-    // Find the latest end time among all reservations today
-
-    const latestReservationEnd = occupiedSlots.reduce((latest, slot) => {
-
-        const slotEnd = new Date(slot.end_time);
-
-        return isAfter(slotEnd, latest) ? slotEnd : latest;
-
-    }, new Date(0)); // Start with a very early date
-
-
-
-    // Determine the company's opening time for today
-
-    const workingHours = getCompanyWorkingHours(company, now);
-
-    if (!workingHours) {
-
-        return null; // Company is closed
-
+    if (activeProviders.length === 0) {
+      return null;
     }
 
+    let earliestTime: Date | null = null;
+    for (const p of activeProviders) {
+      const t = await getLatestAvailableTimeForProvider(company, p.id, serviceId);
+      if (t) {
+        if (!earliestTime || isBefore(t, earliestTime)) {
+          earliestTime = t;
+        }
+      }
+    }
+    return earliestTime;
+  }
 
+  const { start: dayStart, end: dayEnd } = getDayRange(now);
+  const occupiedSlots = await getProviderOccupiedSlots(providerId, dayStart, dayEnd);
 
-    // The provider is available at the latest of:
+  // Find the latest end time among all reservations today
+  const latestReservationEnd = occupiedSlots.reduce((latest, slot) => {
+    const slotEnd = new Date(slot.end_time);
+    return isAfter(slotEnd, latest) ? slotEnd : latest;
+  }, new Date(0));
 
-    // 1. The current time ('now')
+  // Determine the company's opening time for today
+  const workingHours = getCompanyWorkingHours(company, now);
+  if (!workingHours) {
+    return null; // Company is closed
+  }
 
-    // 2. The company's opening time today
+  // The provider is available at the latest of:
+  // 1. The current time ('now')
+  // 2. The company's opening time today
+  // 3. The end time of their last reservation
+  const availableFrom = max([now, workingHours.start, latestReservationEnd]);
 
-    // 3. The end time of their last reservation
-
-    const availableFrom = max([now, workingHours.start, latestReservationEnd]);
-
-    
-
-    return availableFrom;
-
+  return availableFrom;
 }
 
 
