@@ -76,6 +76,11 @@ export default function ServiceCard({
 
   const primaryPhoto = service.photo || service.service_photos?.[0]?.url || null;
 
+  const ratingSummary = service.company?.rating_summary;
+  const hasRatings = Boolean(ratingSummary && Number(ratingSummary.total_ratings) > 0);
+  const averageStars = hasRatings ? Number(ratingSummary!.average_stars) : 1;
+  const totalRatings = hasRatings ? Number(ratingSummary!.total_ratings) : 0;
+
   if (service.is_package) {
     return <PackageCard service={service} className={className} />;
   }
@@ -144,9 +149,18 @@ export default function ServiceCard({
       {/* ── Content & Info Section ── */}
       <div className="flex-1 p-3.5 sm:p-5 flex flex-col justify-between min-w-0">
         <div>
-          {/* Category / Type */}
-          <div className="text-xs font-bold text-amber-600 dark:text-amber-500 tracking-tight mb-1">
-            {categoryName}
+          {/* Category / Type & Rating */}
+          <div className="flex items-center justify-between gap-2 mb-1">
+            <span className="text-xs font-bold text-amber-600 dark:text-amber-500 tracking-tight truncate">
+              {categoryName}
+            </span>
+            <div className="flex items-center gap-1 bg-amber-50 dark:bg-amber-950/40 border border-amber-200/50 dark:border-amber-900/40 px-2 py-0.5 rounded-full text-[11px] font-bold text-amber-800 dark:text-amber-300 shrink-0">
+              <Icon icon="solar:star-bold" className="w-3 h-3 text-amber-500 fill-amber-500" />
+              <span>{hasRatings ? averageStars.toFixed(1) : "1"}</span>
+              <span className="text-[10px] text-amber-600/80 dark:text-amber-400/80 font-normal">
+                ({hasRatings ? totalRatings : 1})
+              </span>
+            </div>
           </div>
 
           {/* Service Title */}

@@ -970,7 +970,11 @@ export const getAllServices = async (): Promise<Service[]> => {
 
   
 
-      return servicesWithProviders as Service[];
+      const result = servicesWithProviders as Service[];
+      await enrichServicesWithCategories(result);
+      await enrichServicesWithCompanyRatings(result);
+
+      return result;
 
   
 
@@ -1400,7 +1404,9 @@ export const getAllCompanies = async (): Promise<Company[]> => {
 
     // No mapping needed if the query returns the shape we want
 
-    return data || []; 
+    const companies = (data || []) as Company[];
+    await enrichCompaniesWithRatings(companies);
+    return companies; 
 
   } catch (error) {
 
@@ -1581,26 +1587,59 @@ export const getCompanyOptions = async (): Promise<LocationOption[]> => {
       company: company,                // Add the mapped company
     };
 
-    // 6. Fetch included services if this is a package
-    if (service.is_package && Array.isArray(service.included_service_ids) && service.included_service_ids.length > 0) {
-      try {
-        const { data: subServicesData, error: subError } = await supabase
-          .from('services')
-          .select('*, service_photos(url)')
-          .in('id', service.included_service_ids);
+    // 6. Fetch included services & company specialists if this is a package
+    if (service.is_package) {
+      if (Array.isArray(service.included_service_ids) && service.included_service_ids.length > 0) {
+        try {
+          const { data: subServicesData, error: subError } = await supabase
+            .from('services')
+            .select('*, service_photos(url)')
+            .in('id', service.included_service_ids);
 
-        if (!subError && subServicesData) {
-          service.included_services = subServicesData.map((sub: any) => ({
-            ...mapToService(sub),
-            photo: sub.service_photos && sub.service_photos.length > 0 ? sub.service_photos[0].url : sub.photo,
-          }));
+          if (!subError && subServicesData) {
+            service.included_services = subServicesData.map((sub: any) => ({
+              ...mapToService(sub),
+              photo: sub.service_photos && sub.service_photos.length > 0 ? sub.service_photos[0].url : sub.photo,
+            }));
+
+            // If package wait time isn't explicitly set, sum the included services wait times
+            if (!service.estimated_wait_time_mins || service.estimated_wait_time_mins <= 0) {
+              const totalMins = service.included_services.reduce(
+                (sum, s) => sum + (s.estimated_wait_time_mins || 0),
+                0
+              );
+              if (totalMins > 0) {
+                service.estimated_wait_time_mins = totalMins;
+              }
+            }
+          }
+        } catch (subErr) {
+          console.error("Error fetching included services for package:", subErr);
         }
-      } catch (subErr) {
-        console.error("Error fetching included services for package:", subErr);
+      }
+
+      // If package doesn't have providers directly attached, pull active providers from the company
+      if ((!service.providers || service.providers.length === 0) && service.company_id) {
+        try {
+          const { data: companyProviders, error: cpErr } = await supabase
+            .from('providers')
+            .select('*')
+            .eq('company_id', service.company_id)
+            .eq('is_active', true);
+
+          if (!cpErr && companyProviders && companyProviders.length > 0) {
+            service.providers = companyProviders.map((p: any) => mapToProvider(p));
+          }
+        } catch (cpErr) {
+          console.error("Error fetching company providers for package:", cpErr);
+        }
       }
     }
 
     await enrichServicesWithCategories([service]);
+    if (service.company && !service.company.rating_summary) {
+      await enrichCompaniesWithRatings([service.company]);
+    }
 
     return service;
 
@@ -3070,7 +3109,9 @@ export async function getRecentCompanies(limit: number = 8): Promise<Company[]> 
 
   }
 
-  return data as Company[];
+  const companies = (data || []) as Company[];
+  await enrichCompaniesWithRatings(companies);
+  return companies;
 
 }
 
@@ -3239,6 +3280,7 @@ export const getFilteredServices = async (
 
 
     await enrichServicesWithCategories(services);
+    await enrichServicesWithCompanyRatings(services);
 
     return services;
 
@@ -3368,7 +3410,9 @@ export async function getCompaniesByType(typeId: string): Promise<Company[]> {
 
 
 
-  return data || [];
+  const companies = (data || []) as Company[];
+  await enrichCompaniesWithRatings(companies);
+  return companies;
 
 }
 
@@ -3394,6 +3438,76 @@ export async function getCompanyTypesWithCounts(): Promise<CompanyTypeWithCount[
 
   return data || [];
 
+}
+
+export async function enrichCompaniesWithRatings(companies: Company[]): Promise<void> {
+  if (!companies || companies.length === 0) return;
+  const companyIds = Array.from(new Set(companies.map((c) => c.id).filter(Boolean)));
+  if (companyIds.length === 0) return;
+
+  try {
+    const { data: ratingSummaries, error } = await supabase
+      .from('company_rating_summary')
+      .select('company_id, average_stars, total_ratings')
+      .in('company_id', companyIds);
+
+    if (!error && ratingSummaries) {
+      const summaryMap = new Map<string, { average_stars: number; total_ratings: number }>();
+      ratingSummaries.forEach((r: any) => {
+        if (r.company_id) {
+          summaryMap.set(r.company_id, {
+            average_stars: Number(r.average_stars) || 0,
+            total_ratings: Number(r.total_ratings) || 0,
+          });
+        }
+      });
+
+      companies.forEach((c) => {
+        c.rating_summary = summaryMap.get(c.id) || null;
+      });
+    }
+  } catch (err) {
+    console.error("Error enriching companies with rating summaries:", err);
+  }
+}
+
+export async function enrichServicesWithCompanyRatings(services: Service[]): Promise<void> {
+  if (!services || services.length === 0) return;
+  const companyIds = new Set<string>();
+  services.forEach((s) => {
+    if (s.company_id) companyIds.add(s.company_id);
+    if (s.company?.id) companyIds.add(s.company.id);
+  });
+
+  if (companyIds.size === 0) return;
+
+  try {
+    const { data: ratingSummaries, error } = await supabase
+      .from('company_rating_summary')
+      .select('company_id, average_stars, total_ratings')
+      .in('company_id', Array.from(companyIds));
+
+    if (!error && ratingSummaries) {
+      const summaryMap = new Map<string, { average_stars: number; total_ratings: number }>();
+      ratingSummaries.forEach((r: any) => {
+        if (r.company_id) {
+          summaryMap.set(r.company_id, {
+            average_stars: Number(r.average_stars) || 0,
+            total_ratings: Number(r.total_ratings) || 0,
+          });
+        }
+      });
+
+      services.forEach((s) => {
+        const rating = (s.company_id ? summaryMap.get(s.company_id) : null) || (s.company?.id ? summaryMap.get(s.company.id) : null) || null;
+        if (s.company) {
+          s.company.rating_summary = rating;
+        }
+      });
+    }
+  } catch (err) {
+    console.error("Error enriching services with company ratings:", err);
+  }
 }
 
 // Helper function to enrich service objects with their service_category using category_id
@@ -3527,6 +3641,7 @@ export async function getAllPackages(): Promise<Service[]> {
     }
 
     await enrichServicesWithCategories(packages);
+    await enrichServicesWithCompanyRatings(packages);
 
     return packages;
   } catch (error) {

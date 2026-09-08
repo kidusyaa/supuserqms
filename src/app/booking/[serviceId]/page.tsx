@@ -145,7 +145,24 @@ export default function BookingPage() {
         if (selectedProviderId === ANY_PROVIDER_ID) {
           const activeProviders = (service.providers || []).filter((p) => p.is_active);
           if (activeProviders.length === 0) {
-            setAvailableSlots([]);
+            // Fallback: Generate slots based on company schedule if no individual specialists are registered
+            const fallbackProvider: Provider = {
+              id: ANY_PROVIDER_ID,
+              name: "Specialist",
+              specialization: "Professional Specialist",
+              is_active: true,
+              company_id: company.id,
+              created_at: new Date().toISOString(),
+              isAny: true,
+            };
+            const slots = generateAvailableSlots(
+              company,
+              service,
+              fallbackProvider,
+              selectedDate,
+              []
+            );
+            setAvailableSlots(slots);
             return;
           }
 
@@ -420,7 +437,7 @@ export default function BookingPage() {
                 slotsLoading={slotsLoading}
                 availableSlots={availableSlots}
                 onSlotClick={handleSlotClick}
-                isProviderSelected={!!selectedProvider}
+                isProviderSelected={!!selectedProvider || Boolean(service.is_package)}
               />
             </div>
           ) : (

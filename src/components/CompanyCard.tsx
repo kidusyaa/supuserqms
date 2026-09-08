@@ -41,6 +41,14 @@ export default function CompanyCard({ company, className }: CompanyCardProps) {
     .toUpperCase()
     .slice(0, 2);
 
+  const ratingSummary = (company as any).rating_summary as
+    | { average_stars: number; total_ratings: number }
+    | null
+    | undefined;
+  const hasRatings = Boolean(ratingSummary && Number(ratingSummary.total_ratings) > 0);
+  const averageStars = hasRatings ? Number(ratingSummary!.average_stars) : 1;
+  const totalRatings = hasRatings ? Number(ratingSummary!.total_ratings) : 0;
+
   return (
     <Link
       href={`/company/${companySlugOrId}`}
@@ -98,14 +106,24 @@ export default function CompanyCard({ company, className }: CompanyCardProps) {
           </div>
         </div>
 
-        {/* Company Name & Category */}
+        {/* Company Name & Category with Rating */}
         <div>
           <h3 className="font-bold text-base sm:text-lg text-slate-900 dark:text-white group-hover:text-amber-600 transition-colors line-clamp-1 leading-snug">
             {company.name}
           </h3>
-          <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 mt-0.5">
-            {companyTypeName}
-          </p>
+          <div className="flex items-center justify-between gap-2 mt-1">
+            <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 truncate">
+              {companyTypeName}
+            </p>
+            {/* Rating badge */}
+            <div className="flex items-center gap-1 bg-amber-50 dark:bg-amber-950/40 border border-amber-200/50 dark:border-amber-900/40 px-2 py-0.5 rounded-full text-xs font-bold text-amber-800 dark:text-amber-300 shrink-0">
+              <Icon icon="solar:star-bold" className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+              <span>{hasRatings ? averageStars.toFixed(1) : "1"}</span>
+              <span className="text-[10px] text-amber-600/80 dark:text-amber-400/80 font-normal">
+                ({hasRatings ? totalRatings : 1})
+              </span>
+            </div>
+          </div>
         </div>
 
         {/* Location & Details */}
