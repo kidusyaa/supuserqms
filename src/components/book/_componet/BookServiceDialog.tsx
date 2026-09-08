@@ -31,6 +31,7 @@ import type {
   BookingStatus,
   PaymentStatus,
 } from "@/type";
+import { formatEthiopian } from "@/lib/ethiopian-calendar";
 import { Calendar, Clock, User, Wallet, AlertCircle, Building2 } from "lucide-react";
 import { Icon } from "@iconify/react";
 
@@ -174,9 +175,14 @@ export default function BookServiceDialog({
                 <span className="text-slate-400 flex items-center gap-1.5">
                   <Calendar className="w-3.5 h-3.5 text-amber-500" /> Date
                 </span>
-                <p className="font-semibold text-slate-800 dark:text-slate-200">
-                  {format(selectedSlot.start, "EEE, MMM d, yyyy")}
-                </p>
+                <div>
+                  <p className="font-semibold text-slate-800 dark:text-slate-200">
+                    {formatEthiopian(selectedSlot.start, { locale: "am", includeWeekday: true })}
+                  </p>
+                  <p className="text-[10px] text-slate-400">
+                    {format(selectedSlot.start, "EEE, MMM d, yyyy")}
+                  </p>
+                </div>
               </div>
               <div className="space-y-1">
                 <span className="text-slate-400 flex items-center gap-1.5">

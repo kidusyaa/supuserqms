@@ -7,6 +7,8 @@ import type { CompanyRating, RatingSourceType } from "../hook/Useratings";
 import type { Booking } from "@/type";
 import { getCategoryIconInfo } from "@/lib/categoryIcons";
 
+import { formatEthiopian } from "@/lib/ethiopian-calendar";
+
 interface Props {
   booking: Booking;
   rating: CompanyRating | null;
@@ -45,16 +47,26 @@ export function BookingCard({
   // Format date and time
   const startDate = new Date(b.start_time || Date.now());
   const now = new Date();
+  const isToday =
+    startDate.getDate() === now.getDate() &&
+    startDate.getMonth() === now.getMonth() &&
+    startDate.getFullYear() === now.getFullYear();
   const isTomorrow =
     startDate.getDate() === now.getDate() + 1 &&
     startDate.getMonth() === now.getMonth() &&
     startDate.getFullYear() === now.getFullYear();
 
+  const timeStr = startDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+  const ethDateStr = formatEthiopian(startDate, { locale: "am" });
+  const gregDateStr = startDate.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+
   let formattedDate = "";
-  if (isTomorrow) {
-    formattedDate = `Tomorrow · ${startDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })}`;
+  if (isToday) {
+    formattedDate = `ዛሬ (${ethDateStr}) · ${timeStr}`;
+  } else if (isTomorrow) {
+    formattedDate = `ነገ (${ethDateStr}) · ${timeStr}`;
   } else {
-    formattedDate = `${startDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })} · ${startDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })}`;
+    formattedDate = `${ethDateStr} (${gregDateStr}) · ${timeStr}`;
   }
 
   const locationText = b.company?.location_text?.split(",")?.[0]?.trim() || 

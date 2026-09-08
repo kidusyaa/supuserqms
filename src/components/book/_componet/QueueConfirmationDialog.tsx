@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import { format, isToday } from "date-fns";
+import { formatEthiopian } from "@/lib/ethiopian-calendar";
 import type { Company, Service, Provider, QueueItem } from "@/type";
 import { useRouter } from 'next/navigation';
 
@@ -80,11 +81,10 @@ export function QueueConfirmationDialog({
                         {queueEntry.phone_number && <p><strong>Phone:</strong> {queueEntry.phone_number}</p>}
                         <p><strong>Provider:</strong> {selectedProvider.name}</p>
                         <p><strong>Your estimated position:</strong> {queueEntry.position}</p>
-                        
                         {startTime && endTime ? (
                             <>
                                 <p className="text-primary font-semibold">
-                                    <strong>Est. Service Time:</strong> {format(startTime, 'h:mm a')} - {format(endTime, 'h:mm a')} {isToday(startTime) ? 'Today' : format(startTime, 'MMM do')}
+                                    <strong>Est. Service Time:</strong> {format(startTime, 'h:mm a')} - {format(endTime, 'h:mm a')} ({isToday(startTime) ? 'ዛሬ / Today' : formatEthiopian(startTime, { locale: 'am' })})
                                 </p>
                                 <p className="text-muted-foreground">
                                     Please arrive at least 30 minutes before your estimated start time.

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { getBookingDetails } from "@/lib/supabase-utils";
 import { format, parseISO } from "date-fns";
+import { formatEthiopian } from "@/lib/ethiopian-calendar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
@@ -164,7 +165,12 @@ export default function BookingConfirmationPage() {
               </div>
               <div>
                 <p className="text-muted-foreground text-[11px]">Date</p>
-                <p className="font-semibold">{format(startDate, "PPPP")}</p>
+                <p className="font-semibold text-slate-900 dark:text-white">
+                  {formatEthiopian(startDate, { locale: "am", includeWeekday: true })}
+                </p>
+                <p className="text-[11px] text-slate-400">
+                  {format(startDate, "PPPP")}
+                </p>
               </div>
               <div>
                 <p className="text-muted-foreground text-[11px]">Time</p>

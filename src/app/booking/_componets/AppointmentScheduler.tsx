@@ -1,9 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { Calendar } from "@/components/ui/calendar";
+import { EthiopianCalendar } from "@/components/ui/ethiopian-calendar";
 import { format, getDay, isPast, isSameDay, startOfDay } from "date-fns";
 import type { AvailableSlot, Company, DailyWorkingHours } from "@/type";
 import { parseWorkingHours } from "@/lib/booking-utils";
+import { formatEthiopian, formatDualDate } from "@/lib/ethiopian-calendar";
 import { Icon } from "@iconify/react";
 import { cn } from "@/lib/utils";
 
@@ -26,6 +29,8 @@ export default function AppointmentScheduler({
   onSlotClick,
   isProviderSelected,
 }: AppointmentSchedulerProps) {
+  const [calendarMode, setCalendarMode] = useState<"ethiopian" | "gregorian">("ethiopian");
+
   const disabledDays = (date: Date) =>
     isPast(startOfDay(date)) && !isSameDay(date, new Date());
 
@@ -53,20 +58,59 @@ export default function AppointmentScheduler({
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
       {/* ── Left: Calendar (5 Cols) ── */}
       <div className="lg:col-span-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-5 shadow-none">
-        <label className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5 mb-3">
-          <Icon icon="solar:calendar-bold" className="w-4 h-4 text-amber-500" />
-          <span>1. Select Date</span>
-        </label>
+        <div className="flex items-center justify-between mb-3">
+          <label className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
+            <Icon icon="solar:calendar-bold" className="w-4 h-4 text-amber-500" />
+            <span>1. Select Date</span>
+          </label>
+
+          {/* Calendar Type Switcher (Ethiopian / Gregorian) */}
+          <div className="flex p-0.5 bg-slate-100 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+            <button
+              type="button"
+              onClick={() => setCalendarMode("ethiopian")}
+              className={cn(
+                "px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1",
+                calendarMode === "ethiopian"
+                  ? "bg-[#0f2937] text-white shadow-xs"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              )}
+            >
+              <span>🇪🇹 ኢትዮጵያ</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setCalendarMode("gregorian")}
+              className={cn(
+                "px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1",
+                calendarMode === "gregorian"
+                  ? "bg-[#0f2937] text-white shadow-xs"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+              )}
+            >
+              <span>🌐 Gregorian</span>
+            </button>
+          </div>
+        </div>
         
         <div className="flex justify-center">
-          <Calendar
-            mode="single"
-            selected={selectedDate}
-            onSelect={onDateSelect}
-            initialFocus
-            disabled={disabledDays}
-            className="rounded-2xl border border-slate-100 dark:border-slate-800 p-2"
-          />
+          {calendarMode === "ethiopian" ? (
+            <EthiopianCalendar
+              selected={selectedDate}
+              onSelect={onDateSelect}
+              disabled={disabledDays}
+              className="rounded-2xl border border-slate-100 dark:border-slate-800 p-2"
+            />
+          ) : (
+            <Calendar
+              mode="single"
+              selected={selectedDate}
+              onSelect={onDateSelect}
+              initialFocus
+              disabled={disabledDays}
+              className="rounded-2xl border border-slate-100 dark:border-slate-800 p-2"
+            />
+          )}
         </div>
 
         <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-400 flex items-center gap-1.5">
@@ -77,13 +121,19 @@ export default function AppointmentScheduler({
 
       {/* ── Right: Available Slots (7 Cols) ── */}
       <div className="lg:col-span-7 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 sm:p-6 shadow-none min-h-[360px] flex flex-col">
-        <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100 dark:border-slate-800">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-4 pb-3 border-b border-slate-100 dark:border-slate-800">
           <label className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
             <Icon icon="solar:clock-circle-bold" className="w-4 h-4 text-amber-500" />
             <span>2. Select Time Slot</span>
           </label>
-          <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-            {selectedDate ? format(selectedDate, "EEE, MMM d, yyyy") : "Choose a date"}
+          <span className="text-xs text-amber-700 dark:text-amber-400 font-semibold bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-md self-start sm:self-auto border border-amber-200/60 dark:border-amber-900/60">
+            {selectedDate ? (
+              calendarMode === "ethiopian"
+                ? `${formatEthiopian(selectedDate, { locale: "am", includeWeekday: true })} · (${format(selectedDate, "MMM d, yyyy")})`
+                : `${format(selectedDate, "EEE, MMM d, yyyy")} · (${formatEthiopian(selectedDate, { locale: "am" })})`
+            ) : (
+              "Choose a date"
+            )}
           </span>
         </div>
 

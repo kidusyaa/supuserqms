@@ -8,6 +8,12 @@ importers:
 
   .:
     dependencies:
+      '@daypicker/ethiopic':
+        specifier: ^10.0.1
+        version: 10.0.1(@types/react@19.2.7)(react@19.1.0)
+      '@daypicker/react':
+        specifier: ^10.0.1
+        version: 10.0.1(@types/react@19.2.7)(react@19.1.0)
       '@mui/icons-material':
         specifier: ^7.3.1
         version: 7.3.6(@mui/material@7.3.6(@types/react@19.2.7)(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(@types/react@19.2.7)(react@19.1.0)
@@ -660,6 +666,25 @@ packages:
 
   '@date-fns/tz@1.4.1':
     resolution: {integrity: sha512-P5LUNhtbj6YfI3iJjw5EL9eUAG6OitD0W3fWQcpQjDRc/QIsL0tRNuO1PcDvPccWL1fSTXXdE1ds+l95DV/OFA==}
+
+  '@daypicker/ethiopic@10.0.1':
+    resolution: {integrity: sha512-lnQNTVVXWffeTnfVRrTc9RP0CSle/qrqfKCfnyL3FBbFqolBwIDdPiLpY0GumYFf7mmgO6AiyV/l8z8s13O+6A==}
+    peerDependencies:
+      '@types/react': '>=16.8.0'
+      react: '>=16.8.0'
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
+
+  '@daypicker/react@10.0.1':
+    resolution: {integrity: sha512-lH4YQz4iMBWP8hsI1bD9Eg0T7t503IkSUR/WDGGkV5mKZvwVv+ukCkJz7yN+uVFBv7vHTK+ww7a5EvlkeFwPYQ==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      '@types/react': '>=16.8.0'
+      react: '>=16.8.0'
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
 
   '@emnapi/runtime@1.7.1':
     resolution: {integrity: sha512-PVtJr5CmLwYAU9PZDMITZoR5iAOShYREoR45EyyLrbntV50mdePTgUn4AmOw90Ifcj+x2kRjdzr1HP3RrNiHGA==}
@@ -3136,6 +3161,16 @@ packages:
   randombytes@2.1.0:
     resolution: {integrity: sha512-vYl3iOX+4CKUWuxGi9Ukhie6fsqXqS9FE2Zaic4tNFD2N2QQaXOMFbuKK4QmDHC0JO6B1Zp41J0LpT0oR68amQ==}
 
+  react-day-picker@10.0.1:
+    resolution: {integrity: sha512-eNh6BlwcYInWaJtRv18mXQ06Ys/H6rdTZAnTaSdOYJuTpwP1JMCHNd1FDRadA+gbeinq+psdULN5Xnowy9mV8w==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      '@types/react': '>=16.8.0'
+      react: '>=16.8.0'
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
+
   react-day-picker@9.13.0:
     resolution: {integrity: sha512-euzj5Hlq+lOHqI53NiuNhCP8HWgsPf/bBAVijR50hNaY1XwjKjShAnIe8jm8RD2W9IJUvihDIZ+KrmqfFzNhFQ==}
     engines: {node: '>=18'}
@@ -4431,6 +4466,21 @@ snapshots:
       '@babel/helper-validator-identifier': 7.28.5
 
   '@date-fns/tz@1.4.1': {}
+
+  '@daypicker/ethiopic@10.0.1(@types/react@19.2.7)(react@19.1.0)':
+    dependencies:
+      '@daypicker/react': 10.0.1(@types/react@19.2.7)(react@19.1.0)
+      date-fns: 4.1.0
+      react: 19.1.0
+    optionalDependencies:
+      '@types/react': 19.2.7
+
+  '@daypicker/react@10.0.1(@types/react@19.2.7)(react@19.1.0)':
+    dependencies:
+      react: 19.1.0
+      react-day-picker: 10.0.1(@types/react@19.2.7)(react@19.1.0)
+    optionalDependencies:
+      '@types/react': 19.2.7
 
   '@emnapi/runtime@1.7.1':
     dependencies:
@@ -6965,6 +7015,14 @@ snapshots:
   randombytes@2.1.0:
     dependencies:
       safe-buffer: 5.2.1
+
+  react-day-picker@10.0.1(@types/react@19.2.7)(react@19.1.0):
+    dependencies:
+      '@date-fns/tz': 1.4.1
+      date-fns: 4.1.0
+      react: 19.1.0
+    optionalDependencies:
+      '@types/react': 19.2.7
 
   react-day-picker@9.13.0(react@19.1.0):
     dependencies:
