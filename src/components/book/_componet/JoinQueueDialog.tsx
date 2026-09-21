@@ -18,8 +18,15 @@ import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import { toast } from "sonner";
 
-import { getAuthUserOrNull, getMyProfileOrNull, isProfileComplete, joinQueue, CreateQueuePayload } from "@/lib/supabase-utils"; // Make sure this is the *updated* joinQueue
-import type { Company, Service, Provider, QueueItem, QueueTypeStatus, AugmentedQueueItem } from "@/type"; // Ensure QueueItem has projected_start/end_time
+import {
+  getAuthUserOrNull,
+  getMyProfileOrNull,
+  isProfileComplete,
+  joinQueue,
+  CreateQueuePayload,
+  calculateItemPriceBreakdown,
+} from "@/lib/supabase-utils"; // Make sure this is the *updated* joinQueue
+import type { Company, Service, ServiceVariant, Provider, QueueItem, QueueTypeStatus, AugmentedQueueItem } from "@/type"; // Ensure QueueItem has projected_start/end_time
 
 // --- UPDATED INTERFACE ---
 // The callback now expects the backend-calculated estimated start AND end times.
@@ -31,6 +38,7 @@ interface JoinQueueDialogProps {
   selectedProvider: Provider;
   currentQueueCount: number;
   estimatedQueueStartTime: Date | null; // This is the PRE-JOIN client-side estimate
+  selectedVariant?: ServiceVariant | null;
   // Callback now includes estimatedEndTime from the backend
   onQueueJoined: (queueEntry: QueueItem, estimatedStartTime: Date | null, estimatedEndTime: Date | null) => void;
 }
@@ -43,6 +51,7 @@ export function JoinQueueDialog({
   selectedProvider,
   currentQueueCount,
   estimatedQueueStartTime,
+  selectedVariant,
   onQueueJoined,
 }: JoinQueueDialogProps) {
   const router = useRouter();
@@ -81,12 +90,19 @@ export function JoinQueueDialog({
   const handleJoinQueue = async () => {
     setIsLoading(true);
     try {
+      const currentItem = selectedVariant || service;
+      const priceBreakdown = calculateItemPriceBreakdown(currentItem);
+
       // --- Use the new CreateQueuePayload type ---
       const queueEntryPayload: CreateQueuePayload = { // <--- Explicitly type with CreateQueuePayload
           service_id: service.id,
           provider_id: selectedProvider.isAny ? null : selectedProvider.id,
           notes: notes.trim() || null,
           queue_type: 'walk-in',
+          service_variant_id: selectedVariant?.id || null,
+          original_price: priceBreakdown.originalPrice,
+          discount_amount: priceBreakdown.discountAmount,
+          final_price: priceBreakdown.finalPrice,
       };
 
       const createdQueueEntry: AugmentedQueueItem = await joinQueue(queueEntryPayload);
@@ -122,6 +138,9 @@ export function JoinQueueDialog({
     }
   };
 
+  const currentItem = selectedVariant || service;
+  const priceBreakdown = calculateItemPriceBreakdown(currentItem);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
@@ -142,6 +161,11 @@ export function JoinQueueDialog({
             />
             <div>
               <p className="text-lg font-semibold">{service.name}</p>
+              {selectedVariant && (
+                <p className="text-xs font-semibold text-amber-600">
+                  Option: {selectedVariant.name} ({selectedVariant.duration_mins || service.estimated_wait_time_mins} min)
+                </p>
+              )}
               <p className="text-sm text-muted-foreground">{company.name}</p>
             </div>
           </div>
@@ -160,6 +184,21 @@ export function JoinQueueDialog({
           <div className="space-y-2 text-sm mt-4">
             <p><strong>Provider:</strong> {selectedProvider.name}</p>
             <p><strong>Your estimated position:</strong> {currentQueueCount + 1} (Final position confirmed after joining)</p>
+            <p>
+              <strong>Price:</strong>{" "}
+              {priceBreakdown.isCallForPrice ? (
+                <span className="text-amber-600">Contact for price</span>
+              ) : priceBreakdown.hasDiscount ? (
+                <span>
+                  ETB {priceBreakdown.finalPrice?.toFixed(0)}{" "}
+                  <span className="line-through text-muted-foreground text-xs">
+                    {priceBreakdown.originalPrice?.toFixed(0)}
+                  </span>
+                </span>
+              ) : (
+                `ETB ${priceBreakdown.originalPrice?.toFixed(0) || "0"}`
+              )}
+            </p>
 
             {estimatedQueueStartTime ? (
               <p className="text-orange-600">

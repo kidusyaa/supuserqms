@@ -1,10 +1,11 @@
 "use client";
 
-import React from "react";
+import React, { useMemo } from "react";
 import Link from "next/link";
 import { Icon } from "@iconify/react";
-import type { Service } from "@/type";
+import type { Service, PackageItem } from "@/type";
 import { cn } from "@/lib/utils";
+import { calculateItemPriceBreakdown } from "@/lib/supabase-utils";
 
 interface PackageCardProps {
   service: Service;
@@ -12,73 +13,129 @@ interface PackageCardProps {
 }
 
 export default function PackageCard({ service, className = "" }: PackageCardProps) {
-  // Discount calculations
-  const originalPriceNum = parseFloat(service.price || '0');
-  const hasDiscount = !!(service.discount_type && service.discount_value && originalPriceNum > 0);
-
-  let discountedPriceNum = originalPriceNum;
-  if (hasDiscount) {
-    if (service.discount_type === 'percentage') {
-      discountedPriceNum = originalPriceNum * (1 - service.discount_value! / 100);
-    } else if (service.discount_type === 'fixed') {
-      discountedPriceNum = Math.max(0, originalPriceNum - service.discount_value!);
-    }
-  }
-
-  // 1. Combined category string: e.g. "Reflexology + Manicure"
-  const getPackageCategoriesText = (): string => {
-    if (service.included_services && service.included_services.length > 0) {
-      const catNames = service.included_services
-        .map(s => s.service_category?.name || s.name)
-        .filter(Boolean);
-      if (catNames.length > 0) {
-        return Array.from(new Set(catNames)).join(" + ");
+  // 1. Calculate sum of individual items if available
+  const individualSum = useMemo(() => {
+    let sum = 0;
+    if (service.package_items && service.package_items.length > 0) {
+      for (const item of service.package_items) {
+        if (item.item_type === 'service') {
+          const p = item.linked_variant?.price || item.linked_service?.price;
+          if (p) sum += parseFloat(String(p)) || 0;
+        }
+      }
+    } else if (service.included_services && service.included_services.length > 0) {
+      for (const sub of service.included_services) {
+        if (sub.price) sum += parseFloat(sub.price) || 0;
       }
     }
-    if (service.service_category?.name) {
-      return service.service_category.name;
-    }
-    if (service.description) {
-      const parts = service.description
-        .split(/[\n,+•]+/)
-        .map(s => s.trim())
-        .filter(s => s.length > 1 && !s.toLowerCase().includes("package"));
-      if (parts.length > 0) return parts.join(" + ");
-    }
-    return "Reflexology + Manicure";
-  };
+    return sum;
+  }, [service.package_items, service.included_services]);
 
-  // 2. Included category items for checklist
-  const getIncludedServices = (): string[] => {
+  // 2. Price and Discount calculations
+  const priceBreakdown = useMemo(() => {
+    return calculateItemPriceBreakdown(service);
+  }, [service]);
+
+  const isPriceVisible = !priceBreakdown.isCallForPrice;
+  const originalPriceNum = priceBreakdown.originalPrice || individualSum || 0;
+  const finalPriceNum = priceBreakdown.finalPrice ?? (originalPriceNum > 0 ? originalPriceNum : null);
+  const hasDiscount = priceBreakdown.hasDiscount || (individualSum > 0 && finalPriceNum !== null && individualSum > finalPriceNum);
+
+  // Struck-through sum (show individual services sum if higher than package price)
+  const struckThroughPrice = useMemo(() => {
+    if (individualSum > 0 && finalPriceNum !== null && individualSum > finalPriceNum) {
+      return individualSum;
+    }
+    if (priceBreakdown.hasDiscount && priceBreakdown.originalPrice && finalPriceNum !== null && priceBreakdown.originalPrice > finalPriceNum) {
+      return priceBreakdown.originalPrice;
+    }
+    return null;
+  }, [individualSum, finalPriceNum, priceBreakdown]);
+
+  // Discount Badge text: e.g. "Total 10% discount" or "Save 400 ETB"
+  const discountBadgeText = useMemo(() => {
+    if (service.discount_type === 'percentage' && service.discount_value) {
+      return `Total ${Math.round(Number(service.discount_value))}% discount`;
+    }
+    if (service.discount_type === 'fixed' && service.discount_value) {
+      return `Save ${service.discount_value} ETB`;
+    }
+    if (struckThroughPrice && finalPriceNum && struckThroughPrice > finalPriceNum) {
+      const saved = Math.round(struckThroughPrice - finalPriceNum);
+      return `Save ${saved} ETB`;
+    }
+    return null;
+  }, [service.discount_type, service.discount_value, struckThroughPrice, finalPriceNum]);
+
+  // 3. Inclusions checklist
+  const inclusionsList = useMemo((): Array<{ text: string; subtext?: string }> => {
+    // If curated package_items exist
+    if (service.package_items && service.package_items.length > 0) {
+      return service.package_items.map((item: PackageItem) => {
+        if (item.item_type === 'custom' || !item.linked_service_id) {
+          return { text: item.custom_name || "Special Amenity" };
+        }
+        const serviceName = item.linked_service?.name || item.custom_name || "Linked Service";
+        const variantName = item.linked_variant?.name || item.service_variant?.name;
+        const subtext = variantName ? `(${variantName})` : undefined;
+        return { text: subtext ? `${serviceName} ${subtext}` : serviceName };
+      });
+    }
+
+    // If description_points exist on the package
+    if (service.description_points && service.description_points.length > 0) {
+      return service.description_points.map((p) => ({ text: p }));
+    }
+
+    // Fallback to included_services
     if (service.included_services && service.included_services.length > 0) {
-      return service.included_services
-        .map(s => s.service_category?.name || s.name || "Treatment")
-        .filter(Boolean);
+      return service.included_services.map((sub) => ({
+        text: sub.name,
+        subtext: sub.service_category?.name,
+      }));
     }
+
+    // Fallback to description breakdown
     if (service.description) {
       const parts = service.description
         .split(/[\n,+•]+/)
-        .map(s => s.trim())
-        .filter(s => s.length > 1 && !s.toLowerCase().includes("package"));
-      if (parts.length > 0) return parts;
+        .map((s) => s.trim())
+        .filter((s) => s.length > 1 && !s.toLowerCase().includes("package"));
+      if (parts.length > 0) {
+        return parts.map((p) => ({ text: p }));
+      }
     }
-    const combined = getPackageCategoriesText();
-    if (combined && combined.includes("+")) {
-      return combined.split("+").map(s => s.trim()).filter(Boolean);
-    }
-    return ["Haircut", "Beard Trim", "Hot Towel Shave"];
-  };
 
-  const packageCategoriesText = getPackageCategoriesText();
-  const includedList = getIncludedServices();
-  const packageBadgeText = includedList.length > 1 ? `${includedList.length}-in-1 package` : "Special package";
+    return [{ text: "Adona Refresh" }, { text: "Wash and Style / Hair cut" }, { text: "Seasonal fruit Juice" }];
+  }, [service.package_items, service.description_points, service.included_services, service.description]);
+
+  // 4. Combined categories text
+  const packageCategoriesText = useMemo(() => {
+    if (service.package_items && service.package_items.length > 0) {
+      const catNames = service.package_items
+        .map((pi) => pi.linked_service?.service_category?.name || pi.linked_service?.name || pi.custom_name)
+        .filter(Boolean);
+      if (catNames.length > 0) return Array.from(new Set(catNames)).join(" + ");
+    }
+    if (service.included_services && service.included_services.length > 0) {
+      const catNames = service.included_services
+        .map((s) => s.service_category?.name || s.name)
+        .filter(Boolean);
+      if (catNames.length > 0) return Array.from(new Set(catNames)).join(" + ");
+    }
+    if (service.service_category?.name) return service.service_category.name;
+    return "Curated Experience";
+  }, [service.package_items, service.included_services, service.service_category]);
+
+  const packageBadgeText = inclusionsList.length > 1 ? `${inclusionsList.length}-in-1 package` : "Curated package";
 
   const ratingSummary = service.company?.rating_summary;
   const hasRatings = Boolean(ratingSummary && Number(ratingSummary.total_ratings) > 0);
   const averageStars = hasRatings ? Number(ratingSummary!.average_stars) : 1;
   const totalRatings = hasRatings ? Number(ratingSummary!.total_ratings) : 0;
 
-  const locationText = service.company?.location_text?.split(",")?.[0]?.trim() ||
+  const locationText =
+    service.company?.location_text?.split(",")?.[0]?.trim() ||
     service.company?.address?.split(",")?.[0]?.trim() ||
     "Bole";
 
@@ -96,31 +153,17 @@ export default function PackageCard({ service, className = "" }: PackageCardProp
       )}
     >
       <div>
-        {/* ── Top Header Row: Badge on Left, Price on Right ── */}
+        {/* ── Top Header Row: Badge on Left, Discount Badge / Price on Right ── */}
         <div className="flex items-center justify-between gap-2 mb-3">
           <span className="inline-flex items-center px-3 py-1 rounded-full bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 font-bold text-xs border border-amber-200/60 tracking-tight">
             {packageBadgeText}
           </span>
 
-          {/* Price */}
-          <div className="flex items-baseline gap-1.5">
-            {service.price === null ? (
-              <span className="text-sm font-bold text-amber-600">Call for price</span>
-            ) : hasDiscount ? (
-              <>
-                <span className="text-lg sm:text-xl font-black text-slate-900 dark:text-white tracking-tight">
-                  {discountedPriceNum.toFixed(0)} ETB
-                </span>
-                <span className="line-through text-xs sm:text-sm text-slate-400 font-normal">
-                  {originalPriceNum.toFixed(0)} ETB
-                </span>
-              </>
-            ) : (
-              <span className="text-lg sm:text-xl font-black text-slate-900 dark:text-white tracking-tight">
-                {originalPriceNum.toFixed(0)} ETB
-              </span>
-            )}
-          </div>
+          {discountBadgeText && (
+            <span className="bg-amber-500 text-white rounded-full text-[11px] font-bold px-2.5 py-0.5 shadow-xs">
+              {discountBadgeText}
+            </span>
+          )}
         </div>
 
         {/* ── Package Title ── */}
@@ -159,19 +202,45 @@ export default function PackageCard({ service, className = "" }: PackageCardProp
           </div>
         </div>
 
-        {/* ── Included Services / Categories List with Orange Checkmarks ── */}
-        <ul className="space-y-2.5 my-4">
-          {includedList.map((categoryItem, idx) => (
-            <li key={idx} className="flex items-center gap-2.5 text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-200">
-              <Icon icon="akar-icons:check" className="w-4 h-4 text-amber-500 shrink-0" />
-              <span className="truncate">{categoryItem}</span>
-            </li>
-          ))}
-        </ul>
+        {/* ── Included Checklist (Curated Inclusions) ── */}
+        <div className="my-3.5">
+          <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">
+            Package Inclusions
+          </p>
+          <ul className="space-y-2">
+            {inclusionsList.map((item, idx) => (
+              <li key={idx} className="flex items-start gap-2 text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-200">
+                <Icon icon="akar-icons:check" className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                <span className="truncate">{item.text}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
 
-      {/* ── Bottom Action: Full-width Dark Tertiary/Navy Book package Button ── */}
-      <div className="pt-2">
+      {/* ── Price Summary & Action ── */}
+      <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80 space-y-3">
+        <div className="flex items-baseline justify-between">
+          <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Package Total</span>
+          <div className="flex items-baseline gap-2">
+            {!isPriceVisible ? (
+              <span className="text-sm font-bold text-amber-600">Contact for price</span>
+            ) : (
+              <>
+                {struckThroughPrice && finalPriceNum && struckThroughPrice > finalPriceNum && (
+                  <span className="line-through text-xs sm:text-sm text-slate-400 font-normal">
+                    {struckThroughPrice.toFixed(0)} ETB
+                  </span>
+                )}
+                <span className="text-lg sm:text-xl font-black text-slate-900 dark:text-white tracking-tight">
+                  Total {finalPriceNum?.toFixed(0)} ETB
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* ── Bottom Action: Full-width Book package Button ── */}
         <Link
           href={bookingHref}
           className="w-full py-3 px-4 rounded-2xl bg-tertiary hover:bg-slate-900 text-white font-bold text-xs sm:text-sm flex items-center justify-center transition-all shadow-sm hover:shadow-md active:scale-[0.98]"

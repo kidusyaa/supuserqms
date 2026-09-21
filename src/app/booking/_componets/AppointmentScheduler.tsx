@@ -18,6 +18,7 @@ interface AppointmentSchedulerProps {
   availableSlots: AvailableSlot[];
   onSlotClick: (slot: AvailableSlot) => void;
   isProviderSelected: boolean;
+  selectedSlot?: AvailableSlot | null;
 }
 
 export default function AppointmentScheduler({
@@ -28,6 +29,7 @@ export default function AppointmentScheduler({
   availableSlots,
   onSlotClick,
   isProviderSelected,
+  selectedSlot,
 }: AppointmentSchedulerProps) {
   const [calendarMode, setCalendarMode] = useState<"ethiopian" | "gregorian">("ethiopian");
 
@@ -149,17 +151,26 @@ export default function AppointmentScheduler({
                 {availableSlots.length} available slots on this day. Select one to confirm:
               </p>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-[300px] overflow-y-auto pr-1">
-                {availableSlots.map((slot) => (
-                  <button
-                    key={slot.start.toISOString()}
-                    type="button"
-                    onClick={() => onSlotClick(slot)}
-                    disabled={!isProviderSelected}
-                    className="py-2.5 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-amber-500 hover:bg-amber-50/50 dark:hover:bg-slate-700 text-xs font-bold text-slate-800 dark:text-slate-200 transition-all cursor-pointer shadow-none hover:shadow-2xs text-center active:scale-98"
-                  >
-                    {slot.formattedTime}
-                  </button>
-                ))}
+                {availableSlots.map((slot) => {
+                  const isSelected = selectedSlot?.start.toISOString() === slot.start.toISOString();
+                  return (
+                    <button
+                      key={slot.start.toISOString()}
+                      type="button"
+                      onClick={() => onSlotClick(slot)}
+                      disabled={!isProviderSelected}
+                      className={cn(
+                        "py-2.5 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer shadow-none text-center active:scale-98 flex items-center justify-center gap-1",
+                        isSelected
+                          ? "border-amber-500 bg-amber-500 text-white shadow-xs font-black ring-2 ring-amber-500/30"
+                          : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-amber-500 hover:bg-amber-50/50 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200"
+                      )}
+                    >
+                      {isSelected && <Icon icon="akar-icons:check" className="w-3.5 h-3.5 shrink-0" />}
+                      <span>{slot.formattedTime}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           ) : (

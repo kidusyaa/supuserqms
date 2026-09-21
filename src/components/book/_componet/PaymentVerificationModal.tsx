@@ -175,9 +175,8 @@ export default function PaymentVerificationModal({
     setUploadError(null);
 
     try {
-      const edgeFunctionUrl = `${
-        process.env.NEXT_PUBLIC_SUPABASE_URL || "https://cxifbxhpwkxnsxxpaxwh.supabase.co"
-      }/functions/v1/send-payment-proof`;
+      const edgeFunctionUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL || "https://cxifbxhpwkxnsxxpaxwh.supabase.co"
+        }/functions/v1/send-payment-proof`;
 
       const formData = new FormData();
       formData.append("booking_id", booking.id);
@@ -296,10 +295,10 @@ export default function PaymentVerificationModal({
                 modalState === "approved"
                   ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400"
                   : modalState === "rejected"
-                  ? "bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400"
-                  : modalState === "verifying"
-                  ? "bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400"
-                  : "bg-[#0f2937]/10 text-[#0f2937] dark:bg-slate-800 dark:text-white"
+                    ? "bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400"
+                    : modalState === "verifying"
+                      ? "bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400"
+                      : "bg-[#0f2937]/10 text-[#0f2937] dark:bg-slate-800 dark:text-white"
               )}
             >
               {modalState === "approved" && <Icon icon="solar:check-circle-bold" className="w-5 h-5" />}

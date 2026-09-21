@@ -62,6 +62,40 @@ export interface CompanyPhoto {
 interface ServicePhoto {
   url: string;
 }
+
+export type ServiceVariant = {
+  id: string;
+  service_id: string;
+  name: string;
+  duration_mins?: number | null;
+  price: string | number | null;
+  price_type?: 'fixed' | 'call_for_price';
+  discount_type?: 'percentage' | 'fixed' | null;
+  discount_value?: number | null;
+  discount_end_date?: string | null;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type PackageItem = {
+  id: string;
+  package_id?: string;
+  service_id?: string;
+  item_type: 'service' | 'custom';
+  linked_service_id?: string | null;
+  linked_variant_id?: string | null;
+  service_variant_id?: string | null;
+  custom_name?: string | null;
+  quantity?: number;
+  display_order?: number;
+  created_at?: string;
+  linked_service?: Service;
+  service?: Service;
+  linked_variant?: ServiceVariant;
+  service_variant?: ServiceVariant;
+};
+
 export type Service = {
   id: string;
   company_id: string;
@@ -81,6 +115,7 @@ export type Service = {
   service_photos?: ServicePhoto[];
   discount_type: 'percentage' | 'fixed' | null;
   discount_value: number | null; 
+  discount_end_date?: string | null;
   service_category?: { name: string };
   requires_prepayment: boolean;
   prepayment_amount?: number | null;
@@ -89,6 +124,11 @@ export type Service = {
   included_services?: Service[];
   video_url?: string | null;
   video_platform?: string | null;
+  is_price_visible?: boolean | null;
+  has_variants?: boolean | null;
+  description_points?: string[] | null;
+  service_variants?: ServiceVariant[];
+  package_items?: PackageItem[];
 };
 
 // In your type.ts file:
@@ -107,6 +147,12 @@ export type QueueItem = {
   user_id: string | null; // uuid from DB, can be null
   projected_start_time?: string | null; // NEW: ISO string
   projected_end_time?: string | null;   // NEW: ISO string
+  service_variant_id?: string | null;
+  original_price?: number | null;
+  discount_amount?: number | null;
+  final_price?: number | null;
+  service_variant?: ServiceVariant;
+  service?: Service;
 };
 
 export interface AugmentedQueueItem extends QueueItem {
@@ -130,6 +176,11 @@ export interface Booking {
   created_at: string;
   notes: string | null;
   payment_proof?: string | null;
+  service_variant_id?: string | null;
+  original_price?: number | null;
+  discount_amount?: number | null;
+  final_price?: number | null;
+  service_variant?: ServiceVariant;
   service?: Service;
   company?: Company;
   provider?: Provider;

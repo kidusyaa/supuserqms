@@ -3,11 +3,12 @@
 import Image from "next/image";
 import { Icon } from "@iconify/react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
-import type { Service, Company } from "@/type";
+import type { Service, Company, ServiceVariant, PackageItem } from "@/type";
 import { format, isToday } from "date-fns";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import ServiceVideoModal from "@/components/ServiceVideoModal";
 import { cn } from "@/lib/utils";
+import { calculateItemPriceBreakdown, calculateServiceStartingPrice } from "@/lib/supabase-utils";
 
 interface ServiceDetailsCardProps {
   service: Service;
@@ -15,32 +16,9 @@ interface ServiceDetailsCardProps {
   queueCount: number;
   estimatedQueueStartTime: Date | null;
   selectedProviderName?: string;
+  selectedVariant?: ServiceVariant | null;
+  onVariantSelect?: (variant: ServiceVariant) => void;
 }
-
-const calculateDiscountedPrice = (service: Service): string | null => {
-  const originalPrice = parseFloat(service.price || "0");
-  if (!service.discount_type || service.discount_value === null || originalPrice === 0) {
-    return service.price;
-  }
-  let finalPrice = originalPrice;
-  if (service.discount_type === "percentage") {
-    finalPrice = originalPrice * (1 - service.discount_value / 100);
-  } else if (service.discount_type === "fixed") {
-    finalPrice = originalPrice - service.discount_value;
-  }
-  return (finalPrice > 0 ? finalPrice : 0).toFixed(0);
-};
-
-const formatDiscount = (service: Service): string => {
-  if (!service.discount_type || service.discount_value === null) return "";
-  if (service.discount_type === "percentage") {
-    return `${service.discount_value}% OFF`;
-  }
-  if (service.discount_type === "fixed") {
-    return `Save ${service.discount_value} ETB`;
-  }
-  return "";
-};
 
 export default function ServiceDetailsCard({
   service,
@@ -48,6 +26,8 @@ export default function ServiceDetailsCard({
   queueCount,
   estimatedQueueStartTime,
   selectedProviderName,
+  selectedVariant,
+  onVariantSelect,
 }: ServiceDetailsCardProps) {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -55,22 +35,75 @@ export default function ServiceDetailsCard({
   const [isAutoPlayPaused, setIsAutoPlayPaused] = useState(false);
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
 
-  const hasDiscount =
-    service.discount_type &&
-    service.discount_value !== null &&
-    parseFloat(service.price || "0") > 0;
+  // Active variants
+  const activeVariants = useMemo(() => {
+    if (!service.has_variants || !service.service_variants) return [];
+    return service.service_variants.filter((v) => v.is_active !== false);
+  }, [service.has_variants, service.service_variants]);
 
-  const originalPriceValue = parseFloat(service.price || "0");
-  const formattedOriginalPrice =
-    originalPriceValue > 0 ? `${originalPriceValue.toFixed(0)} ETB` : null;
+  const hasVariants = activeVariants.length > 0;
 
-  const discountedPriceValue = hasDiscount
-    ? parseFloat(calculateDiscountedPrice(service) || "0")
-    : originalPriceValue;
-  const formattedDiscountedPrice =
-    discountedPriceValue > 0 ? `${discountedPriceValue.toFixed(0)} ETB` : null;
+  // Starting price information for unselected state
+  const startingPriceInfo = useMemo(() => {
+    return calculateServiceStartingPrice(service);
+  }, [service]);
 
-  const discountLabel = hasDiscount ? formatDiscount(service) : null;
+  // Current effective item (selected variant or service)
+  const currentItem = selectedVariant || service;
+  const priceBreakdown = useMemo(() => {
+    return calculateItemPriceBreakdown(currentItem);
+  }, [currentItem]);
+
+  const isPriceVisible = !priceBreakdown.isCallForPrice;
+
+  // Package individual sum
+  const individualSum = useMemo(() => {
+    if (!service.is_package) return 0;
+    let sum = 0;
+    if (service.package_items && service.package_items.length > 0) {
+      for (const item of service.package_items) {
+        if (item.item_type === 'service') {
+          const p = item.linked_variant?.price || item.linked_service?.price;
+          if (p) sum += parseFloat(String(p)) || 0;
+        }
+      }
+    } else if (service.included_services && service.included_services.length > 0) {
+      for (const sub of service.included_services) {
+        if (sub.price) sum += parseFloat(sub.price) || 0;
+      }
+    }
+    return sum;
+  }, [service.is_package, service.package_items, service.included_services]);
+
+  const struckThroughPrice = useMemo(() => {
+    if (service.is_package && individualSum > 0 && priceBreakdown.finalPrice && individualSum > priceBreakdown.finalPrice) {
+      return individualSum;
+    }
+    if (priceBreakdown.hasDiscount && priceBreakdown.originalPrice && priceBreakdown.finalPrice && priceBreakdown.originalPrice > priceBreakdown.finalPrice) {
+      return priceBreakdown.originalPrice;
+    }
+    return null;
+  }, [service.is_package, individualSum, priceBreakdown]);
+
+  // Top discount badge text
+  const discountLabel = useMemo(() => {
+    if (service.is_package) {
+      if (service.discount_type === 'percentage' && service.discount_value) {
+        return `Total ${Math.round(Number(service.discount_value))}% OFF`;
+      }
+      if (service.discount_type === 'fixed' && service.discount_value) {
+        return `Save ${service.discount_value} ETB`;
+      }
+      if (struckThroughPrice && priceBreakdown.finalPrice && struckThroughPrice > priceBreakdown.finalPrice) {
+        const saved = Math.round(struckThroughPrice - priceBreakdown.finalPrice);
+        return `Save ${saved} ETB`;
+      }
+    }
+    if (priceBreakdown.hasDiscount && priceBreakdown.discountLabel) {
+      return priceBreakdown.discountLabel;
+    }
+    return null;
+  }, [service, priceBreakdown, struckThroughPrice]);
 
   // --- Images determination ---
   const imageUrls = new Set<string>();
@@ -109,6 +142,11 @@ export default function ServiceDetailsCard({
     return () => window.clearInterval(id);
   }, [uniqueImageUrls.length, isAutoPlayPaused, selectedImage]);
 
+  const currentDuration = selectedVariant?.duration_mins || service.estimated_wait_time_mins || 30;
+
+  const phoneLink = company.phone ? `tel:${company.phone}` : null;
+  const telegramLink = company.socials?.website?.includes("t.me") ? company.socials.website : null;
+
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 sm:p-7 shadow-none mb-6 sm:mb-8">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-start">
@@ -136,8 +174,8 @@ export default function ServiceDetailsCard({
                   />
 
                   {/* Discount Chip */}
-                  {hasDiscount && discountLabel && (
-                    <div className="absolute top-3 left-3 bg-amber-500 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow-xs flex items-center gap-1">
+                  {discountLabel && (
+                    <div className="absolute top-3 left-3 bg-amber-500 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow-xs flex items-center gap-1 z-10">
                       <Icon icon="solar:tag-price-bold" className="w-3.5 h-3.5" />
                       <span>{discountLabel}</span>
                     </div>
@@ -272,30 +310,196 @@ export default function ServiceDetailsCard({
 
             {/* Price Block */}
             <div className="sm:text-right">
-              {service.price === null ? (
-                <span className="text-sm font-bold text-amber-600">Call for price</span>
-              ) : hasDiscount ? (
+              {!isPriceVisible ? (
+                <div className="flex flex-col sm:items-end gap-1.5">
+                  <span className="text-base sm:text-lg font-bold text-amber-600">Contact for price</span>
+                  {phoneLink && (
+                    <a
+                      href={phoneLink}
+                      className="inline-flex items-center gap-1.5 text-xs font-bold bg-amber-500 text-white px-3 py-1.5 rounded-full hover:bg-amber-600 transition-colors shadow-xs"
+                    >
+                      <Icon icon="solar:phone-calling-bold" className="w-3.5 h-3.5" />
+                      <span>Contact Venue</span>
+                    </a>
+                  )}
+                </div>
+              ) : hasVariants && !selectedVariant ? (
+                <div>
+                  <span className="text-[11px] font-bold text-amber-600 dark:text-amber-500 block uppercase tracking-wide">
+                    Starting from
+                  </span>
+                  <div className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
+                    {startingPriceInfo.minPrice?.toFixed(0) || priceBreakdown.originalPrice?.toFixed(0)} ETB
+                  </div>
+                  <span className="text-[11px] text-slate-400">
+                    Select an option below
+                  </span>
+                </div>
+              ) : priceBreakdown.hasDiscount || (struckThroughPrice && priceBreakdown.finalPrice && struckThroughPrice > priceBreakdown.finalPrice) ? (
                 <div>
                   <div className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
-                    {formattedDiscountedPrice}
+                    {priceBreakdown.finalPrice?.toFixed(0)} ETB
                   </div>
-                  <span className="line-through text-xs sm:text-sm text-slate-400">
-                    {formattedOriginalPrice}
-                  </span>
+                  {struckThroughPrice && (
+                    <span className="line-through text-xs sm:text-sm text-slate-400">
+                      {struckThroughPrice.toFixed(0)} ETB
+                    </span>
+                  )}
                 </div>
               ) : (
                 <div className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
-                  {service.price} ETB
+                  {priceBreakdown.originalPrice?.toFixed(0)} ETB
                 </div>
               )}
             </div>
           </div>
 
-          {/* Description */}
+          {/* ── Top Variant / Option Selector (Prominent at the Top if variants exist) ── */}
+          {hasVariants && (
+            <div
+              id="booking-variant-selector"
+              className={cn(
+                "rounded-2xl p-4 sm:p-5 border transition-all duration-300",
+                !selectedVariant
+                  ? "bg-amber-50/70 dark:bg-amber-950/25 border-amber-300 dark:border-amber-800/70 shadow-xs ring-2 ring-amber-400/25"
+                  : "bg-slate-50/70 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800"
+              )}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <div className="flex items-center gap-2">
+                  <span
+                    className={cn(
+                      "w-2.5 h-2.5 rounded-full shrink-0",
+                      !selectedVariant ? "bg-amber-500 animate-pulse" : "bg-emerald-500"
+                    )}
+                  ></span>
+                  <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                    Select Option / Quantity
+                  </h3>
+                  {!selectedVariant && (
+                    <span className="px-2 py-0.5 rounded-full bg-amber-200/80 dark:bg-amber-900/60 text-amber-900 dark:text-amber-200 text-[10px] font-extrabold uppercase tracking-wide">
+                      Select option to view price
+                    </span>
+                  )}
+                </div>
+
+                {selectedVariant ? (
+                  <span className="text-xs text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
+                    <Icon icon="solar:check-circle-bold" className="w-4 h-4" />
+                    <span>Selected: {selectedVariant.name}</span>
+                  </span>
+                ) : (
+                  <span className="text-xs text-amber-700 dark:text-amber-400 font-semibold italic">
+                    Choose one to proceed
+                  </span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                {activeVariants.map((variant) => {
+                  const isSelected = selectedVariant?.id === variant.id;
+                  const vBreakdown = calculateItemPriceBreakdown(variant);
+                  return (
+                    <button
+                      key={variant.id}
+                      type="button"
+                      onClick={() => onVariantSelect && onVariantSelect(variant)}
+                      className={cn(
+                        "relative p-3.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between gap-2",
+                        isSelected
+                          ? "border-amber-500 bg-white dark:bg-slate-900 ring-2 ring-amber-500/40 shadow-sm"
+                          : "border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-900/60 hover:border-slate-300 hover:bg-white"
+                      )}
+                    >
+                      <div className="flex items-center justify-between w-full gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span
+                            className={cn(
+                              "w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors",
+                              isSelected
+                                ? "border-amber-500 bg-amber-500 text-white"
+                                : "border-slate-300 dark:border-slate-600"
+                            )}
+                          >
+                            {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-white"></span>}
+                          </span>
+                          <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
+                            {variant.name}
+                          </span>
+                        </div>
+                        {vBreakdown.hasDiscount && (
+                          <span className="bg-amber-500 text-white rounded-full text-[9px] font-extrabold px-1.5 py-0.5 shrink-0">
+                            Save {vBreakdown.discountAmount.toFixed(0)}
+                          </span>
+                        )}
+                      </div>
+
+                      {variant.duration_mins && (
+                        <div className="flex items-center gap-1 text-[11px] text-slate-400 pl-6">
+                          <Icon icon="solar:clock-circle-linear" className="w-3.5 h-3.5 text-slate-400" />
+                          <span>{variant.duration_mins} min</span>
+                        </div>
+                      )}
+
+                      <div className="flex items-baseline justify-between mt-1 pt-1.5 border-t border-slate-100 dark:border-slate-800 pl-6">
+                        {vBreakdown.isCallForPrice ? (
+                          <span className="text-xs font-bold text-amber-600">Contact for price</span>
+                        ) : (
+                          <div className="flex items-baseline gap-1.5">
+                            <span className="text-sm font-black text-slate-900 dark:text-white">
+                              {vBreakdown.finalPrice?.toFixed(0)} ETB
+                            </span>
+                            {vBreakdown.hasDiscount && (
+                              <span className="line-through text-[10px] text-slate-400">
+                                {vBreakdown.originalPrice?.toFixed(0)}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        <span
+                          className={cn(
+                            "text-[10px] font-bold uppercase tracking-wider",
+                            isSelected ? "text-amber-600 dark:text-amber-400" : "text-slate-400"
+                          )}
+                        >
+                          {isSelected ? "Selected" : "Select"}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ── High-Visibility Service Description Box ── */}
           {service.description && (
-            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-              {service.description}
-            </p>
+            <div className="bg-white dark:bg-slate-800/90 border border-slate-200/90 dark:border-slate-700/80 rounded-2xl p-4 sm:p-5 shadow-[0_1px_3px_rgba(0,0,0,0.03)] space-y-2">
+              <div className="flex items-center gap-2 text-slate-800 dark:text-slate-200">
+                <Icon icon="solar:document-text-bold" className="w-4 h-4 text-amber-500" />
+                <h4 className="text-xs font-bold uppercase tracking-wider">
+                  About this Service &amp; Details
+                </h4>
+              </div>
+              <div className="text-xs sm:text-sm text-slate-700 dark:text-slate-200 leading-relaxed whitespace-pre-line font-normal">
+                {service.description}
+              </div>
+            </div>
+          )}
+
+          {/* ── Included Amenities / Perks Chips (description_points) ── */}
+          {service.description_points && service.description_points.length > 0 && (
+            <div className="flex flex-wrap gap-2 pt-1">
+              {service.description_points.map((perk, idx) => (
+                <span
+                  key={idx}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200/70 dark:border-emerald-900/50 shadow-2xs"
+                >
+                  <Icon icon="akar-icons:check" className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <span>{perk}</span>
+                </span>
+              ))}
+            </div>
           )}
 
           {/* Meta Specifications Grid (Clean 1px Border Cards) */}
@@ -307,7 +511,7 @@ export default function ServiceDetailsCard({
                 <span>Duration</span>
               </div>
               <p className="font-bold text-sm text-slate-900 dark:text-white">
-                {service.estimated_wait_time_mins || 30} mins
+                {currentDuration} mins
               </p>
             </div>
 
@@ -334,40 +538,84 @@ export default function ServiceDetailsCard({
             </div>
           </div>
 
-          {/* Included Package Sub-Services (If package) */}
-          {service.is_package && service.included_services && service.included_services.length > 0 && (
-            <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl p-3.5 space-y-2.5">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-300">
-                <Icon icon="solar:layers-minimalistic-bold" className="w-4 h-4 text-purple-600" />
-                <span>Included in this Package ({service.included_services.length} services):</span>
+          {/* ── Curated Package Inclusions Breakdown (If package) ── */}
+          {service.is_package && (
+            <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 space-y-3">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 dark:text-slate-200">
+                <Icon icon="solar:layers-minimalistic-bold" className="w-4 h-4 text-amber-600" />
+                <span>Curated Package Inclusions:</span>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {service.included_services.map((sub, idx) => (
-                  <div
-                    key={sub.id || idx}
-                    className="flex items-center gap-2.5 bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200/80 dark:border-slate-800"
-                  >
-                    <div className="relative w-9 h-9 rounded-lg overflow-hidden bg-slate-100 shrink-0 border border-slate-200">
-                      <Image
-                        src={sub.photo || "/placeholder-service.png"}
-                        alt={sub.name}
-                        fill
-                        className="object-cover"
-                      />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold text-xs text-slate-900 dark:text-white truncate">
-                        {sub.name}
-                      </p>
-                      {sub.estimated_wait_time_mins && (
-                        <p className="text-[11px] text-slate-400">
-                          {sub.estimated_wait_time_mins} mins
+
+              {service.package_items && service.package_items.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {service.package_items.map((item, idx) => {
+                    const isCustom = item.item_type === 'custom' || !item.linked_service_id;
+                    const title = isCustom ? item.custom_name : (item.linked_service?.name || item.custom_name || "Service");
+                    const variantName = item.linked_variant?.name || item.service_variant?.name;
+                    return (
+                      <div
+                        key={item.id || idx}
+                        className="flex items-center gap-2.5 bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200/80 dark:border-slate-800"
+                      >
+                        <Icon icon="akar-icons:check" className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <p className="font-bold text-xs text-slate-900 dark:text-white truncate">
+                            {title}
+                          </p>
+                          {variantName && (
+                            <p className="text-[11px] text-amber-600 font-medium">
+                              {variantName}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : service.included_services && service.included_services.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {service.included_services.map((sub, idx) => (
+                    <div
+                      key={sub.id || idx}
+                      className="flex items-center gap-2.5 bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200/80 dark:border-slate-800"
+                    >
+                      <div className="relative w-9 h-9 rounded-lg overflow-hidden bg-slate-100 shrink-0 border border-slate-200">
+                        <Image
+                          src={sub.photo || "/placeholder-service.png"}
+                          alt={sub.name}
+                          fill
+                          className="object-cover"
+                        />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-xs text-slate-900 dark:text-white truncate">
+                          {sub.name}
                         </p>
-                      )}
+                        {sub.estimated_wait_time_mins && (
+                          <p className="text-[11px] text-slate-400">
+                            {sub.estimated_wait_time_mins} mins
+                          </p>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <ul className="space-y-1.5 text-xs text-slate-700">
+                  <li className="flex items-center gap-2">
+                    <Icon icon="akar-icons:check" className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Adona Refresh</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Icon icon="akar-icons:check" className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Wash and Style / Hair cut</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Icon icon="akar-icons:check" className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Seasonal fruit Juice</span>
+                  </li>
+                </ul>
+              )}
             </div>
           )}
 

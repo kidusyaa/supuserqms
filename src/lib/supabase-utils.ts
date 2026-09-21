@@ -39,8 +39,10 @@ import type {
   CompanyTypeWithCount,
 
   AugmentedQueueItem,
- 
-  
+
+  ServiceVariant,
+
+  PackageItem,
 
 } from '../type';
 import { ANY_PROVIDER_ID } from '../type';
@@ -331,9 +333,152 @@ export async function cancelBooking(bookingId: string): Promise<void> {
 
   notes?: string | null; 
 
+  service_variant_id?: string | null;
+
+  original_price?: number | null;
+
+  discount_amount?: number | null;
+
+  final_price?: number | null;
+
 };
 
+// Helper to check if a discount is currently active and not expired
+export function isDiscountActive(
+  discountType?: 'percentage' | 'fixed' | null,
+  discountValue?: number | null,
+  discountEndDate?: string | null
+): boolean {
+  if (!discountType || discountValue === null || discountValue === undefined || Number(discountValue) <= 0) {
+    return false;
+  }
+  if (discountEndDate) {
+    try {
+      const end = new Date(discountEndDate);
+      if (!isNaN(end.getTime()) && new Date() > end) return false;
+    } catch {
+      // ignore
+    }
+  }
+  return true;
+}
 
+// Helper to calculate price breakdown for any service or variant item
+export function calculateItemPriceBreakdown(item: {
+  price: string | number | null;
+  discount_type?: 'percentage' | 'fixed' | null;
+  discount_value?: number | null;
+  discount_end_date?: string | null;
+  is_price_visible?: boolean | null;
+  price_type?: 'fixed' | 'call_for_price';
+}) {
+  const isCallForPrice =
+    item.price_type === 'call_for_price' ||
+    item.is_price_visible === false ||
+    item.price === null ||
+    item.price === undefined ||
+    item.price === '';
+
+  if (isCallForPrice) {
+    return {
+      isCallForPrice: true,
+      originalPrice: null as number | null,
+      discountAmount: 0,
+      finalPrice: null as number | null,
+      hasDiscount: false,
+      discountLabel: '',
+    };
+  }
+
+  const originalPrice =
+    typeof item.price === 'number' ? item.price : parseFloat(String(item.price)) || 0;
+
+  const activeDiscount = isDiscountActive(
+    item.discount_type,
+    item.discount_value,
+    item.discount_end_date
+  );
+
+  let discountAmount = 0;
+  let discountLabel = '';
+  if (activeDiscount && item.discount_value) {
+    if (item.discount_type === 'percentage') {
+      discountAmount = (originalPrice * Number(item.discount_value)) / 100;
+      discountLabel = `${Math.round(Number(item.discount_value))}% off`;
+    } else if (item.discount_type === 'fixed') {
+      discountAmount = Math.min(originalPrice, Number(item.discount_value));
+      discountLabel = `Save ${Number(item.discount_value)} ETB`;
+    }
+  }
+
+  const finalPrice = Math.max(0, originalPrice - discountAmount);
+
+  return {
+    isCallForPrice: false,
+    originalPrice,
+    discountAmount,
+    finalPrice,
+    hasDiscount: discountAmount > 0,
+    discountLabel,
+  };
+}
+
+// Helper to calculate starting price for multi-variant or single service
+export function calculateServiceStartingPrice(service: Service): {
+  isCallForPrice: boolean;
+  minPrice: number | null;
+  originalPrice: number | null;
+  hasDiscount: boolean;
+  minVariant?: ServiceVariant | null;
+} {
+  if (service.is_price_visible === false) {
+    return { isCallForPrice: true, minPrice: null, originalPrice: null, hasDiscount: false };
+  }
+
+  if (service.has_variants && service.service_variants && service.service_variants.length > 0) {
+    const activeVariants = service.service_variants.filter((v) => v.is_active !== false);
+    if (activeVariants.length === 0) {
+      return { isCallForPrice: true, minPrice: null, originalPrice: null, hasDiscount: false };
+    }
+
+    let lowestFinalPrice: number | null = null;
+    let lowestVariant: ServiceVariant | null = null;
+    let lowestOriginalPrice: number | null = null;
+    let lowestHasDiscount = false;
+
+    for (const variant of activeVariants) {
+      const breakdown = calculateItemPriceBreakdown(variant);
+      if (!breakdown.isCallForPrice && breakdown.finalPrice !== null) {
+        if (lowestFinalPrice === null || breakdown.finalPrice < lowestFinalPrice) {
+          lowestFinalPrice = breakdown.finalPrice;
+          lowestVariant = variant;
+          lowestOriginalPrice = breakdown.originalPrice;
+          lowestHasDiscount = breakdown.hasDiscount;
+        }
+      }
+    }
+
+    if (lowestFinalPrice !== null) {
+      return {
+        isCallForPrice: false,
+        minPrice: lowestFinalPrice,
+        originalPrice: lowestOriginalPrice,
+        hasDiscount: lowestHasDiscount,
+        minVariant: lowestVariant,
+      };
+    } else {
+      return { isCallForPrice: true, minPrice: null, originalPrice: null, hasDiscount: false };
+    }
+  }
+
+  const baseBreakdown = calculateItemPriceBreakdown(service);
+  return {
+    isCallForPrice: baseBreakdown.isCallForPrice,
+    minPrice: baseBreakdown.finalPrice,
+    originalPrice: baseBreakdown.originalPrice,
+    hasDiscount: baseBreakdown.hasDiscount,
+  };
+}
 
 // Helper to convert database rows to our Provider type
 
@@ -353,7 +498,20 @@ const mapToProvider = (providerData: any): Provider => ({
 
 });
 
-
+export const mapToServiceVariant = (data: any): ServiceVariant => ({
+  id: data.id,
+  service_id: data.service_id,
+  name: data.name || '',
+  duration_mins: data.duration_mins !== undefined && data.duration_mins !== null ? Number(data.duration_mins) : null,
+  price: data.price !== undefined && data.price !== null ? String(data.price) : null,
+  price_type: data.price_type || 'fixed',
+  discount_type: data.discount_type || null,
+  discount_value: data.discount_value !== undefined && data.discount_value !== null ? Number(data.discount_value) : null,
+  discount_end_date: data.discount_end_date || null,
+  is_active: data.is_active !== undefined ? Boolean(data.is_active) : true,
+  created_at: data.created_at,
+  updated_at: data.updated_at,
+});
 
 // Helper to convert database rows to our Service type
 
@@ -372,6 +530,21 @@ const mapToService = (serviceData: any): Service => {
     }
   }
 
+  let descriptionPoints: string[] = [];
+  if (serviceData.description_points) {
+    if (Array.isArray(serviceData.description_points)) {
+      descriptionPoints = serviceData.description_points;
+    } else if (typeof serviceData.description_points === 'string') {
+      try {
+        const parsed = JSON.parse(serviceData.description_points);
+        if (Array.isArray(parsed)) descriptionPoints = parsed;
+        else descriptionPoints = [serviceData.description_points];
+      } catch {
+        descriptionPoints = [serviceData.description_points];
+      }
+    }
+  }
+
   return {
     id: serviceData.id,
     company_id: serviceData.company_id,
@@ -382,17 +555,23 @@ const mapToService = (serviceData: any): Service => {
     status: serviceData.status,
     code: serviceData.code || null,
     created_at: serviceData.created_at, 
-    price: serviceData.price ? String(serviceData.price) : null,
+    price: serviceData.price !== null && serviceData.price !== undefined ? String(serviceData.price) : null,
     photo: serviceData.photo || null,
     featureEnabled: serviceData.featureEnabled === true,
     discount_type: serviceData.discount_type,
     discount_value: serviceData.discount_value,
+    discount_end_date: serviceData.discount_end_date || null,
     requires_prepayment: serviceData.requires_prepayment || false,
     prepayment_amount: serviceData.prepayment_amount || null,
     is_package: Boolean(serviceData.is_package),
     included_service_ids: parsedIncludedIds,
     video_url: serviceData.video_url || null,
     video_platform: serviceData.video_platform || null,
+    is_price_visible: serviceData.is_price_visible !== undefined ? Boolean(serviceData.is_price_visible) : true,
+    has_variants: Boolean(serviceData.has_variants),
+    description_points: descriptionPoints,
+    service_variants: serviceData.service_variants ? serviceData.service_variants.map(mapToServiceVariant) : [],
+    package_items: serviceData.package_items || [],
   };
 };
 
@@ -958,11 +1137,13 @@ export const getAllServices = async (): Promise<Service[]> => {
 
         return {
 
-          ...service,
+          ...mapToService(service),
 
           photo: photoUrl,
 
           providers: providers,
+
+          company: service.company,
 
         };
 
@@ -973,6 +1154,8 @@ export const getAllServices = async (): Promise<Service[]> => {
       const result = servicesWithProviders as Service[];
       await enrichServicesWithCategories(result);
       await enrichServicesWithCompanyRatings(result);
+      await enrichServicesWithVariants(result);
+      await enrichPackagesWithInclusions(result);
 
       return result;
 
@@ -1637,6 +1820,8 @@ export const getCompanyOptions = async (): Promise<LocationOption[]> => {
     }
 
     await enrichServicesWithCategories([service]);
+    await enrichServicesWithVariants([service]);
+    await enrichPackagesWithInclusions([service]);
     if (service.company && !service.company.rating_summary) {
       await enrichCompaniesWithRatings([service.company]);
     }
@@ -2419,13 +2604,29 @@ export async function getProviderOccupiedSlots(
   startDate: Date,
   endDate: Date
 ): Promise<{ start_time: string; end_time: string }[]> {
-  // 1. Fetch active bookings (ignoring cancelled or payment-rejected bookings)
+  const startIso = startDate.toISOString();
+  const endIso = endDate.toISOString();
+
+  // 1. Fetch provider reservations - the single source of truth enforcing the DB exclusion constraint
+  const { data: resData, error: resError } = await supabase
+    .from('provider_reservations')
+    .select('start_time, end_time, source_type, source_row_id')
+    .eq('provider_id', providerId)
+    .lt('start_time', endIso)
+    .gt('end_time', startIso)
+    .order('start_time', { ascending: true });
+
+  if (resError) {
+    console.error('Error fetching provider occupied slots from provider_reservations:', resError);
+  }
+
+  // 2. Fetch active bookings (defensive fallback for any unlinked records)
   const { data: activeBookings, error: bookingErr } = await supabase
     .from('bookings')
     .select('start_time, end_time, status, payment_status')
     .eq('provider_id', providerId)
-    .gte('start_time', startDate.toISOString())
-    .lt('end_time', endDate.toISOString())
+    .lt('start_time', endIso)
+    .gt('end_time', startIso)
     .neq('status', 'cancelled')
     .neq('payment_status', 'rejected');
 
@@ -2433,33 +2634,30 @@ export async function getProviderOccupiedSlots(
     console.error('Error fetching provider active bookings:', bookingErr);
   }
 
-  // 2. Fetch active queue entries (waiting or serving) for this provider
+  // 3. Fetch active queue entries (waiting or serving) for this provider (defensive fallback)
   const { data: activeQueues, error: queueErr } = await supabase
     .from('queue_entries')
     .select('projected_start_time, projected_end_time, status')
     .eq('provider_id', providerId)
     .in('status', ['waiting', 'serving'])
-    .gte('projected_start_time', startDate.toISOString())
-    .lt('projected_end_time', endDate.toISOString());
+    .lt('projected_start_time', endIso)
+    .gt('projected_end_time', startIso);
 
   if (queueErr) {
     console.error('Error fetching provider active queues:', queueErr);
   }
 
-  // 3. Fetch provider reservations (manual blocked hours or non-booking blocks)
-  const { data: resData, error: resError } = await supabase
-    .from('provider_reservations')
-    .select('start_time, end_time, source_type, source_row_id')
-    .eq('provider_id', providerId)
-    .gte('start_time', startDate.toISOString())
-    .lt('end_time', endDate.toISOString())
-    .order('start_time', { ascending: true });
-
-  if (resError) {
-    console.error('Error fetching provider occupied slots:', resError);
-  }
-
   const occupiedMap = new Map<string, { start_time: string; end_time: string }>();
+
+  // Add ALL provider reservations (whether booking, queue, or manual blocked slots)
+  (resData || []).forEach((r) => {
+    if (r.start_time && r.end_time) {
+      occupiedMap.set(`${r.start_time}_${r.end_time}`, {
+        start_time: r.start_time,
+        end_time: r.end_time,
+      });
+    }
+  });
 
   // Add active bookings
   (activeBookings || []).forEach((b) => {
@@ -2477,16 +2675,6 @@ export async function getProviderOccupiedSlots(
       occupiedMap.set(`${q.projected_start_time}_${q.projected_end_time}`, {
         start_time: q.projected_start_time,
         end_time: q.projected_end_time,
-      });
-    }
-  });
-
-  // Add manual/other reservations (e.g. business blocked hours)
-  (resData || []).forEach((r) => {
-    if (r.source_type !== 'booking' && r.source_type !== 'queue' && r.start_time && r.end_time) {
-      occupiedMap.set(`${r.start_time}_${r.end_time}`, {
-        start_time: r.start_time,
-        end_time: r.end_time,
       });
     }
   });
@@ -2672,6 +2860,10 @@ export async function joinQueue(payload: CreateQueuePayload): Promise<AugmentedQ
       projected_start_time: projectedStartTime!.toISOString(),
       projected_end_time: projectedEndTime!.toISOString(),
       position: estimatedPosition,
+      service_variant_id: payload.service_variant_id || null,
+      original_price: payload.original_price !== undefined ? payload.original_price : null,
+      discount_amount: payload.discount_amount !== undefined ? payload.discount_amount : 0,
+      final_price: payload.final_price !== undefined ? payload.final_price : null,
     }).select().single();
 
     if (queueError || !queueResult) throw new Error(`Failed to join queue: ${queueError?.message}`);
@@ -3555,14 +3747,122 @@ export async function enrichServicesWithCategories(services: Service[]): Promise
   }
 }
 
+// Helper function to enrich services with their active service_variants
+export async function enrichServicesWithVariants(services: Service[]): Promise<void> {
+  if (!services || services.length === 0) return;
+
+  const serviceIdsWithVariants = services
+    .filter((s) => s.has_variants)
+    .map((s) => s.id);
+
+  if (serviceIdsWithVariants.length === 0) return;
+
+  try {
+    const { data: variants, error } = await supabase
+      .from('service_variants')
+      .select('*')
+      .in('service_id', serviceIdsWithVariants)
+      .eq('is_active', true)
+      .order('price', { ascending: true });
+
+    if (!error && variants) {
+      const variantMap = new Map<string, ServiceVariant[]>();
+      variants.forEach((v: any) => {
+        const mapped = mapToServiceVariant(v);
+        const list = variantMap.get(v.service_id) || [];
+        list.push(mapped);
+        variantMap.set(v.service_id, list);
+      });
+
+      services.forEach((s) => {
+        if (variantMap.has(s.id)) {
+          s.service_variants = variantMap.get(s.id)!;
+        }
+      });
+    }
+  } catch (err) {
+    console.warn("Could not enrich services with variants:", err);
+  }
+}
+
+// Helper function to enrich packages with package_items
+export async function enrichPackagesWithInclusions(packages: Service[]): Promise<void> {
+  if (!packages || packages.length === 0) return;
+
+  const packageIds = packages
+    .filter((p) => p.is_package)
+    .map((p) => p.id);
+
+  if (packageIds.length === 0) return;
+
+  try {
+    const { data: items, error } = await supabase
+      .from('package_items')
+      .select(`
+        *,
+        linked_service:services (*),
+        linked_variant:service_variants (*)
+      `)
+      .in('package_id', packageIds)
+      .order('display_order', { ascending: true });
+
+    if (!error && items) {
+      const itemMap = new Map<string, PackageItem[]>();
+      items.forEach((item: any) => {
+        const pkgId = item.package_id || item.service_id;
+        if (pkgId) {
+          const mapped: PackageItem = {
+            id: item.id,
+            package_id: item.package_id,
+            service_id: item.service_id,
+            item_type: item.item_type || (item.linked_service_id ? 'service' : 'custom'),
+            linked_service_id: item.linked_service_id,
+            linked_variant_id: item.linked_variant_id,
+            service_variant_id: item.service_variant_id || item.linked_variant_id,
+            custom_name: item.custom_name,
+            quantity: item.quantity,
+            display_order: item.display_order,
+            created_at: item.created_at,
+            linked_service: item.linked_service ? mapToService(item.linked_service) : undefined,
+            service: item.linked_service ? mapToService(item.linked_service) : undefined,
+            linked_variant: item.linked_variant ? mapToServiceVariant(item.linked_variant) : undefined,
+            service_variant: item.linked_variant ? mapToServiceVariant(item.linked_variant) : undefined,
+          };
+          const list = itemMap.get(pkgId) || [];
+          list.push(mapped);
+          itemMap.set(pkgId, list);
+        }
+      });
+
+      packages.forEach((pkg) => {
+        if (itemMap.has(pkg.id)) {
+          pkg.package_items = itemMap.get(pkg.id)!;
+        }
+      });
+    }
+  } catch (err) {
+    console.warn("Could not enrich packages with inclusions:", err);
+  }
+}
+
 // Helper function to format included categories as "Haircut + Beard Trim + Wash"
 export function formatPackageCategories(service: Service): string {
+  if (service.package_items && service.package_items.length > 0) {
+    const names = service.package_items.map((item) => {
+      if (item.item_type === 'custom') return item.custom_name;
+      return item.linked_service?.service_category?.name || item.linked_service?.name || item.custom_name;
+    }).filter(Boolean);
+    if (names.length > 0) {
+      return Array.from(new Set(names)).join(" + ");
+    }
+  }
+
   if (service.included_services && service.included_services.length > 0) {
     const categoryNames = service.included_services.map((sub) => {
       return sub.service_category?.name || sub.name;
     }).filter(Boolean);
     if (categoryNames.length > 0) {
-      return categoryNames.join(" + ");
+      return Array.from(new Set(categoryNames)).join(" + ");
     }
   }
   return service.description || "";
@@ -3640,8 +3940,10 @@ export async function getAllPackages(): Promise<Service[]> {
       }
     }
 
+    await enrichPackagesWithInclusions(packages);
     await enrichServicesWithCategories(packages);
     await enrichServicesWithCompanyRatings(packages);
+    await enrichServicesWithVariants(packages);
 
     return packages;
   } catch (error) {
@@ -3718,7 +4020,9 @@ export async function getPackageById(packageId: string): Promise<Service | null>
       }
     }
 
+    await enrichPackagesWithInclusions([packageService]);
     await enrichServicesWithCategories([packageService]);
+    await enrichServicesWithVariants([packageService]);
 
     return packageService;
   } catch (error) {

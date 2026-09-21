@@ -102,7 +102,18 @@ export function SavedServicesDrawer({ open, onClose, savedServices, onRemove }: 
                         {service.company?.name || "Verified Salon"}
                       </p>
                       <p className="text-xs font-black text-slate-900 dark:text-white mt-1">
-                        {service.price} ETB
+                        {service.is_price_visible === false || service.price === null ? (
+                          <span className="text-amber-600 font-bold inline-flex items-center gap-1.5">
+                            <span>Contact for price</span>
+                            {service.discount_type === "percentage" && service.discount_value && (
+                              <span className="bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 text-[10px] px-1.5 py-0.5 rounded-full font-bold">
+                                {Math.round(Number(service.discount_value))}% off
+                              </span>
+                            )}
+                          </span>
+                        ) : (
+                          `${service.price} ETB`
+                        )}
                       </p>
                     </div>
                   </Link>

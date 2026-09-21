@@ -21,10 +21,12 @@ import {
   getAuthUserOrNull,
   getMyProfileOrNull,
   isProfileComplete,
+  calculateItemPriceBreakdown,
 } from "@/lib/supabase-utils";
 import type {
   Company,
   Service,
+  ServiceVariant,
   Provider,
   AvailableSlot,
   Booking,
@@ -42,6 +44,7 @@ interface BookServiceDialogProps {
   company: Company;
   selectedProvider: Provider;
   selectedSlot: AvailableSlot | null;
+  selectedVariant?: ServiceVariant | null;
   onPrepaymentRequired?: (booking: Booking) => void;
 }
 
@@ -52,6 +55,7 @@ export default function BookServiceDialog({
   company,
   selectedProvider,
   selectedSlot,
+  selectedVariant,
   onPrepaymentRequired,
 }: BookServiceDialogProps) {
   const router = useRouter();
@@ -85,6 +89,9 @@ export default function BookServiceDialog({
         return;
       }
 
+      const currentItem = selectedVariant || service;
+      const priceBreakdown = calculateItemPriceBreakdown(currentItem);
+
       // If prepayment is required: booking is created with pending status
       // If not: confirmed status
       const newBookingData = {
@@ -99,6 +106,10 @@ export default function BookServiceDialog({
         status: (requiresPrepayment ? "pending" : "confirmed") as BookingStatus,
         payment_status: (requiresPrepayment ? "pending" : "not_required") as PaymentStatus,
         notes: notes.trim() || null,
+        service_variant_id: selectedVariant?.id || null,
+        original_price: priceBreakdown.originalPrice,
+        discount_amount: priceBreakdown.discountAmount,
+        final_price: priceBreakdown.finalPrice,
       };
 
       const createdBooking = await createBooking(newBookingData);
@@ -137,6 +148,9 @@ export default function BookServiceDialog({
     }
   };
 
+  const currentItem = selectedVariant || service;
+  const priceBreakdown = calculateItemPriceBreakdown(currentItem);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col p-0 overflow-hidden rounded-3xl">
@@ -161,7 +175,12 @@ export default function BookServiceDialog({
               <p className="text-base font-bold text-slate-900 dark:text-white truncate">
                 {service.name}
               </p>
-              <div className="flex items-center text-xs text-slate-500 mt-1">
+              {selectedVariant && (
+                <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 truncate">
+                  Option: {selectedVariant.name} ({selectedVariant.duration_mins || service.estimated_wait_time_mins} min)
+                </p>
+              )}
+              <div className="flex items-center text-xs text-slate-500 mt-0.5">
                 <Building2 className="w-3.5 h-3.5 mr-1" />
                 <span className="truncate">{company.name}</span>
               </div>
@@ -205,7 +224,18 @@ export default function BookServiceDialog({
                   <Wallet className="w-3.5 h-3.5 text-amber-500" /> Total Price
                 </span>
                 <p className="font-bold text-slate-900 dark:text-white">
-                  ETB {service.price || "0"}
+                  {priceBreakdown.isCallForPrice ? (
+                    <span className="text-amber-600">Contact for price</span>
+                  ) : priceBreakdown.hasDiscount ? (
+                    <span>
+                      ETB {priceBreakdown.finalPrice?.toFixed(0)}{" "}
+                      <span className="line-through text-slate-400 text-[10px] font-normal">
+                        {priceBreakdown.originalPrice?.toFixed(0)}
+                      </span>
+                    </span>
+                  ) : (
+                    `ETB ${priceBreakdown.originalPrice?.toFixed(0) || "0"}`
+                  )}
                 </p>
               </div>
             </div>

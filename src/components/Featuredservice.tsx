@@ -132,7 +132,20 @@ const FeaturedServices = () => {
                                     <Clock className="w-4 h-4" />
                                     <span className="text-sm">{service.estimated_wait_time_mins} min</span>
                                   </div>
-                                <div className="md:text-lg font-bold text-green-600">{service.price} ETB</div>
+                                <div className="md:text-lg font-bold text-green-600">
+                                  {service.is_price_visible === false || service.price === null ? (
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-sm font-bold text-amber-600">Contact for price</span>
+                                      {service.discount_type === "percentage" && service.discount_value && (
+                                        <span className="bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded-full font-bold">
+                                          {Math.round(Number(service.discount_value))}% off
+                                        </span>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    `${service.price} ETB`
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </Link>

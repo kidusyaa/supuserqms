@@ -158,7 +158,18 @@ export default async function CategoryDetailPage({ params }: CategoryPageProps) 
                       <span>{service.estimated_wait_time_mins || 'N/A'} min</span>
                     </div>
                     <div className="text-lg font-bold text-amber-600">
-                      ${service.price || 'N/A'}
+                      {service.is_price_visible === false || !service.price ? (
+                        <div className="flex items-center gap-1.5">
+                          <span>Contact for price</span>
+                          {service.discount_type === "percentage" && service.discount_value && (
+                            <span className="bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded-full font-bold">
+                              {Math.round(Number(service.discount_value))}% off
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        `${service.price} ETB`
+                      )}
                     </div>
                   </div>
                   
