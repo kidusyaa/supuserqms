@@ -14,10 +14,14 @@ import {
   MapPin,
 } from 'lucide-react';
 import React from 'react';
+import { usePathname } from 'next/navigation';
 import DivCenter from './divCenter'; // Assuming you use this for main content width
 
 const Footer = () => {
+  const pathname = usePathname();
   const currentYear = new Date().getFullYear();
+
+  if (pathname.startsWith('/booking/')) return null;
 
   // Define your navigation links
   const footerLinks = [

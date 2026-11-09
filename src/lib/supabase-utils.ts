@@ -44,6 +44,22 @@ import type {
 
   PackageItem,
 
+  ServiceComponent,
+
+  BookingComponent,
+
+  QueueComponent,
+
+  MarketplaceBookingComponentInput,
+
+  MarketplaceBookingInput,
+
+  MultiServiceBookingPayload,
+
+  QueueComponentInput,
+
+  PriceBreakdown,
+
 } from '../type';
 import { ANY_PROVIDER_ID } from '../type';
 
@@ -327,7 +343,7 @@ export async function cancelBooking(bookingId: string): Promise<void> {
 
   provider_id: string | null; // Can be null if 'Any Provider' is chosen
 
-  queue_type: 'walk-in' | 'booking';
+  queue_type: 'walk-in' | 'booking' | 'walk_in';
 
   appointment_time?: string | null; 
 
@@ -340,6 +356,10 @@ export async function cancelBooking(bookingId: string): Promise<void> {
   discount_amount?: number | null;
 
   final_price?: number | null;
+
+  components?: QueueComponentInput[];
+
+  selected_component_ids?: string[];
 
 };
 
@@ -480,7 +500,135 @@ export function calculateServiceStartingPrice(service: Service): {
   };
 }
 
-// Helper to convert database rows to our Provider type
+// --- COMPONENT PRICING & DURATION CALCULATIONS ---
+
+/**
+ * Calculates the total additional cost for selected components.
+ * Only separately charged components (is_included === false) contribute to the extra cost.
+ * Included components (is_included === true) are never charged twice.
+ */
+export function calculateBookingComponentsTotal(
+  components: Array<{
+    price_at_booking?: number;
+    price?: number;
+    quantity?: number;
+    is_included?: boolean;
+  }>
+): number {
+  if (!components || components.length === 0) return 0;
+  const sum = components.reduce((acc, c) => {
+    if (c.is_included) return acc; // Included components are $0 additional
+    const qty = Math.max(1, Number(c.quantity) || 1);
+    const p = Math.max(0, Number(c.price_at_booking ?? c.price) || 0);
+    return acc + p * qty;
+  }, 0);
+  return Math.round(sum * 100) / 100;
+}
+
+/**
+ * Calculates total elapsed service duration taking overlappable components into account.
+ * Overlappable steps (is_overlappable === true) run concurrently with other treatments
+ * and do not add sequential minutes to the client's elapsed appointment time.
+ */
+export function calculateTotalServiceDurationWithComponents(
+  baseDurationMins: number,
+  components: Array<{ duration_mins?: number; is_overlappable?: boolean }>
+): number {
+  const base = Math.max(0, Number(baseDurationMins) || 0);
+  if (!components || components.length === 0) return base;
+
+  // Add sequential (non-overlappable) component durations
+  const addOnsDuration = components.reduce((acc, c) => {
+    if (c.is_overlappable) return acc;
+    return acc + Math.max(0, Number(c.duration_mins) || 0);
+  }, 0);
+
+  return base + addOnsDuration;
+}
+
+/**
+ * Calculates total workload minutes across all components (sequential + overlappable)
+ * for provider capacity and staff scheduling metrics.
+ */
+export function calculateTotalWorkloadDuration(
+  baseDurationMins: number,
+  components: Array<{ duration_mins?: number }>
+): number {
+  const base = Math.max(0, Number(baseDurationMins) || 0);
+  if (!components || components.length === 0) return base;
+  const total = components.reduce((acc, c) => acc + Math.max(0, Number(c.duration_mins) || 0), base);
+  return total;
+}
+
+/**
+ * Unified calculation function across service details, cart, and checkout.
+ * Accurately combines main service/variant pricing with selected add-ons and discounts.
+ */
+export function calculateServiceWithComponentsPriceBreakdown(
+  service: Service,
+  selectedVariant?: ServiceVariant | null,
+  selectedComponents: ServiceComponent[] = []
+): {
+  priceBreakdown: PriceBreakdown;
+  durationMins: number;
+  totalWorkloadMins: number;
+} {
+  const targetItem = selectedVariant || service;
+  const baseBreakdown = calculateItemPriceBreakdown(targetItem);
+
+  const baseDuration = selectedVariant?.duration_mins || service.estimated_wait_time_mins || 30;
+  const sequentialDuration = calculateTotalServiceDurationWithComponents(baseDuration, selectedComponents);
+  const totalWorkload = calculateTotalWorkloadDuration(baseDuration, selectedComponents);
+
+  if (baseBreakdown.isCallForPrice) {
+    return {
+      priceBreakdown: {
+        basePrice: 0,
+        addonsPrice: 0,
+        originalPrice: 0,
+        discountAmount: 0,
+        finalPrice: 0,
+        hasDiscount: false,
+        discountLabel: null,
+        isCallForPrice: true,
+      },
+      durationMins: sequentialDuration,
+      totalWorkloadMins: totalWorkload,
+    };
+  }
+
+  const addonsPrice = calculateBookingComponentsTotal(selectedComponents);
+  const baseOriginal = baseBreakdown.originalPrice || 0;
+  const baseFinal = baseBreakdown.finalPrice || 0;
+
+  const originalPrice = baseOriginal + addonsPrice;
+  const finalPrice = Math.max(0, baseFinal + addonsPrice);
+
+  return {
+    priceBreakdown: {
+      basePrice: baseFinal,
+      addonsPrice,
+      originalPrice,
+      discountAmount: baseBreakdown.discountAmount || 0,
+      finalPrice,
+      hasDiscount: baseBreakdown.hasDiscount,
+      discountLabel: baseBreakdown.discountLabel || null,
+      isCallForPrice: false,
+    },
+    durationMins: sequentialDuration,
+    totalWorkloadMins: totalWorkload,
+  };
+}
+
+/**
+ * Validates whether a component belongs to the specified service.
+ */
+export function validateComponentBelongsToService(
+  component: { service_id: string },
+  serviceId: string
+): boolean {
+  return Boolean(component && component.service_id === serviceId);
+}
 
 const mapToProvider = (providerData: any): Provider => ({
 
@@ -508,6 +656,23 @@ export const mapToServiceVariant = (data: any): ServiceVariant => ({
   discount_type: data.discount_type || null,
   discount_value: data.discount_value !== undefined && data.discount_value !== null ? Number(data.discount_value) : null,
   discount_end_date: data.discount_end_date || null,
+  is_active: data.is_active !== undefined ? Boolean(data.is_active) : true,
+  created_at: data.created_at,
+  updated_at: data.updated_at,
+});
+
+export const mapToServiceComponent = (data: any): ServiceComponent => ({
+  id: data.id,
+  service_id: data.service_id,
+  name: data.name || '',
+  component_type: data.component_type === 'phase' ? 'phase' : 'addon',
+  description: data.description || null,
+  price: Number(data.price) || 0,
+  duration_mins: Number(data.duration_mins) || 0,
+  is_required: Boolean(data.is_required),
+  is_included: Boolean(data.is_included),
+  is_overlappable: Boolean(data.is_overlappable),
+  display_order: Number(data.display_order) || 0,
   is_active: data.is_active !== undefined ? Boolean(data.is_active) : true,
   created_at: data.created_at,
   updated_at: data.updated_at,
@@ -545,6 +710,9 @@ const mapToService = (serviceData: any): Service => {
     }
   }
 
+  const rawComps = serviceData.service_components || serviceData.components || [];
+  const mappedComps = Array.isArray(rawComps) ? rawComps.map(mapToServiceComponent) : [];
+
   return {
     id: serviceData.id,
     company_id: serviceData.company_id,
@@ -572,6 +740,8 @@ const mapToService = (serviceData: any): Service => {
     description_points: descriptionPoints,
     service_variants: serviceData.service_variants ? serviceData.service_variants.map(mapToServiceVariant) : [],
     package_items: serviceData.package_items || [],
+    components: mappedComps,
+    service_components: mappedComps,
   };
 };
 
@@ -1155,6 +1325,7 @@ export const getAllServices = async (): Promise<Service[]> => {
       await enrichServicesWithCategories(result);
       await enrichServicesWithCompanyRatings(result);
       await enrichServicesWithVariants(result);
+      await enrichServicesWithComponents(result);
       await enrichPackagesWithInclusions(result);
 
       return result;
@@ -1170,6 +1341,66 @@ export const getAllServices = async (): Promise<Service[]> => {
     }
 
   };
+
+export const getTopRatedServices = async (limit: number = 9): Promise<Service[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('services')
+      .select(`
+        *,
+        company:companies (
+          id,
+          name,
+          location_text
+        ),
+        service_providers (
+          providers ( * )
+        ),
+        service_photos ( url )
+      `)
+      .eq('status', 'active')
+      .or('is_package.is.null,is_package.eq.false')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      console.error('Error fetching top rated services:', error);
+      return [];
+    }
+
+    if (!data || data.length === 0) {
+      return [];
+    }
+
+    const servicesWithProviders = data.map((service: any) => {
+      const providers = service.service_providers
+        ? service.service_providers.map((sp: any) => sp.providers).filter(Boolean)
+        : [];
+      const photoUrl = service.service_photos?.[0]?.url || service.photo || null;
+
+      delete service.service_providers;
+      if (service.service_photos) delete service.service_photos;
+
+      return {
+        ...mapToService(service),
+        photo: photoUrl,
+        providers: providers,
+        company: service.company,
+      };
+    });
+
+    const result = servicesWithProviders as Service[];
+    await enrichServicesWithCategories(result);
+    await enrichServicesWithCompanyRatings(result);
+    await enrichServicesWithVariants(result);
+    await enrichServicesWithComponents(result);
+
+    return result;
+  } catch (error) {
+    console.error('Error in getTopRatedServices function:', error);
+    return [];
+  }
+};
 
 export const getAllServicesByCategory = async (categoryId: string): Promise<Service[]> => {
 
@@ -1453,13 +1684,14 @@ export const searchServices = async (searchTerm: string, categoryId?: string): P
 
 // Featured services: status active AND featureEnabled true
 
-export async function getDiscountedServices(): Promise<Service[]> {
+export async function getDiscountedServices(limit: number = 12): Promise<Service[]> {
   try {
     const { data, error } = await supabase
       .from('services')
       .select(`
         *,
         company:companies (
+          id,
           name,
           location_text
         ),
@@ -1470,7 +1702,8 @@ export async function getDiscountedServices(): Promise<Service[]> {
       .eq('status', 'active')
       .or('is_package.is.null,is_package.eq.false')
       .not('discount_type', 'is', null) // Ensure there is a discount
-      .not('discount_value', 'is', null);
+      .not('discount_value', 'is', null)
+      .limit(limit);
 
     if (error) {
       console.error("Error fetching discounted services:", error);
@@ -1487,6 +1720,9 @@ export async function getDiscountedServices(): Promise<Service[]> {
       }));
 
     await enrichServicesWithCategories(services);
+    await enrichServicesWithCompanyRatings(services);
+    await enrichServicesWithVariants(services);
+    await enrichServicesWithComponents(services);
 
     return services;
   } catch (error) {
@@ -1821,6 +2057,7 @@ export const getCompanyOptions = async (): Promise<LocationOption[]> => {
 
     await enrichServicesWithCategories([service]);
     await enrichServicesWithVariants([service]);
+    await enrichServicesWithComponents([service]);
     await enrichPackagesWithInclusions([service]);
     if (service.company && !service.company.rating_summary) {
       await enrichCompaniesWithRatings([service.company]);
@@ -1916,28 +2153,18 @@ export const createQueueEntry = async (payload: CreateQueuePayload): Promise<Que
 
     // For 'booking' queues, position might be less relevant or handled differently later
 
-    const currentQueueCount = payload.queue_type === 'walk-in' ? await getCurrentQueueCount(payload.service_id) : 0;
-
+    const safeQueueType = (payload.queue_type === 'walk_in' || payload.queue_type === 'walk-in' || !payload.queue_type) ? 'walk-in' : payload.queue_type;
+    const currentQueueCount = safeQueueType === 'walk-in' ? await getCurrentQueueCount(payload.service_id) : 0;
     const position = currentQueueCount + 1;
 
-
-
     const { data, error } = await supabase
-
       .from('queue_entries')
-
       .insert({
-
         service_id: payload.service_id,
-
         provider_id: payload.provider_id, // This can now be null
-
         user_name: payload.user_name,
-
         phone_number: payload.phone_number,
-
-        queue_type: payload.queue_type,
-
+        queue_type: safeQueueType,
         status: 'waiting', // Default status for new entries
 
         appointment_time: payload.appointment_time,
@@ -2368,9 +2595,7 @@ export async function getCompanyBySlugWithServices(companySlug: string): Promise
 
   if (!cleanSlug) return null;
 
-  const { data, error } = await supabase
-    .from('companies')
-    .select(`
+  const companySelect = `
       *,
       company_photos (
         id,
@@ -2394,9 +2619,21 @@ export async function getCompanyBySlugWithServices(companySlug: string): Promise
           url
         )
       )
-    `)
+    `;
+
+  let { data, error } = await supabase
+    .from('companies')
+    .select(companySelect)
     .eq('slug', cleanSlug)
     .maybeSingle();
+
+  if (!data && !error) {
+    ({ data, error } = await supabase
+      .from('companies')
+      .select(companySelect)
+      .eq('id', cleanSlug)
+      .maybeSingle());
+  }
 
   if (error) {
     console.error('Error fetching company by slug:', error);
@@ -2595,9 +2832,12 @@ export function getCompanyWorkingHours(
 
  * Fetches all occupied slots for a given provider within a date range,
 
- * including both 'booking' and 'queue' reservations.
-
+/**
+ * In-memory cache & request deduplication for provider occupied slots
+ * Prevents flood of duplicate network queries across re-renders and intervals.
  */
+const occupiedSlotsCache = new Map<string, { timestamp: number; data: { start_time: string; end_time: string }[] }>();
+const occupiedSlotsInFlight = new Map<string, Promise<{ start_time: string; end_time: string }[]>>();
 
 export async function getProviderOccupiedSlots(
   providerId: string,
@@ -2606,92 +2846,255 @@ export async function getProviderOccupiedSlots(
 ): Promise<{ start_time: string; end_time: string }[]> {
   const startIso = startDate.toISOString();
   const endIso = endDate.toISOString();
+  const cacheKey = `${providerId}__${startIso}__${endIso}`;
 
-  // 1. Fetch provider reservations - the single source of truth enforcing the DB exclusion constraint
-  const { data: resData, error: resError } = await supabase
-    .from('provider_reservations')
-    .select('start_time, end_time, source_type, source_row_id')
-    .eq('provider_id', providerId)
-    .lt('start_time', endIso)
-    .gt('end_time', startIso)
-    .order('start_time', { ascending: true });
-
-  if (resError) {
-    console.error('Error fetching provider occupied slots from provider_reservations:', resError);
+  const cached = occupiedSlotsCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < 15000) {
+    return cached.data;
   }
 
-  // 2. Fetch active bookings (defensive fallback for any unlinked records)
-  const { data: activeBookings, error: bookingErr } = await supabase
-    .from('bookings')
-    .select('start_time, end_time, status, payment_status')
-    .eq('provider_id', providerId)
-    .lt('start_time', endIso)
-    .gt('end_time', startIso)
-    .neq('status', 'cancelled')
-    .neq('payment_status', 'rejected');
-
-  if (bookingErr) {
-    console.error('Error fetching provider active bookings:', bookingErr);
+  if (occupiedSlotsInFlight.has(cacheKey)) {
+    return occupiedSlotsInFlight.get(cacheKey)!;
   }
 
-  // 3. Fetch active queue entries (waiting or serving) for this provider (defensive fallback)
-  const { data: activeQueues, error: queueErr } = await supabase
-    .from('queue_entries')
-    .select('projected_start_time, projected_end_time, status')
-    .eq('provider_id', providerId)
-    .in('status', ['waiting', 'serving'])
-    .lt('projected_start_time', endIso)
-    .gt('projected_end_time', startIso);
+  const fetchPromise = (async () => {
+    try {
+      // 1. Fetch provider reservations - the single source of truth enforcing the DB exclusion constraint
+      const { data: resData, error: resError } = await supabase
+        .from('provider_reservations')
+        .select('start_time, end_time, source_type, source_row_id')
+        .eq('provider_id', providerId)
+        .lt('start_time', endIso)
+        .gt('end_time', startIso)
+        .order('start_time', { ascending: true });
 
-  if (queueErr) {
-    console.error('Error fetching provider active queues:', queueErr);
-  }
+      if (resError) {
+        console.error('Error fetching provider occupied slots from provider_reservations:', resError);
+      }
 
-  const occupiedMap = new Map<string, { start_time: string; end_time: string }>();
+      // 2. Fetch active bookings (defensive fallback for any unlinked records)
+      const { data: activeBookings, error: bookingErr } = await supabase
+        .from('bookings')
+        .select('start_time, end_time, status, payment_status')
+        .eq('provider_id', providerId)
+        .lt('start_time', endIso)
+        .gt('end_time', startIso)
+        .neq('status', 'cancelled')
+        .neq('payment_status', 'rejected');
 
-  // Add ALL provider reservations (whether booking, queue, or manual blocked slots)
-  (resData || []).forEach((r) => {
-    if (r.start_time && r.end_time) {
-      occupiedMap.set(`${r.start_time}_${r.end_time}`, {
-        start_time: r.start_time,
-        end_time: r.end_time,
+      if (bookingErr) {
+        console.error('Error fetching provider active bookings:', bookingErr);
+      }
+
+      // 3. Fetch active queue entries (waiting or serving) for this provider (defensive fallback)
+      const { data: activeQueues, error: queueErr } = await supabase
+        .from('queue_entries')
+        .select('projected_start_time, projected_end_time, status')
+        .eq('provider_id', providerId)
+        .in('status', ['waiting', 'serving'])
+        .lt('projected_start_time', endIso)
+        .gt('projected_end_time', startIso);
+
+      if (queueErr) {
+        console.error('Error fetching provider active queues:', queueErr);
+      }
+
+      const occupiedMap = new Map<string, { start_time: string; end_time: string }>();
+
+      (resData || []).forEach((r) => {
+        if (r.start_time && r.end_time) {
+          occupiedMap.set(`${r.start_time}_${r.end_time}`, {
+            start_time: r.start_time,
+            end_time: r.end_time,
+          });
+        }
       });
-    }
-  });
 
-  // Add active bookings
-  (activeBookings || []).forEach((b) => {
-    if (b.start_time && b.end_time) {
-      occupiedMap.set(`${b.start_time}_${b.end_time}`, {
-        start_time: b.start_time,
-        end_time: b.end_time,
+      (activeBookings || []).forEach((b) => {
+        if (b.start_time && b.end_time) {
+          occupiedMap.set(`${b.start_time}_${b.end_time}`, {
+            start_time: b.start_time,
+            end_time: b.end_time,
+          });
+        }
       });
-    }
-  });
 
-  // Add active queues
-  (activeQueues || []).forEach((q) => {
-    if (q.projected_start_time && q.projected_end_time) {
-      occupiedMap.set(`${q.projected_start_time}_${q.projected_end_time}`, {
-        start_time: q.projected_start_time,
-        end_time: q.projected_end_time,
+      (activeQueues || []).forEach((q) => {
+        if (q.projected_start_time && q.projected_end_time) {
+          occupiedMap.set(`${q.projected_start_time}_${q.projected_end_time}`, {
+            start_time: q.projected_start_time,
+            end_time: q.projected_end_time,
+          });
+        }
       });
-    }
-  });
 
-  return Array.from(occupiedMap.values()).sort(
-    (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
-  );
+      const result = Array.from(occupiedMap.values()).sort(
+        (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+      );
+
+      occupiedSlotsCache.set(cacheKey, { timestamp: Date.now(), data: result });
+      return result;
+    } finally {
+      occupiedSlotsInFlight.delete(cacheKey);
+    }
+  })();
+
+  occupiedSlotsInFlight.set(cacheKey, fetchPromise);
+  return fetchPromise;
 }
 
 /**
-
- * Finds the latest end time for a provider's reservations today.
-
- * Accounts for current time and company working hours.
-
+ * Batched fetch of occupied slots across multiple providers in a single roundtrip.
+ * Drastically reduces network traffic for ANY_PROVIDER mode from 3*N queries to only 3 queries.
  */
+export async function getMultiProviderOccupiedSlots(
+  providerIds: string[],
+  startDate: Date,
+  endDate: Date
+): Promise<Map<string, { start_time: string; end_time: string }[]>> {
+  const result = new Map<string, { start_time: string; end_time: string }[]>();
+  if (!providerIds || providerIds.length === 0) return result;
 
+  const startIso = startDate.toISOString();
+  const endIso = endDate.toISOString();
+
+  const missingProviderIds: string[] = [];
+  for (const pid of providerIds) {
+    const cacheKey = `${pid}__${startIso}__${endIso}`;
+    const cached = occupiedSlotsCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < 15000) {
+      result.set(pid, cached.data);
+    } else {
+      missingProviderIds.push(pid);
+    }
+  }
+
+  if (missingProviderIds.length === 0) {
+    return result;
+  }
+
+  try {
+    const [resResp, bookingsResp, queuesResp] = await Promise.all([
+      supabase
+        .from('provider_reservations')
+        .select('provider_id, start_time, end_time')
+        .in('provider_id', missingProviderIds)
+        .lt('start_time', endIso)
+        .gt('end_time', startIso),
+      supabase
+        .from('bookings')
+        .select('provider_id, start_time, end_time')
+        .in('provider_id', missingProviderIds)
+        .lt('start_time', endIso)
+        .gt('end_time', startIso)
+        .neq('status', 'cancelled')
+        .neq('payment_status', 'rejected'),
+      supabase
+        .from('queue_entries')
+        .select('provider_id, projected_start_time, projected_end_time')
+        .in('provider_id', missingProviderIds)
+        .in('status', ['waiting', 'serving'])
+        .lt('projected_start_time', endIso)
+        .gt('projected_end_time', startIso),
+    ]);
+
+    const mapByProvider = new Map<string, Map<string, { start_time: string; end_time: string }>>();
+    missingProviderIds.forEach((pid) => mapByProvider.set(pid, new Map()));
+
+    (resResp.data || []).forEach((r: any) => {
+      if (r.provider_id && r.start_time && r.end_time) {
+        mapByProvider.get(r.provider_id)?.set(`${r.start_time}_${r.end_time}`, {
+          start_time: r.start_time,
+          end_time: r.end_time,
+        });
+      }
+    });
+
+    (bookingsResp.data || []).forEach((b: any) => {
+      if (b.provider_id && b.start_time && b.end_time) {
+        mapByProvider.get(b.provider_id)?.set(`${b.start_time}_${b.end_time}`, {
+          start_time: b.start_time,
+          end_time: b.end_time,
+        });
+      }
+    });
+
+    (queuesResp.data || []).forEach((q: any) => {
+      if (q.provider_id && q.projected_start_time && q.projected_end_time) {
+        mapByProvider.get(q.provider_id)?.set(`${q.projected_start_time}_${q.projected_end_time}`, {
+          start_time: q.projected_start_time,
+          end_time: q.projected_end_time,
+        });
+      }
+    });
+
+    missingProviderIds.forEach((pid) => {
+      const slots = Array.from(mapByProvider.get(pid)?.values() || []).sort(
+        (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+      );
+      result.set(pid, slots);
+      occupiedSlotsCache.set(`${pid}__${startIso}__${endIso}`, {
+        timestamp: Date.now(),
+        data: slots,
+      });
+    });
+  } catch (batchErr) {
+    console.error("Error in getMultiProviderOccupiedSlots batch query:", batchErr);
+    // Fallback: fetch individually if batch fails
+    await Promise.all(
+      missingProviderIds.map(async (pid) => {
+        const slots = await getProviderOccupiedSlots(pid, startDate, endDate);
+        result.set(pid, slots);
+      })
+    );
+  }
+
+  return result;
+}
+
+/**
+ * Batched queue summary in ONE single query instead of N individual count queries.
+ */
+export async function getServiceQueueSummary(
+  serviceId: string,
+  providerIds: string[] = []
+): Promise<{ overallCount: number; providerCounts: Record<string, number> }> {
+  try {
+    const { data, error } = await supabase
+      .from('queue_entries')
+      .select('provider_id')
+      .eq('service_id', serviceId)
+      .eq('status', 'waiting');
+
+    if (error || !data) {
+      return { overallCount: 0, providerCounts: {} };
+    }
+
+    const providerCounts: Record<string, number> = {};
+    providerIds.forEach((pid) => {
+      providerCounts[pid] = 0;
+    });
+
+    data.forEach((row: any) => {
+      if (row.provider_id) {
+        providerCounts[row.provider_id] = (providerCounts[row.provider_id] || 0) + 1;
+      }
+    });
+
+    const countsList = providerIds.length > 0 ? providerIds.map((pid) => providerCounts[pid] || 0) : [data.length];
+    const overallCount = countsList.length > 0 ? Math.min(...countsList) : data.length;
+
+    return { overallCount, providerCounts };
+  } catch (err) {
+    console.error("Error in getServiceQueueSummary:", err);
+    return { overallCount: 0, providerCounts: {} };
+  }
+}
+
+/**
+ * Finds the latest end time for a provider's reservations today.
+ * Accounts for current time and company working hours.
+ */
 export async function getLatestAvailableTimeForProvider(
   company: Company,
   providerId: string,
@@ -2701,26 +3104,32 @@ export async function getLatestAvailableTimeForProvider(
 
   // If ANY_PROVIDER or empty, calculate the earliest available start time across all service providers
   if (!providerId || providerId === ANY_PROVIDER_ID || providerId === 'ANY_PROVIDER') {
-    const { data: spData } = await supabase
-      .from('service_providers')
-      .select('provider_id, providers(id, is_active)')
-      .eq('service_id', serviceId);
-
-    const activeProviders = (spData || [])
-      .map((sp: any) => sp.providers)
-      .filter((p: any) => p && p.is_active);
-
+    const activeProviders = (company.providers || []).filter((p: any) => p && p.is_active);
     if (activeProviders.length === 0) {
       return null;
     }
 
+    const { start: dayStart, end: dayEnd } = getDayRange(now);
+    const multiOccupied = await getMultiProviderOccupiedSlots(
+      activeProviders.map((p: any) => p.id),
+      dayStart,
+      dayEnd
+    );
+
+    const workingHours = getCompanyWorkingHours(company, now);
+    if (!workingHours) return null;
+
     let earliestTime: Date | null = null;
     for (const p of activeProviders) {
-      const t = await getLatestAvailableTimeForProvider(company, p.id, serviceId);
-      if (t) {
-        if (!earliestTime || isBefore(t, earliestTime)) {
-          earliestTime = t;
-        }
+      const occupiedSlots = multiOccupied.get(p.id) || [];
+      const latestReservationEnd = occupiedSlots.reduce((latest, slot) => {
+        const slotEnd = new Date(slot.end_time);
+        return isAfter(slotEnd, latest) ? slotEnd : latest;
+      }, new Date(0));
+
+      const availableFrom = max([now, workingHours.start, latestReservationEnd]);
+      if (!earliestTime || isBefore(availableFrom, earliestTime)) {
+        earliestTime = availableFrom;
       }
     }
     return earliestTime;
@@ -2765,8 +3174,8 @@ export async function joinQueue(payload: CreateQueuePayload): Promise<AugmentedQ
   }
 
   const service = await getServiceDetails(service_id);
-  if (!service || !service.company || !service.estimated_wait_time_mins) {
-    throw new Error("Service details, company, or estimated wait time not found.");
+  if (!service || !service.company) {
+    throw new Error("Service details or company not found.");
   }
 
   const company = service.company;
@@ -2790,7 +3199,38 @@ export async function joinQueue(payload: CreateQueuePayload): Promise<AugmentedQ
     provider_id = bestProvider.id; // Assign to the most available provider
   }
 
-  const estimatedServiceDuration = service.estimated_wait_time_mins;
+  // --- RESOLVE COMPONENTS & EFFECTIVE DURATION ---
+  const activeComponents = service.components || [];
+  const compMap = new Map(activeComponents.map((c) => [c.id, c]));
+
+  const selectedCompIds = new Set<string>();
+  if (payload.components && payload.components.length > 0) {
+    payload.components.forEach((c) => selectedCompIds.add(c.component_id));
+  } else if (payload.selected_component_ids && payload.selected_component_ids.length > 0) {
+    payload.selected_component_ids.forEach((id) => selectedCompIds.add(id));
+  }
+
+  // Enforce required components automatically
+  activeComponents.forEach((c) => {
+    if (c.is_required) selectedCompIds.add(c.id);
+  });
+
+  const resolvedComponents: ServiceComponent[] = [];
+  for (const id of Array.from(selectedCompIds)) {
+    const comp = compMap.get(id);
+    if (comp) resolvedComponents.push(comp);
+  }
+
+  const baseWaitTime = service.estimated_wait_time_mins || 30;
+  const effectiveDuration = calculateTotalServiceDurationWithComponents(baseWaitTime, resolvedComponents);
+
+  // Recalculate price breakdown authoritatively
+  const priceBreakdown = calculateServiceWithComponentsPriceBreakdown(
+    service,
+    service.service_variants?.find((v) => v.id === payload.service_variant_id) || null,
+    resolvedComponents
+  );
+
   let projectedStartTime: Date | null = null;
   let projectedEndTime: Date | null = null;
 
@@ -2811,7 +3251,12 @@ export async function joinQueue(payload: CreateQueuePayload): Promise<AugmentedQ
         company_id: company.id,
       } as Provider);
 
-    // Instead of failing near closing time, find the next available slot (today or next open day).
+    const effectiveServiceForSlots = {
+      ...service,
+      estimated_wait_time_mins: effectiveDuration,
+    };
+
+    // Find the next available slot (today or next open day).
     const MAX_DAYS_AHEAD = 14;
     const baseDate = startOfDay(new Date());
     let found: { start: Date; end: Date } | null = null;
@@ -2820,7 +3265,7 @@ export async function joinQueue(payload: CreateQueuePayload): Promise<AugmentedQ
       const day = addDays(baseDate, i);
       const { start: dayStart, end: dayEnd } = getDayRange(day);
       const occupied = await getProviderOccupiedSlots(provider_id, dayStart, dayEnd);
-      let slots = generateAvailableSlots(company, service, providerObj, day, occupied);
+      let slots = generateAvailableSlots(company, effectiveServiceForSlots, providerObj, day, occupied);
 
       // For "today", don't show anything before the provider is actually available.
       if (i === 0 && latestAvailable) {
@@ -2847,13 +3292,15 @@ export async function joinQueue(payload: CreateQueuePayload): Promise<AugmentedQ
   const estimatedPosition = currentQueueCount + 1;
   let createdQueueEntryResult: QueueItem | null = null;
 
+  const safeQueueType = (queue_type === 'walk_in' || queue_type === 'walk-in' || !queue_type) ? 'walk-in' : queue_type;
+
   try {
     const { data: queueResult, error: queueError } = await supabase.from('queue_entries').insert({
       service_id,
       provider_id,
       user_name,
       phone_number,
-      queue_type,
+      queue_type: safeQueueType,
       status: 'waiting',
       notes,
       user_id: user.id,
@@ -2861,9 +3308,9 @@ export async function joinQueue(payload: CreateQueuePayload): Promise<AugmentedQ
       projected_end_time: projectedEndTime!.toISOString(),
       position: estimatedPosition,
       service_variant_id: payload.service_variant_id || null,
-      original_price: payload.original_price !== undefined ? payload.original_price : null,
-      discount_amount: payload.discount_amount !== undefined ? payload.discount_amount : 0,
-      final_price: payload.final_price !== undefined ? payload.final_price : null,
+      original_price: priceBreakdown.priceBreakdown.isCallForPrice ? null : priceBreakdown.priceBreakdown.originalPrice,
+      discount_amount: priceBreakdown.priceBreakdown.discountAmount || 0,
+      final_price: priceBreakdown.priceBreakdown.isCallForPrice ? null : priceBreakdown.priceBreakdown.finalPrice,
     }).select().single();
 
     if (queueError || !queueResult) throw new Error(`Failed to join queue: ${queueError?.message}`);
@@ -2878,12 +3325,39 @@ export async function joinQueue(payload: CreateQueuePayload): Promise<AugmentedQ
     });
 
     if (reservationError) throw new Error(`Failed to create reservation: ${reservationError.message}`);
+
+    // Snapshot queue_components if any components selected
+    let savedQueueComponents: QueueComponent[] = [];
+    if (resolvedComponents.length > 0 && createdQueueEntryResult.id) {
+      try {
+        const qcompPayloads = resolvedComponents.map((c) => ({
+          queue_entry_id: createdQueueEntryResult!.id,
+          component_id: c.id,
+          price_at_queue: c.is_included ? 0 : Number(c.price) || 0,
+          duration_mins: Number(c.duration_mins) || 0,
+          quantity: 1,
+        }));
+        const { data: insertedQComps, error: qcompErr } = await supabase
+          .from('queue_components')
+          .insert(qcompPayloads)
+          .select('*, component:service_components(*)');
+
+        if (!qcompErr && insertedQComps) {
+          savedQueueComponents = insertedQComps as any;
+        } else if (qcompErr) {
+          console.debug("queue_components snapshot insert warning:", qcompErr.message);
+        }
+      } catch (qcompErr) {
+        console.warn("Could not insert queue_components snapshot:", qcompErr);
+      }
+    }
     
     return { 
       ...createdQueueEntryResult, 
       position: estimatedPosition, 
       estimatedServiceStartTime: projectedStartTime, 
-      estimatedServiceEndTime: projectedEndTime 
+      estimatedServiceEndTime: projectedEndTime,
+      queue_components: savedQueueComponents,
     };
   } catch (error: any) {
     if (createdQueueEntryResult?.id) {
@@ -2893,139 +3367,393 @@ export async function joinQueue(payload: CreateQueuePayload): Promise<AugmentedQ
   }
 }
 
-
-
-
-
 export async function createBooking(
   bookingData: Omit<Booking, 'id' | 'created_at' | 'status'> & { 
     status?: BookingStatus;
     payment_status?: PaymentStatus;
+    components?: MarketplaceBookingComponentInput[];
+    selected_component_ids?: string[];
   }
 ): Promise<Booking> {
   let { provider_id, service_id, start_time, end_time, user_id } = bookingData;
 
-  // Require sign-in + completed profile for booking
+  // 1. Require sign-in + completed profile for booking
   const { user, profile } = await requireUserAndCompletedProfile();
   bookingData.user_id = user.id;
   bookingData.user_name = (profile.name ?? bookingData.user_name ?? "").trim();
   bookingData.phone_number = (profile.phone_number ?? bookingData.phone_number ?? "").trim();
 
   if (!service_id || !start_time || !end_time) {
-      throw new Error("Missing required booking data for reservation.");
+    throw new Error("Missing required booking data for reservation.");
   }
 
-  // --- AUTO-ASSIGNMENT LOGIC FOR "ANY PROVIDER" ---
-  if (!provider_id || provider_id === ANY_PROVIDER_ID) {
-    const service = await getServiceDetails(service_id);
-    
-    // FIX 1: Ensure service is not null before accessing its properties
-    if (!service) {
-        throw new Error("Service not found. Cannot assign provider.");
-    }
+  // 2. Validate Service Ownership & Availability from DB
+  const { data: dbService, error: serviceErr } = await supabase
+    .from('services')
+    .select('id, name, company_id, price, status, is_price_visible, discount_type, discount_value, discount_end_date, has_variants, requires_prepayment, prepayment_amount, estimated_wait_time_mins')
+    .eq('id', service_id)
+    .single();
 
-    const activeProviders = service.providers?.filter(p => p.is_active) || [];
+  if (serviceErr || !dbService || dbService.status !== 'active') {
+    throw new Error("Service not found or is currently inactive.");
+  }
+
+  if (bookingData.company_id && dbService.company_id !== bookingData.company_id) {
+    throw new Error("Service does not belong to the requested company.");
+  }
+
+  // 3. Validate Variant/Service relationship
+  let dbVariant: ServiceVariant | null = null;
+  if (bookingData.service_variant_id) {
+    const { data: vData, error: vErr } = await supabase
+      .from('service_variants')
+      .select('*')
+      .eq('id', bookingData.service_variant_id)
+      .eq('service_id', service_id)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (vErr || !vData) {
+      throw new Error("Selected service option is invalid or inactive.");
+    }
+    dbVariant = mapToServiceVariant(vData);
+  }
+
+  // 4. Fetch & Validate Service Components from DB
+  const { data: dbCompsRaw } = await supabase
+    .from('service_components')
+    .select('*')
+    .eq('service_id', service_id)
+    .eq('is_active', true)
+    .order('display_order', { ascending: true });
+
+  const dbComponents = (dbCompsRaw || []).map(mapToServiceComponent);
+  const dbCompMap = new Map(dbComponents.map((c) => [c.id, c]));
+
+  // Collect requested components
+  const requestedCompIds = new Set<string>();
+  const inputCompsMap = new Map<string, MarketplaceBookingComponentInput>();
+
+  if (bookingData.components && bookingData.components.length > 0) {
+    bookingData.components.forEach((c) => {
+      requestedCompIds.add(c.component_id);
+      inputCompsMap.set(c.component_id, c);
+    });
+  } else if (bookingData.selected_component_ids && bookingData.selected_component_ids.length > 0) {
+    bookingData.selected_component_ids.forEach((id) => requestedCompIds.add(id));
+  }
+
+  // Enforce required components automatically
+  dbComponents.forEach((c) => {
+    if (c.is_required) {
+      requestedCompIds.add(c.id);
+    }
+  });
+
+  // Snapshot component details authoritatively
+  const componentsToSnapshot: Array<{
+    component_id: string;
+    provider_id?: string | null;
+    quantity: number;
+    price_at_booking: number;
+    duration_mins: number;
+  }> = [];
+
+  for (const compId of Array.from(requestedCompIds)) {
+    const comp = dbCompMap.get(compId);
+    if (!comp) {
+      throw new Error("An invalid or inactive add-on was selected for this service.");
+    }
+    const inputMeta = inputCompsMap.get(compId);
+    componentsToSnapshot.push({
+      component_id: comp.id,
+      provider_id: inputMeta?.provider_id || provider_id || null,
+      quantity: Math.max(1, inputMeta?.quantity || 1),
+      price_at_booking: comp.is_included ? 0 : (Number(comp.price) || 0),
+      duration_mins: Number(comp.duration_mins) || 0,
+    });
+  }
+
+  // 5. Server-Authoritative Price Calculation
+  const baseItem = dbVariant || dbService;
+  const baseBreakdown = calculateItemPriceBreakdown(baseItem);
+
+  let authoritativeOriginalPrice = baseBreakdown.originalPrice || 0;
+  let authoritativeDiscountAmount = baseBreakdown.discountAmount || 0;
+  let authoritativeFinalPrice = baseBreakdown.finalPrice || 0;
+
+  if (!baseBreakdown.isCallForPrice) {
+    const extraAddonsPrice = componentsToSnapshot.reduce(
+      (sum, c) => sum + c.price_at_booking * c.quantity,
+      0
+    );
+    authoritativeOriginalPrice += extraAddonsPrice;
+    authoritativeFinalPrice = Math.max(0, authoritativeFinalPrice + extraAddonsPrice);
+  }
+
+  // 6. AUTO-ASSIGNMENT LOGIC FOR "ANY PROVIDER"
+  if (!provider_id || provider_id === ANY_PROVIDER_ID) {
+    const fullService = await getServiceDetails(service_id);
+    if (!fullService) throw new Error("Service not found. Cannot assign specialist.");
+
+    const activeProviders = fullService.providers?.filter(p => p.is_active) || [];
     let assignedProvider = false;
 
-    for (const p of activeProviders) {
-      const occupied = await getProviderOccupiedSlots(p.id, startOfDay(new Date(start_time)), endOfDay(new Date(end_time)));
-      const hasOverlap = occupied.some(r => {
-        return (new Date(start_time) < new Date(r.end_time)) && (new Date(end_time) > new Date(r.start_time));
-      });
+    if (activeProviders.length > 0) {
+      const multiOccupied = await getMultiProviderOccupiedSlots(
+        activeProviders.map(p => p.id),
+        startOfDay(new Date(start_time)),
+        endOfDay(new Date(end_time))
+      );
 
-      if (!hasOverlap) {
-        provider_id = p.id; // Pick the first provider who has this slot completely free
-        assignedProvider = true;
-        break;
+      for (const p of activeProviders) {
+        const occupied = multiOccupied.get(p.id) || [];
+        const hasOverlap = occupied.some(r => {
+          return (new Date(start_time) < new Date(r.end_time)) && (new Date(end_time) > new Date(r.start_time));
+        });
+
+        if (!hasOverlap) {
+          provider_id = p.id;
+          assignedProvider = true;
+          break;
+        }
       }
     }
     
-    if (!assignedProvider) throw new Error("No providers are available for this specific time slot.");
-    
-    // Update the booking data payload with the specific resolved provider
-    bookingData.provider_id = provider_id; 
+    if (!assignedProvider) throw new Error("No specialists are available for this specific time slot.");
+    bookingData.provider_id = provider_id;
   }
 
-  // FIX 2: Explicitly tell TypeScript that provider_id is definitely a string now
   if (!provider_id || provider_id === ANY_PROVIDER_ID) {
-      throw new Error("A valid provider could not be assigned.");
+    throw new Error("A valid provider could not be assigned.");
   }
 
   const bookingStartTime = new Date(start_time);
   const bookingEndTime = new Date(end_time);
 
-  // Check for overlaps using provider_reservations (our single source of truth)
-  // TypeScript now knows provider_id is a valid string
+  // Check for overlaps using provider_reservations
   const existingReservations = await getProviderOccupiedSlots(
-      provider_id,
-      startOfDay(bookingStartTime),
-      endOfDay(bookingEndTime)
+    provider_id,
+    startOfDay(bookingStartTime),
+    endOfDay(bookingEndTime)
   );
 
   const newBookingRange = { start: bookingStartTime, end: bookingEndTime };
-
   const hasOverlap = existingReservations.some(reservation => {
-      const existingStart = new Date(reservation.start_time);
-      const existingEnd = new Date(reservation.end_time);
-      return (newBookingRange.start < existingEnd) && (newBookingRange.end > existingStart);
+    const existingStart = new Date(reservation.start_time);
+    const existingEnd = new Date(reservation.end_time);
+    return (newBookingRange.start < existingEnd) && (newBookingRange.end > existingStart);
   });
 
   if (hasOverlap) {
-      throw new Error("The selected time slot is no longer available. Please choose another time.");
+    throw new Error("The selected time slot is no longer available. Please choose another time.");
   }
 
   let createdBooking: Booking | null = null;
   try {
-      const { data: bookingResult, error: bookingError } = await supabase
-          .from('bookings')
-          .insert({
-              ...bookingData,
-              status: bookingData.status || 'pending',
-              payment_status: bookingData.payment_status || 'not_required',
-          })
-          .select()
-          .single();
+    const hasPrepayment = Boolean(dbService.requires_prepayment && (Number(dbService.prepayment_amount) || 0) > 0);
+    const servicePrepayment = hasPrepayment ? (Number(dbService.prepayment_amount) || 0) : 0;
 
-      if (bookingError || !bookingResult) {
-          console.error('Supabase booking insert error:', bookingError);
-          throw new Error(`Failed to create booking: ${bookingError?.message || 'Unknown error'}`);
+    const insertPayload: any = {
+      service_id,
+      service_variant_id: bookingData.service_variant_id || null,
+      company_id: bookingData.company_id || dbService.company_id,
+      provider_id,
+      user_name: bookingData.user_name,
+      phone_number: bookingData.phone_number,
+      user_id: user.id,
+      start_time,
+      end_time,
+      status: bookingData.status || (hasPrepayment ? 'pending' : 'confirmed'),
+      payment_status: bookingData.payment_status || (hasPrepayment ? 'pending' : 'not_required'),
+      notes: bookingData.notes || null,
+      original_price: baseBreakdown.isCallForPrice ? null : authoritativeOriginalPrice,
+      discount_amount: baseBreakdown.isCallForPrice ? 0 : authoritativeDiscountAmount,
+      final_price: baseBreakdown.isCallForPrice ? null : authoritativeFinalPrice,
+      amount_paid: bookingData.amount_paid || 0,
+      prepayment_amount: servicePrepayment,
+    };
+
+    if (bookingData.booking_group_id) {
+      insertPayload.booking_group_id = bookingData.booking_group_id;
+    }
+
+    let { data: bookingResult, error: bookingError } = await supabase
+      .from('bookings')
+      .insert(insertPayload)
+      .select()
+      .single();
+
+    // Fallback if booking_group_id column is not yet migrated to the live database
+    if (bookingError && insertPayload.booking_group_id && bookingError.message?.includes('booking_group_id')) {
+      console.warn("booking_group_id column missing in live DB. Retrying insert without group id.");
+      delete insertPayload.booking_group_id;
+      const retry = await supabase.from('bookings').insert(insertPayload).select().single();
+      bookingResult = retry.data;
+      bookingError = retry.error;
+    }
+
+    if (bookingError || !bookingResult) {
+      console.error('Supabase booking insert error:', bookingError);
+      throw new Error(`Failed to create booking: ${bookingError?.message || 'Unknown error'}`);
+    }
+    createdBooking = bookingResult as Booking;
+
+    // Create provider reservation
+    const { error: reservationError } = await supabase
+      .from('provider_reservations')
+      .insert({
+        provider_id,
+        service_id,
+        start_time,
+        end_time,
+        source_type: 'booking',
+        source_row_id: createdBooking.id,
+      });
+
+    if (reservationError) {
+      console.error('Supabase reservation insert error:', reservationError);
+      throw new Error(`Failed to create provider reservation: ${reservationError.message || 'Unknown error'}`);
+    }
+
+    // Insert snapshot records into booking_components
+    let savedBookingComponents: BookingComponent[] = [];
+    if (componentsToSnapshot.length > 0 && createdBooking.id) {
+      try {
+        const bcompPayloads = componentsToSnapshot.map((c) => ({
+          booking_id: createdBooking!.id,
+          component_id: c.component_id,
+          provider_id: c.provider_id || provider_id || null,
+          quantity: c.quantity || 1,
+          price_at_booking: Number(c.price_at_booking) || 0,
+          duration_mins: Number(c.duration_mins) || 0,
+        }));
+
+        const { data: insertedComps, error: bcompError } = await supabase
+          .from('booking_components')
+          .insert(bcompPayloads)
+          .select();
+
+        if (!bcompError && insertedComps) {
+          savedBookingComponents = insertedComps as any;
+        } else if (!bcompError) {
+          savedBookingComponents = bcompPayloads.map((bc) => ({
+            ...bc,
+            id: `snap_${Math.random().toString(36).substring(2, 9)}`,
+            created_at: new Date().toISOString(),
+          })) as any;
+        } else {
+          console.warn("booking_components snapshot insert warning (RLS/policy):", bcompError.message);
+        }
+      } catch (bcInsertErr) {
+        console.warn("Could not insert booking_components snapshot:", bcInsertErr);
       }
-      createdBooking = bookingResult;
+    }
 
-      const { data: reservationResult, error: reservationError } = await supabase
-          .from('provider_reservations')
-          .insert({
-              provider_id: provider_id, // This is now safely guaranteed to be a string
-              service_id: service_id,
-              start_time: start_time,
-              end_time: end_time,
-              source_type: 'booking',
-              source_row_id: createdBooking?.id,
-          })
-          .select()
-          .single();
-
-      if (reservationError || !reservationResult) {
-          console.error('Supabase reservation insert error:', reservationError);
-          throw new Error(`Failed to create provider reservation: ${reservationError?.message || 'Unknown error'}`);
-      }
-      
-      if (!createdBooking) {
-        throw new Error('Booking creation failed: result is null.');
-      }
-      return createdBooking as Booking;
-
+    return {
+      ...createdBooking,
+      booking_components: savedBookingComponents,
+    };
   } catch (error: any) {
-      if (createdBooking?.id) {
-          console.warn(`Attempting to delete partially created booking ${createdBooking.id} due to reservation failure.`);
-          await supabase.from('bookings').delete().eq('id', createdBooking.id);
+    if (createdBooking?.id) {
+      console.warn(`Rolling back partially created booking ${createdBooking.id}:`, error);
+      try {
+        await supabase.from('provider_reservations').delete().eq('source_row_id', createdBooking.id);
+        await supabase.from('booking_components').delete().eq('booking_id', createdBooking.id);
+        await supabase.from('bookings').delete().eq('id', createdBooking.id);
+      } catch (cleanupErr) {
+        console.error("Cleanup error during booking rollback:", cleanupErr);
       }
-      console.error('Transaction failed for booking:', error);
-      throw error;
+    }
+    throw error;
   }
 }
 
+/**
+ * Generates an RFC4122 compliant UUID v4 string for booking_group_id.
+ */
+function generateUUIDv4(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
 
+/**
+ * Creates multi-service bookings within a single customer checkout flow.
+ * Links all appointments with a shared booking_group_id UUID and guarantees transaction safety.
+ */
+export async function createMultiServiceBookings(
+  payload: MultiServiceBookingPayload
+): Promise<Booking[]> {
+  const groupId = payload.booking_group_id || generateUUIDv4();
+  const createdBookings: Booking[] = [];
+
+  try {
+    for (const item of payload.bookings) {
+      const singleBooking = await createBooking({
+        service_id: item.service_id,
+        service_variant_id: item.service_variant_id || null,
+        company_id: payload.company_id,
+        provider_id: item.provider_id || null,
+        user_name: payload.user_name,
+        phone_number: payload.phone_number,
+        start_time: item.start_time,
+        end_time: item.end_time,
+        notes: item.notes || payload.notes || null,
+        booking_group_id: groupId,
+        components: item.components,
+        selected_component_ids: item.selected_component_ids,
+      } as any);
+
+      createdBookings.push(singleBooking);
+    }
+    return createdBookings;
+  } catch (error: any) {
+    if (createdBookings.length > 0) {
+      const ids = createdBookings.map((b) => b.id);
+      console.warn("Rolling back multi-service booking group:", ids);
+      try {
+        await supabase.from('provider_reservations').delete().in('source_row_id', ids);
+        await supabase.from('booking_components').delete().in('booking_id', ids);
+        await supabase.from('bookings').delete().in('id', ids);
+      } catch (cleanupErr) {
+        console.error("Error during multi-booking rollback:", cleanupErr);
+      }
+    }
+    throw error;
+  }
+}
+
+/**
+ * Fetches all bookings belonging to a specific booking_group_id with related components.
+ */
+export async function getBookingGroupDetails(bookingGroupId: string): Promise<Booking[]> {
+  if (!bookingGroupId) return [];
+  const { data, error } = await supabase
+    .from('bookings')
+    .select(`
+      *,
+      service:services(*),
+      company:companies(*),
+      provider:providers(*),
+      service_variant:service_variants(*),
+      booking_components:booking_components(*, component:service_components(*))
+    `)
+    .eq('booking_group_id', bookingGroupId)
+    .order('start_time', { ascending: true });
+
+  if (error) {
+    console.error('Error fetching booking group details:', error.message);
+    return [];
+  }
+
+  return (data || []) as Booking[];
+}
 
 export async function getConfirmedBookingsForProvider(
 
@@ -3070,41 +3798,55 @@ export async function getConfirmedBookingsForProvider(
 
 
 export async function getBookingDetails(bookingId: string): Promise<Booking | null> {
+  const { data, error } = await supabase
+    .from('bookings')
+    .select(`
+      *,
+      service:services(*),
+      company:companies(*),
+      provider:providers(*),
+      service_variant:service_variants(*)
+    `)
+    .eq('id', bookingId)
+    .single();
 
-    const { data, error } = await supabase
+  if (error && error.code !== 'PGRST116') {
+    console.error('Error fetching booking details:', error.message);
+    throw new Error('Failed to fetch booking details.');
+  }
 
-        .from('bookings')
+  if (!data) return null;
 
-        .select(`
+  // Retrieve attached booking components
+  try {
+    const { data: bcompData, error: bcompError } = await supabase
+      .from('booking_components')
+      .select(`
+        *,
+        component:service_components (*),
+        provider:providers (*)
+      `)
+      .eq('booking_id', bookingId)
+      .order('created_at', { ascending: true });
 
-            *,
-
-            service:services(*),
-
-            company:companies(*),
-
-            provider:providers(*)
-
-        `)
-
-        .eq('id', bookingId)
-
-        .single();
-
-
-
-    if (error && error.code !== 'PGRST116') { // PGRST116 means no rows found
-
-        console.error('Error fetching booking details:', error.message);
-
-        throw new Error('Failed to fetch booking details.');
-
+    if (!bcompError && bcompData) {
+      data.booking_components = bcompData.map((bc: any) => ({
+        ...bc,
+        price_at_booking: Number(bc.price_at_booking) || 0,
+        duration_mins: Number(bc.duration_mins) || 0,
+        quantity: Number(bc.quantity) || 1,
+        component: bc.component ? mapToServiceComponent(bc.component) : null,
+        provider: bc.provider ? mapToProvider(bc.provider) : null,
+      }));
+    } else {
+      data.booking_components = [];
     }
+  } catch (bcFetchErr) {
+    console.warn("Could not fetch booking components for booking details:", bcFetchErr);
+    data.booking_components = [];
+  }
 
-
-
-    return data;
-
+  return data as Booking;
 }
 
 export async function getQueueEntryDetails(queueId: string): Promise<QueueItem | null> {
@@ -3845,6 +4587,102 @@ export async function enrichPackagesWithInclusions(packages: Service[]): Promise
   }
 }
 
+// Helper function to enrich services with active service_components (Phases & Add-ons)
+export async function enrichServicesWithComponents(services: Service[]): Promise<void> {
+  if (!services || services.length === 0) return;
+
+  const serviceIds = services.map((s) => s.id).filter(Boolean);
+  if (serviceIds.length === 0) return;
+
+  try {
+    const { data: components, error } = await supabase
+      .from('service_components')
+      .select('*')
+      .in('service_id', serviceIds)
+      .eq('is_active', true)
+      .order('display_order', { ascending: true })
+      .order('created_at', { ascending: true });
+
+    if (!error && components) {
+      const compMap = new Map<string, ServiceComponent[]>();
+      components.forEach((c: any) => {
+        const mapped = mapToServiceComponent(c);
+        const list = compMap.get(c.service_id) || [];
+        list.push(mapped);
+        compMap.set(c.service_id, list);
+      });
+
+      services.forEach((s) => {
+        const comps = compMap.get(s.id) || [];
+        s.components = comps;
+        s.service_components = comps;
+      });
+    }
+  } catch (err) {
+    console.warn("Could not enrich services with components:", err);
+  }
+}
+
+// Fetch active service components for a specific service
+export async function getServiceComponents(
+  serviceId: string,
+  onlyActive: boolean = true
+): Promise<ServiceComponent[]> {
+  try {
+    let query = supabase
+      .from('service_components')
+      .select('*')
+      .eq('service_id', serviceId)
+      .order('display_order', { ascending: true })
+      .order('created_at', { ascending: true });
+
+    if (onlyActive) {
+      query = query.eq('is_active', true);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      console.error('Error fetching service components:', error);
+      return [];
+    }
+    return (data || []).map(mapToServiceComponent);
+  } catch (err) {
+    console.error('Error in getServiceComponents:', err);
+    return [];
+  }
+}
+
+// Fetch booking components for a confirmed booking
+export async function getBookingComponents(bookingId: string): Promise<BookingComponent[]> {
+  try {
+    const { data, error } = await supabase
+      .from('booking_components')
+      .select(`
+        *,
+        component:service_components (*),
+        provider:providers (*)
+      `)
+      .eq('booking_id', bookingId)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching booking components:', error);
+      return [];
+    }
+    return (data || []).map((bc: any) => ({
+      ...bc,
+      price_at_booking: Number(bc.price_at_booking) || 0,
+      duration_mins: Number(bc.duration_mins) || 0,
+      quantity: Number(bc.quantity) || 1,
+      component: bc.component ? mapToServiceComponent(bc.component) : null,
+      provider: bc.provider ? mapToProvider(bc.provider) : null,
+    }));
+  } catch (err) {
+    console.error('Error in getBookingComponents:', err);
+    return [];
+  }
+}
+
 // Helper function to format included categories as "Haircut + Beard Trim + Wash"
 export function formatPackageCategories(service: Service): string {
   if (service.package_items && service.package_items.length > 0) {
@@ -3869,9 +4707,9 @@ export function formatPackageCategories(service: Service): string {
 }
 
 // Fetch all active package services with company and sub-service categories resolved
-export async function getAllPackages(): Promise<Service[]> {
+export async function getAllPackages(limit?: number): Promise<Service[]> {
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from('services')
       .select(`
         *,
@@ -3885,6 +4723,12 @@ export async function getAllPackages(): Promise<Service[]> {
       `)
       .eq('is_package', true)
       .eq('status', 'active');
+
+    if (limit && limit > 0) {
+      query = query.limit(limit);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.error("Error fetching packages:", error);
@@ -4160,4 +5004,4 @@ export async function toggleServiceFavorite(serviceId: string): Promise<{ isFavo
     if (insErr) throw insErr;
     return { isFavorited: true };
   }
-}
+}

@@ -241,7 +241,7 @@ export default function ProfileClient() {
     return (
       <div className="min-h-[80vh] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 rounded-full border-2 border-amber-400 border-t-transparent animate-spin" />
+          <div className="w-8 h-8 rounded-full border-2 border-[#FBA819] border-t-transparent animate-spin" />
           <p className="text-sm text-slate-400">Loading profile…</p>
         </div>
       </div>
@@ -250,49 +250,36 @@ export default function ProfileClient() {
 
   return (
     <>
-      <div className="min-h-screen bg-slate-50/50 dark:bg-slate-950 py-6 sm:py-10">
-        <div className="max-w-6xl mx-auto px-4 space-y-6 sm:space-y-8">
+      <div className="min-h-screen bg-[#F8FAFC] dark:bg-slate-950 py-6 sm:py-10 pb-24 md:pb-10">
+        <div className="max-w-6xl mx-auto px-4">
+          
+          <div className="flex flex-col lg:flex-row items-start gap-6 sm:gap-8">
+            
+            {/* ── Left Column: Profile Card + Navigation Menu (Desktop) ── */}
+            <div className="w-full lg:w-[310px] shrink-0 space-y-4">
+              {/* Profile Card */}
+              <ProfileHero
+                name={name || profile?.name || ""}
+                email={profile?.email ?? null}
+                createdAt={profile?.created_at}
+                avatarUrl={avatarUrl}
+                totalBookings={bookings.length}
+                totalQueue={queueEntries.length}
+                totalRatings={totalRatings}
+                onEditClick={() => setDrawerOpen(true)}
+              />
 
-          {/* ── 1. Hero Profile Banner ── */}
-          <ProfileHero
-            name={name || profile?.name || ""}
-            email={profile?.email ?? null}
-            createdAt={profile?.created_at}
-            avatarUrl={avatarUrl}
-            totalBookings={bookings.length}
-            totalQueue={queueEntries.length}
-            totalRatings={totalRatings}
-            onEditClick={() => setDrawerOpen(true)}
-          />
-
-          {/* ── 2. Content Layout: Desktop (Account on Left, Activity on Right), Mobile (flex-col-reverse: Activity on Top, Account on Bottom) ── */}
-          <div className="flex flex-col-reverse lg:flex-row items-start gap-6 sm:gap-8">
-
-            {/* Left Column (Desktop) / Bottom (Mobile): Account Section */}
-            <div className="w-full lg:w-[320px] shrink-0">
-              <h2 className="font-serif font-bold text-xl sm:text-2xl text-slate-900 dark:text-white tracking-tight mb-3">
-                Account
-              </h2>
-
-              <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800 shadow-2xs overflow-hidden">
-
+              {/* Navigation Links Card (Desktop only, hidden on mobile bottom nav) */}
+              <div className="hidden md:block bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 p-2 divide-y divide-slate-100 dark:divide-slate-800 shadow-2xs overflow-hidden">
                 {/* Personal Details */}
                 <button
                   type="button"
                   onClick={() => setDrawerOpen(true)}
-                  className="w-full p-4 sm:p-4.5 flex items-center justify-between hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors text-left group cursor-pointer"
+                  className="w-full p-3.5 flex items-center justify-between hover:bg-slate-50/80 dark:hover:bg-slate-800/50 rounded-2xl transition-colors text-left group cursor-pointer"
                 >
-                  <div className="flex items-center gap-3.5">
-                    <div className="w-10 h-10 rounded-2xl bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center shrink-0">
-                      <Icon icon="solar:user-linear" className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-sm text-slate-900 dark:text-white">
-                        Personal details
-                      </h4>
-                      <p className="text-xs text-slate-400 mt-0.5">Name, phone, avatar</p>
-                    </div>
-                  </div>
+                  <span className="font-semibold text-sm text-slate-800 dark:text-slate-200">
+                    Personal details
+                  </span>
                   <Icon
                     icon="solar:alt-arrow-right-linear"
                     className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform"
@@ -303,24 +290,14 @@ export default function ProfileClient() {
                 <button
                   type="button"
                   onClick={() => setSavedDrawerOpen(true)}
-                  className="w-full p-4 sm:p-4.5 flex items-center justify-between hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors text-left group cursor-pointer"
+                  className="w-full p-3.5 flex items-center justify-between hover:bg-slate-50/80 dark:hover:bg-slate-800/50 rounded-2xl transition-colors text-left group cursor-pointer"
                 >
-                  <div className="flex items-center gap-3.5">
-                    <div className="w-10 h-10 rounded-2xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 flex items-center justify-center shrink-0">
-                      <Icon icon="solar:bookmark-linear" className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-sm text-slate-900 dark:text-white">
-                        Saved services
-                      </h4>
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        {savedServices.length} {savedServices.length === 1 ? "service" : "services"} saved
-                      </p>
-                    </div>
-                  </div>
+                  <span className="font-semibold text-sm text-slate-800 dark:text-slate-200">
+                    Saved services
+                  </span>
                   <div className="flex items-center gap-2">
                     {savedServices.length > 0 && (
-                      <span className="text-[11px] font-bold bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-full">
+                      <span className="text-[11px] font-bold bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 px-2 py-0.5 rounded-full">
                         {savedServices.length}
                       </span>
                     )}
@@ -330,26 +307,25 @@ export default function ProfileClient() {
                     />
                   </div>
                 </button>
+
                 {/* Sign Out */}
                 <button
                   type="button"
                   onClick={handleSignOut}
-                  className="w-full p-4 sm:p-4.5 flex items-center justify-between hover:bg-rose-50/50 dark:hover:bg-rose-950/20 transition-colors text-left group cursor-pointer"
+                  className="w-full p-3.5 flex items-center justify-between hover:bg-rose-50/50 dark:hover:bg-rose-950/20 rounded-2xl transition-colors text-left group cursor-pointer"
                 >
-                  <div className="flex items-center gap-3.5">
-                    <div className="w-10 h-10 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
-                      <Icon icon="solar:logout-2-linear" className="w-5 h-5" />
-                    </div>
-                    <h4 className="font-semibold text-sm text-rose-600">
-                      Sign out
-                    </h4>
-                  </div>
+                  <span className="font-semibold text-sm text-rose-600">
+                    Sign out
+                  </span>
+                  <Icon
+                    icon="solar:logout-2-linear"
+                    className="w-4 h-4 text-rose-500"
+                  />
                 </button>
-
               </div>
             </div>
 
-            {/* Right Column (Desktop with more width) / Top (Mobile): My Activity Section */}
+            {/* ── Right Column: My Activity Section + Filter Bar ── */}
             <div className="w-full lg:flex-1">
               <ActivityTabs
                 bookings={bookings}
@@ -368,6 +344,45 @@ export default function ProfileClient() {
           </div>
 
         </div>
+      </div>
+
+      {/* ── MOBILE BOTTOM NAVIGATION BAR (Matches Mockup) ── */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 px-4 py-2.5 flex items-center justify-around shadow-lg">
+        {/* Activity Tab */}
+        <button
+          type="button"
+          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          className="text-xs font-bold text-amber-600 dark:text-amber-400 flex flex-col items-center gap-0.5 cursor-pointer"
+        >
+          <span>Activity</span>
+        </button>
+
+        {/* Details Tab */}
+        <button
+          type="button"
+          onClick={() => setDrawerOpen(true)}
+          className="text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 flex flex-col items-center gap-0.5 cursor-pointer"
+        >
+          <span>Details</span>
+        </button>
+
+        {/* Saved Tab */}
+        <button
+          type="button"
+          onClick={() => setSavedDrawerOpen(true)}
+          className="text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 flex flex-col items-center gap-0.5 cursor-pointer"
+        >
+          <span>Saved · {savedServices.length}</span>
+        </button>
+
+        {/* Sign Out */}
+        <button
+          type="button"
+          onClick={handleSignOut}
+          className="text-xs font-semibold text-rose-600 hover:text-rose-700 flex flex-col items-center gap-0.5 cursor-pointer"
+        >
+          <span>Sign out</span>
+        </button>
       </div>
 
       {/* ── Saved Services Drawer ── */}

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import React, { useState } from 'react';
 import { Icon } from '@iconify/react';
@@ -33,9 +34,12 @@ const NavSection = ({ servicesSectionId }: NavSectionProps) => {
         {/* ── Left: Brand Logo & Unified Tertiary Title ── */}
         <div className="flex items-center gap-6">
           <Link href="/" className="flex items-center gap-2.5 group shrink-0">
-            <img
+            <Image
               src="/images/logopro.png"
               alt="GizeBook Logo"
+              width={36}
+              height={36}
+              priority
               className="h-8 sm:h-9 w-auto object-contain transition-transform group-hover:scale-105"
             />
             <span className="text-xl sm:text-2xl font-black tracking-tight text-tertiary">

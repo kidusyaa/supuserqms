@@ -18,14 +18,18 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabaseClient";
 import type { Booking, Company, Service, Provider } from "@/type";
 import { cn } from "@/lib/utils";
+import { LogoLoader } from "@/components/ui/LogoLoader";
 
 interface PaymentVerificationModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   booking: Booking | null;
-  service: Service;
+  service?: Service | null;
   company: Company;
-  selectedProvider: Provider;
+  selectedProvider?: Provider | null;
+  bookingGroupId?: string | null;
+  totalPrepaymentAmount?: number | null;
+  serviceNames?: string[];
   onSuccess?: () => void;
 }
 
@@ -38,6 +42,9 @@ export default function PaymentVerificationModal({
   service,
   company,
   selectedProvider,
+  bookingGroupId,
+  totalPrepaymentAmount,
+  serviceNames,
   onSuccess,
 }: PaymentVerificationModalProps) {
   const router = useRouter();
@@ -178,8 +185,18 @@ export default function PaymentVerificationModal({
       const edgeFunctionUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL || "https://cxifbxhpwkxnsxxpaxwh.supabase.co"
         }/functions/v1/send-payment-proof`;
 
+      const effectiveAmount = totalPrepaymentAmount != null
+        ? totalPrepaymentAmount
+        : (service?.prepayment_amount || service?.price || 0);
+
+      const activeGroupId = bookingGroupId || booking.booking_group_id;
+
       const formData = new FormData();
       formData.append("booking_id", booking.id);
+      if (activeGroupId) {
+        formData.append("booking_group_id", activeGroupId);
+      }
+      formData.append("amount_paid", String(effectiveAmount));
       formData.append("screenshot", selectedFile);
 
       const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
@@ -198,6 +215,18 @@ export default function PaymentVerificationModal({
         throw new Error(
           errorData.message || errorData.error || `Upload failed with status ${response.status}`
         );
+      }
+
+      // Record verification submission directly for reliable triggers
+      try {
+        await supabase.from("payment_verifications").insert({
+          booking_id: booking.id,
+          booking_group_id: activeGroupId || null,
+          amount_paid: Number(effectiveAmount) || 0,
+          status: "submitted",
+        });
+      } catch (pvErr) {
+        console.debug("payment_verifications record insert notice:", pvErr);
       }
 
       toast.success("Payment proof submitted successfully!");
@@ -340,12 +369,12 @@ export default function PaymentVerificationModal({
                     Required Prepayment
                   </span>
                   <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
-                    For <strong className="text-slate-900 dark:text-white">{service.name}</strong>
+                    For <strong className="text-slate-900 dark:text-white">{serviceNames && serviceNames.length > 0 ? serviceNames.join(", ") : (service?.name || "Service Reservation")}</strong>
                   </p>
                 </div>
                 <div className="text-right">
                   <div className="text-2xl font-black text-amber-600 dark:text-amber-400">
-                    ETB {service.prepayment_amount || service.price || "0"}
+                    ETB {totalPrepaymentAmount != null ? totalPrepaymentAmount.toLocaleString() : (service?.prepayment_amount || service?.price || "0")}
                   </div>
                   <span className="text-[10px] text-slate-500">Deposit required</span>
                 </div>
@@ -518,13 +547,9 @@ export default function PaymentVerificationModal({
              ════════════════════════════════════════════════════════════ */}
           {modalState === "verifying" && (
             <div className="py-8 px-2 text-center space-y-6">
-              {/* Radar pulse animation */}
-              <div className="relative w-28 h-28 mx-auto flex items-center justify-center">
-                <div className="absolute inset-0 rounded-full bg-amber-400/20 animate-ping duration-1000" />
-                <div className="absolute inset-2 rounded-full bg-amber-500/10 animate-pulse" />
-                <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-tr from-[#0f2937] to-[#1b3d52] text-amber-400 flex items-center justify-center shadow-lg border border-amber-500/30">
-                  <Icon icon="solar:shield-check-bold" className="w-8 h-8 animate-pulse" />
-                </div>
+              {/* Logo Loader animation */}
+              <div className="flex justify-center">
+                <LogoLoader variant="flip" size="lg" />
               </div>
 
               <div className="space-y-2 max-w-sm mx-auto">
@@ -555,13 +580,13 @@ export default function PaymentVerificationModal({
                   <div className="flex justify-between text-slate-500">
                     <span>Service:</span>
                     <span className="font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[150px]">
-                      {service.name}
+                      {serviceNames && serviceNames.length > 0 ? serviceNames.join(", ") : (service?.name || "Service Reservation")}
                     </span>
                   </div>
                   <div className="flex justify-between text-slate-500">
                     <span>Specialist:</span>
                     <span className="font-semibold text-slate-800 dark:text-slate-200">
-                      {selectedProvider.name}
+                      {selectedProvider?.name || "Assigned Specialist"}
                     </span>
                   </div>
                 </div>
@@ -592,15 +617,15 @@ export default function PaymentVerificationModal({
                 <div className="flex items-center gap-3 pb-3 border-b border-slate-200/80 dark:border-slate-800">
                   <div className="relative w-12 h-12 rounded-xl overflow-hidden bg-white border shrink-0">
                     <Image
-                      src={service.photo || "/placeholder.svg"}
-                      alt={service.name}
+                      src={service?.photo || "/placeholder.svg"}
+                      alt={service?.name || "Service"}
                       fill
                       className="object-cover"
                     />
                   </div>
                   <div className="min-w-0">
                     <h4 className="font-bold text-sm text-slate-900 dark:text-white truncate">
-                      {service.name}
+                      {serviceNames && serviceNames.length > 0 ? serviceNames.join(", ") : (service?.name || "Service Reservation")}
                     </h4>
                     <p className="text-xs text-slate-500 truncate">{company.name}</p>
                   </div>
@@ -624,13 +649,13 @@ export default function PaymentVerificationModal({
                   <div>
                     <span className="text-slate-400 block text-[11px]">Specialist</span>
                     <span className="font-semibold text-slate-800 dark:text-slate-200">
-                      {selectedProvider.name}
+                      {selectedProvider?.name || "Assigned Specialist"}
                     </span>
                   </div>
                   <div>
                     <span className="text-slate-400 block text-[11px]">Deposit Verified</span>
                     <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                      ETB {service.prepayment_amount || service.price || "0"}
+                      ETB {totalPrepaymentAmount != null ? totalPrepaymentAmount.toLocaleString() : (service?.prepayment_amount || service?.price || "0")}
                     </span>
                   </div>
                 </div>
@@ -661,7 +686,7 @@ export default function PaymentVerificationModal({
                 <p className="font-bold">Next Steps:</p>
                 <ul className="list-disc list-inside space-y-0.5 text-[11px] text-amber-700 dark:text-amber-400">
                   <li>Double-check the company account number.</li>
-                  <li>Ensure the receipt shows the correct transfer amount (ETB {service.prepayment_amount}).</li>
+                  <li>Ensure the receipt shows the correct transfer amount (ETB {totalPrepaymentAmount != null ? totalPrepaymentAmount : (service?.prepayment_amount || "0")}).</li>
                   <li>Click &quot;Re-upload Receipt&quot; below to submit a new screenshot.</li>
                 </ul>
               </div>

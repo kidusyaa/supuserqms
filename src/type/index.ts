@@ -2,10 +2,10 @@ export type UserRole = "company" | "user";
 export type BookingStatus = "pending" | "confirmed" | "completed" | "cancelled";
 export type PaymentStatus = "not_required" | "pending" | "approved" | "rejected";
 
-export type QueueTypeStatus = 'walk_in' | 'online' | 'scheduled' | 'other'; // Adjust 'other' as needed for your DB enum values
+export type QueueTypeStatus = 'walk_in' | 'online' | 'scheduled' | 'other';
 
-// --- Ensure your QueueEntryStatus for the 'status' column is also correct ---
 export type QueueEntryStatus = 'waiting' | 'serving' | 'served' | 'noshow' | 'cancelled';
+
 export type BankAccount = {
   id: string;
   account_type: string;
@@ -44,10 +44,9 @@ export type Company = {
   account_name?: string | null;
   account_number?: string | null;
   rating_summary?: {
-  average_stars: number;
-  total_ratings: number;
-} | null;
-
+    average_stars: number;
+    total_ratings: number;
+  } | null;
 };
 
 export interface CompanyPhoto {
@@ -58,7 +57,6 @@ export interface CompanyPhoto {
   created_at?: string;
 }
 
-  
 interface ServicePhoto {
   url: string;
 }
@@ -77,6 +75,68 @@ export type ServiceVariant = {
   created_at?: string;
   updated_at?: string;
 };
+
+// --- SERVICE COMPONENTS (Multi-step Phases & Add-ons) ---
+export type ServiceComponentType = 'phase' | 'addon';
+
+export interface ServiceComponent {
+  id: string;
+  service_id: string;
+  name: string;
+  component_type: ServiceComponentType;
+  description: string | null;
+  price: number;
+  duration_mins: number;
+  is_required: boolean;
+  is_included: boolean;
+  is_overlappable: boolean;
+  display_order: number;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export type CreateServiceComponentInput = Omit<ServiceComponent, 'id' | 'created_at' | 'updated_at'>;
+export type UpdateServiceComponentInput = Partial<CreateServiceComponentInput>;
+
+export interface BookingComponent {
+  id: string;
+  booking_id: string;
+  component_id: string;
+  provider_id?: string | null;
+  quantity: number;
+  price_at_booking: number;
+  duration_mins: number;
+  created_at?: string;
+  component?: ServiceComponent | null;
+  provider?: Provider | null;
+}
+
+export interface QueueComponent {
+  id: string;
+  queue_entry_id: string | number;
+  component_id: string;
+  quantity?: number;
+  price_at_queue: number;
+  duration_mins: number;
+  created_at?: string;
+  component?: ServiceComponent | null;
+}
+
+export interface PaymentVerification {
+  id: string;
+  booking_id?: string | null;
+  booking_group_id?: string | null;
+  status: 'submitted' | 'approved' | 'rejected';
+  amount_paid?: number | null;
+  proof_image_url?: string | null;
+  telegram_chat_id?: number | null;
+  telegram_message_id?: number | null;
+  submitted_at: string;
+  verified_at?: string | null;
+  verified_by_telegram_id?: number | null;
+  rejection_reason?: string | null;
+}
 
 export type PackageItem = {
   id: string;
@@ -129,38 +189,44 @@ export type Service = {
   description_points?: string[] | null;
   service_variants?: ServiceVariant[];
   package_items?: PackageItem[];
+  // Components (Multi-step Phases & Add-ons)
+  components?: ServiceComponent[];
+  service_components?: ServiceComponent[];
 };
 
-// In your type.ts file:
+export type ServiceWithComponents = Service & {
+  components: ServiceComponent[];
+};
+
 export type QueueItem = {
   id: number; // bigint from DB
   service_id: string;
   provider_id: string | null;
   user_name: string;
   phone_number: string | null;
-  status: 'waiting' | 'serving' | 'served' | 'noshow' | 'cancelled'; // or your USER-DEFINED enum
+  status: 'waiting' | 'serving' | 'served' | 'noshow' | 'cancelled';
   position: number | null;
-  queue_type: 'walk-in' | 'booking' | null; // or your USER-DEFINED enum
+  queue_type: 'walk-in' | 'booking' | null;
   notes: string | null;
   joined_at: string; // ISO string from DB
   served_at: string | null;
-  user_id: string | null; // uuid from DB, can be null
-  projected_start_time?: string | null; // NEW: ISO string
-  projected_end_time?: string | null;   // NEW: ISO string
+  user_id: string | null;
+  projected_start_time?: string | null;
+  projected_end_time?: string | null;
   service_variant_id?: string | null;
   original_price?: number | null;
   discount_amount?: number | null;
   final_price?: number | null;
   service_variant?: ServiceVariant;
   service?: Service;
+  queue_components?: QueueComponent[];
 };
 
 export interface AugmentedQueueItem extends QueueItem {
-    // These are the calculated Date objects returned by the `joinQueue` function,
-    // which are not directly persisted in the `queue_entries` table.
-    estimatedServiceStartTime?: Date | null;
-    estimatedServiceEndTime?: Date | null;
+  estimatedServiceStartTime?: Date | null;
+  estimatedServiceEndTime?: Date | null;
 }
+
 export interface Booking {
   id: string;
   user_id: string | null;
@@ -180,34 +246,41 @@ export interface Booking {
   original_price?: number | null;
   discount_amount?: number | null;
   final_price?: number | null;
+  amount_paid?: number | null;
+  prepayment_amount?: number | null;
+  booking_group_id?: string | null;
+  booking_components?: BookingComponent[];
   service_variant?: ServiceVariant;
   service?: Service;
   company?: Company;
   provider?: Provider;
 }
+
 export interface DailyWorkingHours {
-  start: Date; // Time component only (e.g., 9:00 AM on a dummy date)
-  end: Date;   // Time component only (e.g., 5:00 PM on a dummy date)
+  start: Date;
+  end: Date;
 }
 
 export type ParsedWorkingHours = {
-  [key: number]: DailyWorkingHours[]; // Key: Day of week (0=Sun, 1=Mon, ...), Value: Array of time ranges
+  [key: number]: DailyWorkingHours[];
 };
+
 export interface WorkingHoursForDay {
-  start: string; // HH:mm format, e.g., "08:00"
-  end: string;   // HH:mm format, e.g., "17:00"
+  start: string;
+  end: string;
 }
 
 export interface WorkingHoursJsonb {
-  [dayIndex: number]: WorkingHoursForDay[]; // Day index 0-6 (Sun-Sat)
+  [dayIndex: number]: WorkingHoursForDay[];
 }
+
 export interface AvailableSlot {
-  start: Date; // Full date-time for the slot
-  end: Date;   // Full date-time for the slot
+  start: Date;
+  end: Date;
   formattedTime: string;
-  isBooked: boolean; 
-  // e.g., "9:00 AM"
+  isBooked: boolean;
 }
+
 export type ServiceWithDetails = Service & {
   company?: Company; 
   queueCount: number; 
@@ -226,20 +299,20 @@ export type Provider = {
   specialization: string | null; 
   is_active: boolean; 
   created_at: string; 
-  company_id: string; // Providers must belong to a company
-  isAny?: boolean; // Flag for 'Any Provider' option
+  company_id: string;
+  isAny?: boolean;
 };
 
 export const ANY_PROVIDER_ID = "any_provider_id"; 
 
 export const ANY_PROVIDER_OPTION: Provider = {
   id: ANY_PROVIDER_ID, 
-  name: 'Any Available Provider', // Changed name for clarity in UI
+  name: 'Any Available Provider',
   specialization: 'General',
-  is_active: true, // Always active for selection
+  is_active: true,
   created_at: new Date().toISOString(), 
   isAny: true, 
-  company_id: "", // A placeholder for this virtual provider
+  company_id: "",
 };
 
 export type Category = {
@@ -250,22 +323,23 @@ export type Category = {
   parent_category_id: string | null;
   created_at: string;
   services?: number | null; 
-  children?: Category[]; // For hierarchical display
+  children?: Category[];
 };
 
 export type CompanyType = {
   id: string;
   name: string;
-  description: string | null;
-  icon: string | null;
+  description: string | null; 
+  icon: string | null; 
   created_at: string;
 };
+
 export type CompanyTypeWithCount = {
   id: string;
   name: string;
   description: string | null;
   icon: string | null;
-  company_count: number; // Supabase returns bigint as a number in JS
+  company_count: number;
 };
 
 export interface LocationOption {
@@ -285,6 +359,7 @@ export interface FilterState {
   locations: LocationOption[]; 
   categoryId: string | null; 
   companyIds: string[]; 
+  companyTypeIds: string[];
 }
 
 export type MessageTemplate = {
@@ -314,10 +389,108 @@ export interface GlobalStatsData {
   servicesCompletedCount: number;
   usersCount: number;
 }
-export interface FilterState {
-  searchTerm: string;
-  locations: LocationOption[]; // Array of selected location options
-  categoryId: string | null;   // ID of selected category
-  companyIds: string[];        // Array of selected company IDs
-  companyTypeIds: string[];    // Array of selected company type IDs
+
+// --- CART & MULTI-SERVICE BOOKING TYPES ---
+export interface SelectedComponent {
+  id: string;
+  component_id: string;
+  name: string;
+  price: number;
+  duration_mins: number;
+  is_required: boolean;
+  is_included: boolean;
+  is_overlappable: boolean;
+  component_type: ServiceComponentType;
+  quantity?: number;
+}
+
+export interface PriceBreakdown {
+  basePrice: number;
+  addonsPrice: number;
+  originalPrice: number;
+  discountAmount: number;
+  finalPrice: number;
+  hasDiscount: boolean;
+  discountLabel?: string | null;
+  isCallForPrice: boolean;
+  isStartingFrom?: boolean;
+}
+
+export interface SelectedServiceItem {
+  cartItemId: string; // Unique cart line item ID
+  service: Service;
+  variant: ServiceVariant | null;
+  provider: Provider | null;
+  selectedComponents: ServiceComponent[];
+  priceBreakdown: PriceBreakdown;
+  durationMins: number; // sequential elapsed appointment time
+  totalWorkloadMins: number; // total work duration including overlappable
+  selectedDate?: string | null; // ISO string
+  selectedSlot?: AvailableSlot | null;
+  notes?: string | null;
+}
+
+export interface MarketplaceBookingComponentInput {
+  component_id: string;
+  provider_id?: string | null;
+  quantity?: number;
+  price_at_booking?: number;
+  duration_mins?: number;
+}
+
+export interface MarketplaceBookingInput {
+  service_id: string;
+  company_id: string;
+  provider_id?: string | null;
+  service_variant_id?: string | null;
+  start_time: string;
+  end_time: string;
+  user_name: string;
+  phone_number: string | number;
+  notes?: string | null;
+  booking_group_id?: string | null;
+  components?: MarketplaceBookingComponentInput[];
+  selected_component_ids?: string[];
+  original_price?: number | null;
+  discount_amount?: number | null;
+  final_price?: number | null;
+}
+
+export interface MultiServiceBookingPayload {
+  company_id: string;
+  user_name: string;
+  phone_number: string | number;
+  booking_group_id?: string | null;
+  notes?: string | null;
+  bookings: Array<{
+    service_id: string;
+    service_variant_id?: string | null;
+    provider_id?: string | null;
+    start_time: string;
+    end_time: string;
+    components?: MarketplaceBookingComponentInput[];
+    selected_component_ids?: string[];
+    notes?: string | null;
+  }>;
+}
+
+export interface QueueComponentInput {
+  component_id: string;
+  price_at_queue?: number;
+  duration_mins?: number;
+}
+
+export interface MarketplaceQueueInput {
+  service_id: string;
+  provider_id?: string | null;
+  service_variant_id?: string | null;
+  user_name?: string;
+  phone_number?: string;
+  notes?: string | null;
+  queue_type?: 'walk_in' | 'online' | 'scheduled';
+  components?: QueueComponentInput[];
+  selected_component_ids?: string[];
+  original_price?: number | null;
+  discount_amount?: number | null;
+  final_price?: number | null;
 }

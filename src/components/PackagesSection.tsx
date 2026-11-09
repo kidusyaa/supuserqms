@@ -18,7 +18,7 @@ export default function PackagesSection() {
     const fetchPackages = async () => {
       setIsLoading(true);
       try {
-        const data = await getAllPackages();
+        const data = await getAllPackages(10);
         setPackages(data);
       } catch (err) {
         console.error("Failed to load packages for homepage:", err);
@@ -114,7 +114,7 @@ export default function PackagesSection() {
         {/* Packages Horizontal Slider */}
         <div
           ref={sliderRef}
-          className="flex gap-5 sm:gap-6 overflow-x-auto scroll-smooth snap-x snap-mandatory no-scrollbar pb-4 pt-1 -mx-4 px-4 sm:mx-0 sm:px-0"
+          className="flex gap-5 sm:gap-6 overflow-x-auto scroll-smooth snap-x snap-mandatory no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden pb-4 pt-1 -mx-4 px-4 sm:mx-0 sm:px-0"
         >
           {isLoading ? (
             Array.from({ length: 3 }).map((_, idx) => (

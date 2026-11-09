@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { getAllServices } from "@/lib/supabase-utils";
+import { getTopRatedServices } from "@/lib/supabase-utils";
 import type { Service } from "@/type";
 import ServiceCard from "@/app/services/_componet/ServiceCard";
 
@@ -18,12 +18,8 @@ export default function TopRatedServices() {
     const loadServices = async () => {
       setIsLoading(true);
       try {
-        const all = await getAllServices();
-        // Take top 9 individual services (excluding packages if needed or filtering active)
-        const filtered = (all || [])
-          .filter((s) => !s.is_package)
-          .slice(0, 9);
-        setServices(filtered);
+        const top = await getTopRatedServices(9);
+        setServices(top);
       } catch (error) {
         console.error("Failed to load top rated services:", error);
       } finally {

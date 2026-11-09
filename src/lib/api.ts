@@ -400,4 +400,18 @@ export const getCategoriesWithServiceCounts = async (): Promise<Category[]> => {
   }
 };
 
-export { getAllPackages, getPackageById, formatPackageCategories } from './supabase-utils';
+export {
+  getAllPackages,
+  getPackageById,
+  formatPackageCategories,
+  getServiceComponents,
+  getBookingComponents,
+  enrichServicesWithComponents,
+  calculateBookingComponentsTotal,
+  calculateTotalServiceDurationWithComponents,
+  calculateTotalWorkloadDuration,
+  calculateServiceWithComponentsPriceBreakdown,
+  validateComponentBelongsToService,
+  createMultiServiceBookings,
+  getBookingGroupDetails,
+} from './supabase-utils';

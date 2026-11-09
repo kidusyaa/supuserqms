@@ -10,6 +10,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { LogoLoader } from "@/components/ui/LogoLoader";
 import type {
   Service,
   Provider,
@@ -19,15 +20,20 @@ import type {
   Booking,
   BookingStatus,
   PaymentStatus,
+  ServiceComponent,
 } from "@/type";
 import { ANY_PROVIDER_ID } from "@/type";
 import {
   getServiceDetails,
   getCurrentQueueCount,
   getProviderOccupiedSlots,
+  getMultiProviderOccupiedSlots,
+  getServiceQueueSummary,
   getLatestAvailableTimeForProvider,
   calculateItemPriceBreakdown,
   calculateServiceStartingPrice,
+  calculateServiceWithComponentsPriceBreakdown,
+  calculateTotalServiceDurationWithComponents,
   getAuthUserOrNull,
   getMyProfileOrNull,
   createBooking,
@@ -43,6 +49,7 @@ import {
   format,
   isToday,
 } from "date-fns";
+import { useBookingCart } from "@/context/BookingCartContext";
 import PaymentVerificationModal from "@/components/book/_componet/PaymentVerificationModal";
 import { QueueConfirmationDialog } from "@/components/book/_componet/QueueConfirmationDialog";
 import ServiceVideoModal from "@/components/ServiceVideoModal";
@@ -56,7 +63,7 @@ interface ConfirmedQueueItem extends QueueItem {
   estimatedServiceEndTime?: Date | null;
 }
 
-type StepKey = "details" | "option" | "specialist" | "when" | "confirm";
+type StepKey = "services" | "specialist" | "when" | "confirm";
 
 export default function BookingPage() {
   const params = useParams();
@@ -65,10 +72,21 @@ export default function BookingPage() {
   const searchParams = useSearchParams();
   const serviceId = params.serviceId as string;
   const initialVariantId = searchParams.get("variantId");
+  const {
+    addItem,
+    items: cartItems,
+    itemCount,
+    totalPrice: cartTotalPrice,
+    totalDurationMins: cartTotalDurationMins,
+    removeItem,
+    setIsCartOpen,
+    companyId: cartCompanyId,
+  } = useBookingCart();
 
   // ── States ────────────────────────────────────────────────────────
   const [service, setService] = useState<Service | null>(null);
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(initialVariantId);
+  const [selectedComponents, setSelectedComponents] = useState<ServiceComponent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedProviderId, setSelectedProviderId] = useState<string>(ANY_PROVIDER_ID);
@@ -115,27 +133,36 @@ export default function BookingPage() {
 
   const hasVariants = activeVariants.length > 0;
 
-  // Compute all steps dynamically based on whether service has variants
-  // Step 1 is always "Details" so customer reviews service details first!
+  // Active service components (phases & add-ons)
+  const activeComponents = useMemo(() => {
+    const comps = service?.components || service?.service_components || [];
+    return comps.filter((c) => c.is_active !== false);
+  }, [service?.components, service?.service_components]);
+
+  const activePhases = useMemo(() => {
+    return activeComponents.filter((c) => c.component_type === "phase");
+  }, [activeComponents]);
+
+  const activeAddons = useMemo(() => {
+    return activeComponents.filter((c) => c.component_type === "addon");
+  }, [activeComponents]);
+  const selectedAddonCount = useMemo(
+    () => selectedComponents.filter((component) => component.component_type === "addon").length,
+    [selectedComponents]
+  );
+
+  const hasComponents = activeComponents.length > 0;
+
+  // Service details, variants, and add-ons are configured together in one step.
   const allSteps = useMemo(() => {
-    if (hasVariants) {
-      return [
-        { key: "details" as StepKey, label: "Details", number: 1 },
-        { key: "option" as StepKey, label: "Option", number: 2 },
-        { key: "specialist" as StepKey, label: "Specialist", number: 3 },
-        { key: "when" as StepKey, label: "When", number: 4 },
-        { key: "confirm" as StepKey, label: "Confirm", number: 5 },
-      ];
-    }
     return [
-      { key: "details" as StepKey, label: "Details", number: 1 },
+      { key: "services" as StepKey, label: "Services", number: 1 },
       { key: "specialist" as StepKey, label: "Specialist", number: 2 },
       { key: "when" as StepKey, label: "When", number: 3 },
-      { key: "confirm" as StepKey, label: "Confirm", number: 4 },
     ];
-  }, [hasVariants]);
+  }, []);
 
-  const currentStep = allSteps[currentStepIndex]?.key || "details";
+  const currentStep = allSteps[currentStepIndex]?.key || "services";
 
   // Selected Provider Object
   const selectedProvider = useMemo(() => {
@@ -148,7 +175,7 @@ export default function BookingPage() {
         specialization: "First available certified specialist",
         is_active: true,
         company_id: company?.id || "",
-        created_at: new Date().toISOString(),
+        created_at: "1970-01-01T00:00:00.000Z",
         isAny: true,
       } as Provider;
     }
@@ -161,17 +188,27 @@ export default function BookingPage() {
     return activeVariants.find((v) => v.id === selectedVariantId) || null;
   }, [hasVariants, selectedVariantId, activeVariants]);
 
+  // Combined Price & Duration Calculation
+  const combinedCalculation = useMemo(() => {
+    if (!service) return null;
+    return calculateServiceWithComponentsPriceBreakdown(
+      service,
+      selectedVariant,
+      selectedComponents
+    );
+  }, [service, selectedVariant, selectedComponents]);
+
+  const effectivePriceBreakdown = combinedCalculation?.priceBreakdown || null;
+
   // Effective service for slots & duration calculations
   const effectiveService = useMemo(() => {
     if (!service) return null;
-    if (selectedVariant?.duration_mins) {
-      return {
-        ...service,
-        estimated_wait_time_mins: selectedVariant.duration_mins,
-      };
-    }
-    return service;
-  }, [service, selectedVariant]);
+    const totalMins = combinedCalculation?.durationMins || selectedVariant?.duration_mins || service.estimated_wait_time_mins || 30;
+    return {
+      ...service,
+      estimated_wait_time_mins: totalMins,
+    };
+  }, [service, combinedCalculation?.durationMins, selectedVariant?.duration_mins]);
 
   // Pricing calculations
   const startingPriceInfo = useMemo(() => {
@@ -179,10 +216,20 @@ export default function BookingPage() {
     return calculateServiceStartingPrice(service);
   }, [service]);
 
-  const effectivePriceBreakdown = useMemo(() => {
-    if (!service) return null;
-    return calculateItemPriceBreakdown(selectedVariant || service);
-  }, [service, selectedVariant]);
+  // Toggle optional add-ons
+  const handleToggleComponent = (comp: ServiceComponent) => {
+    if (comp.component_type !== "addon" || comp.is_required) return;
+    setSelectedSlot(null);
+
+    setSelectedComponents((prev) => {
+      const isSelected = prev.some((c) => c.id === comp.id);
+      if (isSelected) {
+        return prev.filter((c) => c.id !== comp.id);
+      } else {
+        return [...prev, comp];
+      }
+    });
+  };
 
   // Open status check
   const isCompanyOpenToday = useMemo(() => {
@@ -228,7 +275,7 @@ export default function BookingPage() {
 
   // Auto-slide photos when on details step
   useEffect(() => {
-    if (uniqueImageUrls.length <= 1 || isAutoPlayPaused || selectedLightboxImage || currentStep !== "details") return;
+    if (uniqueImageUrls.length <= 1 || isAutoPlayPaused || selectedLightboxImage || currentStep !== "services") return;
     const id = window.setInterval(() => {
       setCurrentImageIndex((prev) => (prev + 1) % uniqueImageUrls.length);
     }, 4500);
@@ -248,6 +295,11 @@ export default function BookingPage() {
         const data = await getServiceDetails(serviceId);
         if (!data || !data.company) throw new Error("Service or company not found.");
         setService(data);
+
+        // Components initialization: automatically select required phases
+        const comps = data.components || data.service_components || [];
+        const requiredComps = comps.filter((c: ServiceComponent) => c.is_required && c.is_active !== false);
+        setSelectedComponents(requiredComps);
 
         // Variant selection initialization
         if (data.has_variants && data.service_variants && data.service_variants.length > 0) {
@@ -293,11 +345,26 @@ export default function BookingPage() {
   }, []);
 
   // ── Fetch Appointment Slots ───────────────────────────────────────
+  // ONLY fetch appointment slots when on the "when" or "confirm" step and booking tab is "appointment"
+  const isWhenOrConfirm = currentStep === "when";
+  const selectedDateKey = selectedDate ? selectedDate.toISOString().slice(0, 10) : "";
+  const serviceDurationMins = effectiveService?.estimated_wait_time_mins || 30;
+
   useEffect(() => {
-    if (!effectiveService || !company || !selectedDate || !selectedProvider || bookingTab !== "appointment") {
-      setAvailableSlots([]);
+    if (
+      !effectiveService ||
+      !company ||
+      !selectedDate ||
+      !selectedProvider ||
+      bookingTab !== "appointment" ||
+      !isWhenOrConfirm ||
+      paymentVerificationModalOpen ||
+      isSubmitting
+    ) {
       return;
     }
+
+    let isMounted = true;
 
     const fetchSlots = async () => {
       setSlotsLoading(true);
@@ -313,7 +380,7 @@ export default function BookingPage() {
               specialization: "Certified Specialist",
               is_active: true,
               company_id: company.id,
-              created_at: new Date().toISOString(),
+              created_at: "1970-01-01T00:00:00.000Z",
               isAny: true,
             };
             const slots = generateAvailableSlots(
@@ -323,19 +390,20 @@ export default function BookingPage() {
               selectedDate,
               []
             );
-            setAvailableSlots(slots);
+            if (isMounted) setAvailableSlots(slots);
             return;
           }
 
-          const perProviderOccupied = await Promise.all(
-            activeProviders.map(async (p) => ({
-              provider: p,
-              occupied: await getProviderOccupiedSlots(p.id, dayStart, dayEnd),
-            }))
+          // Single batched query for all active providers instead of 3*N separate network queries
+          const multiOccupied = await getMultiProviderOccupiedSlots(
+            activeProviders.map((p) => p.id),
+            dayStart,
+            dayEnd
           );
 
           const slotMap = new Map<string, AvailableSlot>();
-          for (const { provider, occupied } of perProviderOccupied) {
+          for (const provider of activeProviders) {
+            const occupied = multiOccupied.get(provider.id) || [];
             const slotsForProvider = generateAvailableSlots(
               company,
               effectiveService,
@@ -352,7 +420,7 @@ export default function BookingPage() {
           const merged = Array.from(slotMap.values()).sort(
             (a, b) => a.start.getTime() - b.start.getTime()
           );
-          setAvailableSlots(merged);
+          if (isMounted) setAvailableSlots(merged);
         } else {
           const occupiedSlots = await getProviderOccupiedSlots(
             selectedProvider.id,
@@ -366,61 +434,83 @@ export default function BookingPage() {
             selectedDate,
             occupiedSlots
           );
-          setAvailableSlots(slots);
+          if (isMounted) setAvailableSlots(slots);
         }
       } catch (err) {
         console.error("Error fetching slots:", err);
-        setAvailableSlots([]);
+        if (isMounted) setAvailableSlots([]);
       } finally {
-        setSlotsLoading(false);
+        if (isMounted) setSlotsLoading(false);
       }
     };
 
     fetchSlots();
-  }, [effectiveService, company, selectedDate, selectedProviderId, bookingTab, selectedProvider]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [
+    effectiveService?.id,
+    company?.id,
+    selectedDateKey,
+    selectedProviderId,
+    bookingTab,
+    isWhenOrConfirm,
+    serviceDurationMins,
+    paymentVerificationModalOpen,
+    isSubmitting,
+  ]);
 
   // ── Fetch Live Queue & Estimates ─────────────────────────────────
   const fetchQueueData = useCallback(async () => {
-    if (!service || !company || !selectedProvider) return;
+    if (!service || !company || !selectedProvider || paymentVerificationModalOpen || isSubmitting) return;
 
     try {
-      const count = await getCurrentQueueCount(service.id, selectedProviderId);
-      setQueueCount(count);
+      // Single batched query replaces separate queries for overall count + each provider count
+      const activeProviderIds = (service.providers || []).map((p) => p.id);
+      const { overallCount, providerCounts } = await getServiceQueueSummary(service.id, activeProviderIds);
+      setQueueCount(overallCount);
+      setProviderQueueCounts(providerCounts);
 
-      const estimate = await getLatestAvailableTimeForProvider(
-        company,
-        selectedProviderId,
-        service.id
-      );
-      setEstimatedQueueStartTime(estimate);
-
-      if (service.providers && service.providers.length > 0) {
-        const counts: Record<string, number> = {};
-        await Promise.all(
-          service.providers.map(async (p) => {
-            counts[p.id] = await getCurrentQueueCount(service.id, p.id);
-          })
+      // Only calculate latest available queue start time when user is actually on the live queue tab
+      if (bookingTab === "queue" && currentStep === "when") {
+        const estimate = await getLatestAvailableTimeForProvider(
+          company,
+          selectedProviderId,
+          service.id
         );
-        setProviderQueueCounts(counts);
+        setEstimatedQueueStartTime(estimate);
       }
     } catch (err) {
       console.error("Error fetching queue data:", err);
     }
-  }, [service, company, selectedProvider, selectedProviderId]);
+  }, [
+    service?.id,
+    company?.id,
+    selectedProviderId,
+    bookingTab,
+    currentStep,
+    paymentVerificationModalOpen,
+    isSubmitting,
+  ]);
 
   useEffect(() => {
+    if (paymentVerificationModalOpen || isSubmitting) return;
+
     fetchQueueData();
+
+    // Background interval ONLY if user is on the specialist step or live queue tab
+    const shouldPoll = currentStep === "specialist" || (currentStep === "when" && bookingTab === "queue");
+    if (!shouldPoll) return;
+
     const interval = setInterval(fetchQueueData, 30000);
     return () => clearInterval(interval);
-  }, [fetchQueueData]);
+  }, [fetchQueueData, currentStep, bookingTab, paymentVerificationModalOpen, isSubmitting]);
 
   // ── Validation & Step Navigation ──────────────────────────────────
   const canProceed = useMemo(() => {
-    if (currentStep === "details") {
-      return true; // Always allow moving from Details to Option/Specialist
-    }
-    if (currentStep === "option") {
-      return Boolean(selectedVariantId);
+    if (currentStep === "services") {
+      return !hasVariants || Boolean(selectedVariantId);
     }
     if (currentStep === "specialist") {
       return Boolean(selectedProviderId);
@@ -431,14 +521,11 @@ export default function BookingPage() {
       }
       return Boolean(isCompanyOpenToday);
     }
-    if (currentStep === "confirm") {
-      return Boolean(customerName.trim().length > 0 && customerPhone.trim().length >= 9);
-    }
     return true;
-  }, [currentStep, selectedVariantId, selectedProviderId, bookingTab, selectedSlot, isCompanyOpenToday, customerName, customerPhone]);
+  }, [currentStep, hasVariants, selectedVariantId, selectedProviderId, bookingTab, selectedSlot, isCompanyOpenToday]);
 
   const handleNextStep = () => {
-    if (currentStep === "option" && !selectedVariantId) {
+    if (currentStep === "services" && hasVariants && !selectedVariantId) {
       toast.error("Please select an option to continue.");
       return;
     }
@@ -469,18 +556,42 @@ export default function BookingPage() {
     }
   };
 
+  const handleSelectProvider = (providerId: string) => {
+    setSelectedProviderId(providerId);
+    const whenIndex = allSteps.findIndex((step) => step.key === "when");
+    if (whenIndex !== -1) setCurrentStepIndex(whenIndex);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleAddServiceAndBrowse = () => {
+    if (!service || !company) return;
+    if (hasVariants && !selectedVariantId) {
+      toast.error("Please choose a service option first.");
+      return;
+    }
+    if (cartCompanyId && cartCompanyId !== company.id) {
+      toast.error("Your selection already contains services from another business.");
+      return;
+    }
+
+    addItem(
+      service,
+      selectedVariant,
+      selectedComponents,
+      selectedProvider?.isAny ? null : selectedProvider || null,
+      {
+        date: selectedDate ? selectedDate.toISOString() : null,
+        notes: customerNotes,
+      }
+    );
+    setIsCartOpen(false);
+    toast.success(`${service.name} added. Choose another service or review your booking.`);
+    router.push(`/company/${company.slug || company.id}`);
+  };
+
   // ── Final Booking Confirmation ────────────────────────────────────
   const handleFinalSubmit = async () => {
     if (!service || !company || !selectedProvider) return;
-
-    if (!customerName.trim()) {
-      toast.error("Please enter your full name.");
-      return;
-    }
-    if (!customerPhone.trim() || customerPhone.trim().length < 9) {
-      toast.error("Please enter a valid phone number.");
-      return;
-    }
 
     setIsSubmitting(true);
     try {
@@ -488,6 +599,15 @@ export default function BookingPage() {
       if (!user) {
         toast.info("Please sign in to confirm your booking.");
         router.push(`/auth?next=${encodeURIComponent(pathname || "/")}`);
+        return;
+      }
+
+      const profile = await getMyProfileOrNull();
+      const bookingName = customerName.trim() || profile?.name?.trim() || "";
+      const bookingPhone = customerPhone.trim() || profile?.phone_number?.trim() || "";
+      if (!bookingName || bookingPhone.length < 9) {
+        toast.info("Complete your name and phone number to book.");
+        router.push(`/profile?next=${encodeURIComponent(pathname || "/")}`);
         return;
       }
 
@@ -505,8 +625,8 @@ export default function BookingPage() {
 
         const newBookingData = {
           user_id: user.id,
-          user_name: customerName.trim(),
-          phone_number: customerPhone.trim(),
+          user_name: bookingName,
+          phone_number: bookingPhone,
           service_id: service.id,
           company_id: company.id,
           provider_id: selectedProvider.id,
@@ -519,6 +639,12 @@ export default function BookingPage() {
           original_price: effectivePriceBreakdown?.originalPrice || null,
           discount_amount: effectivePriceBreakdown?.discountAmount || 0,
           final_price: effectivePriceBreakdown?.finalPrice || null,
+          components: selectedComponents.map((c) => ({
+            component_id: c.id,
+            provider_id: selectedProvider.isAny ? null : selectedProvider.id,
+            price_at_booking: Number(c.price) || 0,
+            duration_mins: Number(c.duration_mins) || 0,
+          })),
         };
 
         const createdBooking = await createBooking(newBookingData);
@@ -540,11 +666,14 @@ export default function BookingPage() {
           service_id: service.id,
           provider_id: selectedProvider.isAny ? null : selectedProvider.id,
           notes: customerNotes.trim() || null,
-          queue_type: "walk_in" as const,
+          queue_type: "walk-in" as const,
           service_variant_id: selectedVariant?.id || null,
           original_price: effectivePriceBreakdown?.originalPrice || null,
           discount_amount: effectivePriceBreakdown?.discountAmount || 0,
           final_price: effectivePriceBreakdown?.finalPrice || null,
+          components: selectedComponents.map((c) => ({
+            component_id: c.id,
+          })),
         };
 
         const createdQueueEntry = await joinQueue(queuePayload as any);
@@ -580,13 +709,13 @@ export default function BookingPage() {
   // ── Loading & Error States ─────────────────────────────────────────
   if (loading) {
     return (
-      <div className="min-h-screen bg-white dark:bg-slate-950 flex items-center justify-center">
-        <div className="text-center space-y-3">
-          <div className="w-10 h-10 border-2 border-slate-300 border-t-amber-500 rounded-full animate-spin mx-auto"></div>
-          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-            Loading Service &amp; Schedule...
-          </p>
-        </div>
+      <div className="min-h-screen bg-white dark:bg-slate-950 flex items-center justify-center p-6">
+        <LogoLoader
+          variant="flip"
+          size="lg"
+          text="Loading Service Details"
+          subtext="Preparing schedule and provider details"
+        />
       </div>
     );
   }
@@ -634,7 +763,7 @@ export default function BookingPage() {
   const isFinalStep = currentStepIndex === allSteps.length - 1;
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] dark:bg-slate-950 font-sans pb-16">
+    <div className="min-h-screen bg-[#fbfaf7] dark:bg-slate-950 font-sans pb-28">
       {/* ── Breadcrumb ── */}
       <div className="max-w-4xl mx-auto px-4 pt-6 pb-3">
         <BookingBreadcrumb company={company} serviceName={service.name} slug={company.slug} />
@@ -652,6 +781,7 @@ export default function BookingPage() {
                   src={primaryPhoto}
                   alt={service.name}
                   fill
+                  sizes="64px"
                   className="object-cover"
                 />
               ) : (
@@ -673,19 +803,6 @@ export default function BookingPage() {
                 {" "}·{" "}
                 <span>{locationText}</span>
               </p>
-              {currentStep !== "details" && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCurrentStepIndex(0);
-                    window.scrollTo({ top: 0, behavior: "smooth" });
-                  }}
-                  className="text-xs text-amber-600 hover:text-amber-700 dark:text-amber-500 font-semibold inline-flex items-center gap-1 mt-1 cursor-pointer hover:underline"
-                >
-                  <span>View full details</span>
-                  <Icon icon="solar:alt-arrow-right-linear" className="w-3 h-3" />
-                </button>
-              )}
             </div>
           </div>
 
@@ -717,7 +834,81 @@ export default function BookingPage() {
           </div>
         </div>
 
-        {/* ── 2. Stepper Progress Bar (Details -> Option -> Specialist -> When -> Confirm) ── */}
+        {cartItems.length > 0 && (
+          <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-bold text-slate-900 dark:text-white">
+                  Your services <span className="text-amber-700">{itemCount}</span>
+                </h2>
+                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                  {company.name} · {cartTotalDurationMins} min total
+                </p>
+              </div>
+            </div>
+            <div className="mt-3 divide-y divide-slate-100 dark:divide-slate-800">
+              {cartItems.map((item) => (
+                <div key={item.cartItemId} className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-semibold text-slate-800 dark:text-slate-200">
+                      {item.service.name}{item.variant ? ` · ${item.variant.name}` : ""}
+                    </p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      {item.durationMins} min · {item.priceBreakdown.finalPrice.toLocaleString()} ETB
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeItem(item.cartItemId)}
+                    aria-label={`Remove ${item.service.name}`}
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/40"
+                  >
+                    <Icon icon="solar:close-circle-linear" className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3 text-xs dark:border-slate-800">
+              <span className="font-semibold text-slate-600 dark:text-slate-300">Current total</span>
+              <span className="font-bold text-slate-900 dark:text-white">{cartTotalPrice.toLocaleString()} ETB</span>
+            </div>
+          </section>
+        )}
+
+        <div id="booking-cart-review" />
+
+        {currentStep === "services" && (
+          <section className="flex flex-col gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 shadow-sm dark:border-amber-800 dark:bg-amber-950/30 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-200 text-amber-900 dark:bg-amber-900/70 dark:text-amber-200">
+                <Icon icon="solar:cart-plus-bold" className="h-5 w-5" />
+              </span>
+              <div>
+                <h2 className="text-sm font-bold text-slate-900 dark:text-white">
+                  {cartItems.length > 0 ? "Add another service" : "Want more than one service?"}
+                </h2>
+                <p className="mt-1 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+                  Add services to one booking first. You can do this without choosing a specialist.
+                  {hasVariants && !selectedVariantId ? " Choose an option below before adding this service." : ""}
+                  {cartCompanyId && cartCompanyId !== company.id
+                    ? " Your current selection is from another business."
+                    : ""}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleAddServiceAndBrowse}
+              disabled={Boolean(cartCompanyId && cartCompanyId !== company.id)}
+              className="inline-flex min-h-12 w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-amber-800 px-5 py-3 text-sm font-bold text-white shadow-sm transition-colors hover:bg-amber-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+            >
+              <span>{cartItems.length > 0 ? "Add & browse services" : "Add service & choose another"}</span>
+              <Icon icon="solar:arrow-right-linear" className="h-4 w-4" />
+            </button>
+          </section>
+        )}
+
+        {/* ── Booking Progress ── */}
         <div className="flex items-center justify-between max-w-2xl mx-auto px-2 py-2">
           {allSteps.map((step, idx) => {
             const isCurrent = idx === currentStepIndex;
@@ -747,7 +938,7 @@ export default function BookingPage() {
                         ? "bg-[#0f2937] text-white shadow-xs scale-105"
                         : isCompleted
                         ? "bg-emerald-600 text-white"
-                        : "border border-slate-300 dark:border-slate-700 text-slate-400 bg-white dark:bg-slate-900"
+                        : "border border-slate-300 dark:border-slate-700 text-slate-400 bg-[#ad741f] dark:bg-slate-900"
                     )}
                   >
                     {isCompleted ? (
@@ -784,11 +975,30 @@ export default function BookingPage() {
         </div>
 
         {/* ── 3. Step Views Container ── */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-3xl p-5 sm:p-7 shadow-xs">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-sm">
           
           {/* ════════════ STEP 1: SERVICE DETAILS & OVERVIEW ════════════ */}
-          {currentStep === "details" && (
-            <div className="space-y-6">
+          {currentStep === "services" && (
+            <details className="group rounded-xl border border-slate-200 bg-slate-50/70 dark:border-slate-800 dark:bg-slate-800/30">
+              <summary className="flex cursor-pointer list-none items-center gap-3 p-3.5">
+                <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-white dark:bg-slate-800">
+                  {primaryPhoto ? (
+                    <Image src={primaryPhoto} alt={service.name} fill sizes="48px" className="object-cover" />
+                  ) : (
+                    <span className="flex h-full w-full items-center justify-center text-amber-700">
+                      <Icon icon="solar:scissors-bold" className="h-5 w-5" />
+                    </span>
+                  )}
+                </div>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-bold text-slate-900 dark:text-white">About {service.name}</span>
+                  <span className="mt-0.5 block truncate text-xs text-slate-500 dark:text-slate-400">
+                    {service.description || `${service.estimated_wait_time_mins || 30} min · ${locationText}`}
+                  </span>
+                </span>
+                <Icon icon="solar:alt-arrow-down-linear" className="h-4 w-4 shrink-0 text-slate-500 transition-transform group-open:rotate-180" />
+              </summary>
+              <div className="space-y-6 border-t border-slate-200 p-3.5 dark:border-slate-800 sm:p-5">
               <div>
                 <div className="flex items-center gap-2 mb-1.5">
                   {service.is_package ? (
@@ -829,6 +1039,7 @@ export default function BookingPage() {
                       src={uniqueImageUrls[currentImageIndex]}
                       alt={service.name}
                       fill
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 70vw, 896px"
                       className="object-cover group-hover:scale-102 transition-transform duration-500"
                       priority
                     />
@@ -900,7 +1111,7 @@ export default function BookingPage() {
                               : "border-slate-200 opacity-60 hover:opacity-100"
                           )}
                         >
-                          <Image src={url} alt="thumbnail" fill className="object-cover" />
+                          <Image src={url} alt="thumbnail" fill sizes="64px" className="object-cover" />
                         </button>
                       ))}
                     </div>
@@ -919,26 +1130,6 @@ export default function BookingPage() {
                   </div>
                   <div className="text-xs sm:text-sm text-slate-700 dark:text-slate-200 leading-relaxed whitespace-pre-line font-normal">
                     {service.description}
-                  </div>
-                </div>
-              )}
-
-              {/* Included Perks / Amenities */}
-              {service.description_points && service.description_points.length > 0 && (
-                <div className="space-y-2">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                    Included Amenities:
-                  </h4>
-                  <div className="flex flex-wrap gap-2">
-                    {service.description_points.map((perk, idx) => (
-                      <span
-                        key={idx}
-                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200/70 dark:border-emerald-900/50"
-                      >
-                        <Icon icon="akar-icons:check" className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>{perk}</span>
-                      </span>
-                    ))}
                   </div>
                 </div>
               )}
@@ -978,6 +1169,47 @@ export default function BookingPage() {
                 </div>
               )}
 
+              {/* Service Phases & Steps Preview (If any) */}
+              {activePhases.length > 0 && (
+                <div className="bg-emerald-50/40 dark:bg-emerald-950/20 border border-emerald-200/80 dark:border-emerald-900/40 rounded-2xl p-4 sm:p-5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Icon icon="solar:layers-bold" className="w-4 h-4 text-emerald-600" />
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-900 dark:text-emerald-200">
+                        Treatment Workflow Phases ({activePhases.length} Steps)
+                      </h3>
+                    </div>
+                    <span className="text-[11px] text-emerald-700 dark:text-emerald-400 font-semibold">
+                      Included in service
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {activePhases.map((phase, idx) => (
+                      <div
+                        key={phase.id}
+                        className="flex items-center gap-2.5 bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-emerald-100 dark:border-emerald-900/30"
+                      >
+                        <span className="w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 text-[10px] font-black flex items-center justify-center shrink-0">
+                          {phase.display_order || idx + 1}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-bold text-xs text-slate-900 dark:text-white truncate">
+                            {phase.name}
+                          </p>
+                          <div className="flex items-center gap-2 text-[10px] text-slate-400">
+                            {phase.duration_mins && <span>{phase.duration_mins} min</span>}
+                            {phase.is_overlappable && (
+                              <span className="text-blue-600 dark:text-blue-400 font-medium">Concurrent</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Quick Specifications Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2">
                 <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-2xl p-3.5">
@@ -1001,11 +1233,42 @@ export default function BookingPage() {
                   </span>
                 </div>
               </div>
-            </div>
+              </div>
+            </details>
           )}
 
+          {currentStep === "services" &&
+            service.description_points &&
+            service.description_points.length > 0 && (
+              <section className="mt-4 rounded-2xl border border-emerald-200/80 bg-emerald-50/50 p-4 dark:border-emerald-900/50 dark:bg-emerald-950/20">
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <h2 className="text-sm font-bold text-slate-900 dark:text-white">
+                    Amenities included
+                  </h2>
+                  <span className="text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
+                    Included
+                  </span>
+                </div>
+                <ul className="flex flex-wrap gap-2">
+                  {service.description_points.map((amenity, idx) => (
+                    <li
+                      key={`${amenity}-${idx}`}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-white px-3 py-2 text-xs font-medium text-emerald-800 dark:border-emerald-900 dark:bg-slate-900 dark:text-emerald-300"
+                    >
+                      <Icon
+                        icon="akar-icons:check"
+                        aria-hidden="true"
+                        className="h-3.5 w-3.5 shrink-0 text-emerald-600"
+                      />
+                      {amenity}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
           {/* ════════════ STEP 2: CHOOSE OPTION ════════════ */}
-          {currentStep === "option" && (
+          {currentStep === "services" && hasVariants && (
             <div className="space-y-6">
               <div>
                 <h2 className="text-xl sm:text-2xl font-serif font-bold text-slate-900 dark:text-white tracking-tight">
@@ -1017,20 +1280,26 @@ export default function BookingPage() {
               </div>
 
               {/* Radio Options List (Matching reference screenshot) */}
-              <div className="space-y-3">
+              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                 {activeVariants.map((variant) => {
                   const isSelected = selectedVariantId === variant.id;
                   const vBreakdown = calculateItemPriceBreakdown(variant);
+                  const variantDurationMins = calculateTotalServiceDurationWithComponents(
+                    variant.duration_mins || service.estimated_wait_time_mins || 30,
+                    selectedComponents
+                  );
 
                   return (
-                    <div
+                    <button
+                      type="button"
                       key={variant.id}
                       onClick={() => {
                         setSelectedVariantId(variant.id);
                         setSelectedSlot(null);
                       }}
+                      aria-pressed={isSelected}
                       className={cn(
-                        "p-4 sm:p-5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-4",
+                        "min-h-20 w-full rounded-xl border p-4 text-left transition-all flex items-center justify-between gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2",
                         isSelected
                           ? "border-2 border-amber-500 bg-amber-50/20 dark:bg-amber-950/20 ring-2 ring-amber-500/20 shadow-xs"
                           : "border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-700"
@@ -1051,17 +1320,17 @@ export default function BookingPage() {
                           )}
                         </span>
 
-                        {/* Title & Duration */}
+                        {/* Title & estimated appointment duration */}
                         <div className="min-w-0">
-                          <div className="flex items-baseline gap-2 flex-wrap">
-                            <h3 className="font-bold text-sm sm:text-base text-slate-900 dark:text-white">
-                              {variant.name}
-                            </h3>
-                            {variant.duration_mins && (
-                              <span className="text-xs text-slate-400 font-normal">
-                                {variant.duration_mins} min
-                              </span>
-                            )}
+                          <div className="font-bold text-sm sm:text-base text-slate-900 dark:text-white">
+                            {variant.name}
+                          </div>
+                          <div className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
+                            <Icon icon="solar:clock-circle-linear" className="h-3.5 w-3.5 shrink-0" />
+                            <span className="font-bold text-sm sm:text-base text-slate-900 dark:text-white">
+                              {variantDurationMins} min
+                            </span>
+                            <span>estimated</span>
                           </div>
                           {vBreakdown.hasDiscount && (
                             <span className="inline-block mt-1 text-[10px] font-extrabold text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-950/60 px-2 py-0.5 rounded-full">
@@ -1090,9 +1359,199 @@ export default function BookingPage() {
                           </div>
                         )}
                       </div>
-                    </div>
+                    </button>
                   );
                 })}
+              </div>
+            </div>
+          )}
+
+          {/* ════════════ STEP: CHOOSE ADD-ONS & PHASES ════════════ */}
+          {currentStep === "services" && hasComponents && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-xl sm:text-2xl font-serif font-bold text-slate-900 dark:text-white tracking-tight">
+                  Customize your service
+                </h2>
+                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
+                  Select optional add-ons or review the workflow phases included with your appointment.
+                </p>
+              </div>
+
+              {/* 1. Required Service Phases (if any) */}
+              {activePhases.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Icon icon="solar:layers-bold" className="w-4 h-4 text-emerald-600" />
+                    <h3 className="font-bold text-xs uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                      Service Phases &amp; Included Steps ({activePhases.length})
+                    </h3>
+                  </div>
+
+                  <div className="space-y-2">
+                    {activePhases.map((phase, idx) => (
+                      <div
+                        key={phase.id}
+                        className="p-3.5 sm:p-4 rounded-2xl border border-emerald-200/80 dark:border-emerald-900/40 bg-emerald-50/30 dark:bg-emerald-950/20 flex items-center justify-between gap-3"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 text-xs font-black flex items-center justify-center shrink-0">
+                            {phase.display_order || idx + 1}
+                          </span>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white">
+                                {phase.name}
+                              </h4>
+                              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300">
+                                {phase.is_required ? "Required Step" : "Included Step"}
+                              </span>
+                              {phase.is_overlappable && (
+                                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-300">
+                                  Concurrent Processing
+                                </span>
+                              )}
+                            </div>
+                            {phase.description && (
+                              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                {phase.description}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400 block">
+                            {phase.is_included || !phase.price ? "Included" : `+${phase.price} ETB`}
+                          </span>
+                          {phase.duration_mins ? (
+                            <span className="text-[11px] text-slate-400 block">
+                              {phase.duration_mins} min
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 2. Optional Add-ons & Upgrades (if any) */}
+              {activeAddons.length > 0 && (
+                <div className="space-y-3 pt-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Icon icon="solar:magic-stick-3-bold" className="w-4 h-4 text-amber-600" />
+                      <h3 className="font-bold text-xs uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                        Optional Add-ons &amp; Enhancements ({activeAddons.length})
+                      </h3>
+                    </div>
+                    <span className="text-[11px] text-slate-400">
+                      Tap to select or deselect
+                    </span>
+                  </div>
+
+                  <div className="space-y-2.5">
+                    {activeAddons.map((addon) => {
+                      const isSelected = selectedComponents.some((c) => c.id === addon.id);
+                      const isRequired = addon.is_required;
+
+                      return (
+                        <button
+                          type="button"
+                          key={addon.id}
+                          onClick={() => handleToggleComponent(addon)}
+                          aria-pressed={isSelected || isRequired}
+                          disabled={isRequired}
+                          className={cn(
+                            "min-h-20 w-full p-4 rounded-2xl border transition-all flex items-center justify-between gap-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2",
+                            isSelected
+                              ? "border-2 border-amber-500 bg-amber-50/25 dark:bg-amber-950/25 ring-2 ring-amber-500/20 shadow-xs"
+                              : isRequired
+                              ? "border-emerald-200 bg-emerald-50/50 dark:border-emerald-900/50 dark:bg-emerald-950/20 cursor-not-allowed"
+                              : "border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-700 cursor-pointer"
+                          )}
+                        >
+                          <div className="flex items-center gap-3.5 min-w-0">
+                            {/* Checkbox square */}
+                            <span
+                              className={cn(
+                                "w-5 h-5 rounded-lg border-2 flex items-center justify-center shrink-0 transition-colors",
+                                isSelected
+                                  ? "border-amber-500 bg-amber-500 text-white"
+                                  : "border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900"
+                              )}
+                            >
+                              {isSelected && (
+                                <Icon icon="akar-icons:check" className="w-3.5 h-3.5 stroke-[3]" />
+                              )}
+                            </span>
+
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-bold text-sm text-slate-900 dark:text-white">
+                                  {addon.name}
+                                </span>
+                                {isRequired && (
+                                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200">
+                                    Required
+                                  </span>
+                                )}
+                                {addon.is_overlappable && (
+                                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-300">
+                                    Concurrent (No extra wait)
+                                  </span>
+                                )}
+                              </div>
+                              {addon.description && (
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-1">
+                                  {addon.description}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="text-right shrink-0">
+                            <div className="text-sm sm:text-base font-black text-slate-900 dark:text-white">
+                              {addon.is_included
+                                ? "Included"
+                                : Number(addon.price) === 0
+                                ? "Free"
+                                : `+${addon.price} ETB`}
+                            </div>
+                            {addon.duration_mins ? (
+                              <div className="text-[11px] text-slate-400">
+                                {addon.is_overlappable ? `+${addon.duration_mins}m concurrent` : `+${addon.duration_mins}m`}
+                              </div>
+                            ) : null}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Summary of current selections */}
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] text-slate-400 uppercase tracking-wider font-bold block">
+                    Updated Estimate
+                  </span>
+                  <div className="text-xs sm:text-sm text-slate-600 dark:text-slate-300">
+                    {selectedAddonCount > 0
+                      ? `${selectedAddonCount} add-on${selectedAddonCount === 1 ? "" : "s"} selected`
+                      : "No optional add-ons selected"}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="text-lg sm:text-xl font-serif font-black text-slate-900 dark:text-white block">
+                    {effectivePriceBreakdown?.finalPrice?.toFixed(0)} ETB
+                  </span>
+                  <span className="text-xs text-amber-600 font-bold block">
+                    ~{combinedCalculation?.durationMins || 30} mins
+                  </span>
+                </div>
               </div>
             </div>
           )}
@@ -1112,7 +1571,7 @@ export default function BookingPage() {
               <div className="space-y-3">
                 {/* 1. "Any Specialist" Card Featured */}
                 <div
-                  onClick={() => setSelectedProviderId(ANY_PROVIDER_ID)}
+                  onClick={() => handleSelectProvider(ANY_PROVIDER_ID)}
                   className={cn(
                     "p-4 sm:p-5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-4",
                     selectedProviderId === ANY_PROVIDER_ID
@@ -1153,7 +1612,7 @@ export default function BookingPage() {
                     </div>
                   </div>
 
-                  <div className="text-right shrink-0">
+                  <div className="w-full text-left">
                     <span className="text-xs font-bold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-full">
                       {queueCount} waiting
                     </span>
@@ -1169,7 +1628,7 @@ export default function BookingPage() {
                   return (
                     <div
                       key={provider.id}
-                      onClick={() => setSelectedProviderId(provider.id)}
+                      onClick={() => handleSelectProvider(provider.id)}
                       className={cn(
                         "p-4 sm:p-5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-4",
                         isSelected
@@ -1197,6 +1656,7 @@ export default function BookingPage() {
                               src={providerAvatar}
                               alt={provider.name}
                               fill
+                              sizes="44px"
                               className="object-cover"
                             />
                           ) : (
@@ -1444,6 +1904,35 @@ export default function BookingPage() {
                       </div>
                     )}
 
+                    {selectedComponents && selectedComponents.length > 0 && (
+                      <div className="py-2 border-b border-slate-200 dark:border-slate-700 space-y-1.5">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                          Included &amp; Selected Components ({selectedComponents.length})
+                        </span>
+                        {selectedComponents.map((c) => (
+                          <div key={c.id} className="flex items-center justify-between text-xs">
+                            <span className="text-slate-600 dark:text-slate-300 flex items-center gap-1.5 min-w-0">
+                              <span
+                                className={cn(
+                                  "w-1.5 h-1.5 rounded-full shrink-0",
+                                  c.component_type === "phase" ? "bg-emerald-500" : "bg-amber-500"
+                                )}
+                              />
+                              <span className="truncate">{c.name}</span>
+                              {c.is_overlappable && (
+                                <span className="text-[9px] text-blue-600 bg-blue-50 dark:bg-blue-950/60 px-1 rounded font-medium">
+                                  Concurrent
+                                </span>
+                              )}
+                            </span>
+                            <span className="font-semibold text-slate-800 dark:text-slate-200 shrink-0 ml-2">
+                              {c.is_included || !c.price ? "Included" : `+${c.price} ETB`}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
                     <div className="flex justify-between pt-2">
                       <span className="font-bold text-slate-900 dark:text-white">Total Amount</span>
                       <span className="font-black text-lg text-slate-900 dark:text-white text-right">
@@ -1464,6 +1953,7 @@ export default function BookingPage() {
                       </p>
                     </div>
                   )}
+
                 </div>
 
                 {/* Right: Contact Form */}
@@ -1515,15 +2005,23 @@ export default function BookingPage() {
           )}
 
           {/* ── Action Navigation Footer (Inline at the end of each step) ── */}
-          <div className="pt-6 mt-6 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="fixed inset-x-0 bottom-0 z-40 flex flex-col gap-2 border-t border-slate-200 bg-white/95 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur dark:border-slate-800 dark:bg-slate-900/95 sm:static sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:border-t-0 sm:bg-transparent sm:p-0 sm:pt-5 sm:shadow-none sm:backdrop-blur-none sm:dark:bg-transparent">
             {/* Left: Selected Summary */}
-            <div className="min-w-0">
+            <div className="flex items-center justify-between gap-3 sm:hidden">
+              <span className="min-w-0 truncate text-xs font-semibold text-slate-600 dark:text-slate-300">
+                {cartItems.length > 0 ? `${itemCount} services · ${cartTotalDurationMins} min` : selectedVariant?.name || service.name}
+              </span>
+              <span className="shrink-0 text-sm font-black text-slate-900 dark:text-white">
+                {(cartItems.length > 0 ? cartTotalPrice : effectivePriceBreakdown?.finalPrice || startingPriceInfo.minPrice || 0).toLocaleString()} ETB
+              </span>
+            </div>
+            <div className="hidden min-w-0 sm:block">
               <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
                 Selected
               </span>
               <div className="font-bold text-sm sm:text-base text-slate-900 dark:text-white truncate">
                 {selectedVariant?.name || service.name}
-                {currentStepIndex >= (hasVariants ? 2 : 1) && selectedProvider && ` · ${selectedProvider.name}`}
+                {currentStep === "when" && selectedProvider && ` · ${selectedProvider.name}`}
               </div>
             </div>
 
@@ -1542,13 +2040,13 @@ export default function BookingPage() {
 
               <button
                 type="button"
-                onClick={handleNextStep}
-                disabled={!canProceed || isSubmitting}
+                onClick={currentStep === "services" && cartItems.length > 0 ? () => setIsCartOpen(true) : handleNextStep}
+                disabled={(!(currentStep === "services" && cartItems.length > 0) && !canProceed) || isSubmitting}
                 className={cn(
-                  "flex-1 sm:flex-initial px-7 sm:px-9 py-2.5 sm:py-3 rounded-full font-bold text-xs sm:text-sm text-white flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs",
+                  "flex-1 sm:flex-initial px-7 sm:px-9 py-3 rounded-full font-bold text-xs sm:text-sm text-white flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm",
                   !canProceed || isSubmitting
                     ? "bg-slate-300 dark:bg-slate-800 text-slate-400 cursor-not-allowed"
-                    : "bg-[#0f2937] hover:bg-black active:scale-98"
+                    : "bg-[#ad741f] hover:bg-[#925d14] active:scale-98"
                 )}
               >
                 {isSubmitting ? (
@@ -1561,12 +2059,22 @@ export default function BookingPage() {
                     {service.requires_prepayment && (service.prepayment_amount || 0) > 0
                       ? "Proceed to Prepayment"
                       : bookingTab === "appointment"
-                      ? "Confirm Appointment"
-                      : "Confirm & Join Queue"}
+                      ? "Book now"
+                      : "Join queue"}
                   </span>
-                ) : currentStep === "details" ? (
+                ) : currentStep === "services" && cartItems.length > 0 ? (
                   <>
-                    <span>{hasVariants ? "Choose Option" : "Choose Specialist"}</span>
+                    <span>Review {itemCount} services</span>
+                    <Icon icon="solar:arrow-right-linear" className="w-4 h-4" />
+                  </>
+                  ) : currentStep === "services" ? (
+                  <>
+                    <span>Choose specialist</span>
+                    <Icon icon="solar:arrow-right-linear" className="w-4 h-4" />
+                  </>
+                ) : currentStep === "specialist" ? (
+                  <>
+                    <span>Choose date</span>
                     <Icon icon="solar:arrow-right-linear" className="w-4 h-4" />
                   </>
                 ) : (
@@ -1592,6 +2100,7 @@ export default function BookingPage() {
                 src={selectedLightboxImage}
                 alt="Enlarged service"
                 fill
+                sizes="(max-width: 1024px) 100vw, 896px"
                 className="object-contain"
               />
             </div>

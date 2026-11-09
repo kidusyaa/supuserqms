@@ -305,10 +305,10 @@ export default function Filterherosection() {
         </div>
 
         {/* 2. Two Pills Row: Location Pill + Filters Pill */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 relative z-30">
 
           {/* 📍 Location Pill */}
-          <div className="relative flex-1" ref={locationRef}>
+          <div className={`relative flex-1 ${locationOpen ? "z-40" : "z-20"}`} ref={locationRef}>
             <button
               type="button"
               onClick={() => {
@@ -395,7 +395,7 @@ export default function Filterherosection() {
           </div>
 
           {/* 🎛 Filters Pill */}
-          <div className="relative shrink-0" ref={filtersRef}>
+          <div className={`relative shrink-0 ${filtersOpen ? "z-40" : "z-20"}`} ref={filtersRef}>
             <button
               type="button"
               onClick={() => {
@@ -825,7 +825,7 @@ export default function Filterherosection() {
       )}
 
       {/* ── 6 DATABASE CATEGORY ICONS UNDERNEATH ── */}
-      <div className="mt-8 sm:mt-10">
+      <div className="mt-8 sm:mt-10 relative z-10">
         <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 sm:gap-4 max-w-4xl mx-auto">
           {DATABASE_CATEGORIES.map((cat) => {
             return (

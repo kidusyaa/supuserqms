@@ -5,11 +5,11 @@ import Filterherosection from './Filterherosection';
 export default function Herosection() {
   return (
     <div
-      className="relative bg-fixed bg-cover bg-center bg-no-repeat pt-8 pb-12 sm:pt-12 sm:pb-16 border-b border-slate-800/20 mt-0 rounded-t-none rounded-b-3xl overflow-hidden"
+      className="relative z-30 bg-fixed bg-cover bg-center bg-no-repeat pt-8 pb-12 sm:pt-12 sm:pb-16 border-b border-slate-800/20 mt-0 rounded-t-none rounded-b-3xl overflow-visible"
       style={{ backgroundImage: "url('/images/test1.jpg')" }}
     >
       {/* Dark gradient overlay for contrast, depth and readability */}
-      <div className="absolute inset-0 bg-gradient-to-b from-slate-950/75 via-slate-900/65 to-slate-950/80 backdrop-blur-[1px] pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-b from-slate-950/75 via-slate-900/65 to-slate-950/80 backdrop-blur-[1px] pointer-events-none rounded-b-3xl" />
 
       <div className="container mx-auto px-4 relative z-10">
         {/* Main Headline */}

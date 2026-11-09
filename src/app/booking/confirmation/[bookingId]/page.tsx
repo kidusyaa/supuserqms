@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { getBookingDetails } from "@/lib/supabase-utils";
+import { getBookingDetails, getBookingGroupDetails } from "@/lib/supabase-utils";
 import { format, parseISO } from "date-fns";
 import { formatEthiopian } from "@/lib/ethiopian-calendar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,12 +10,14 @@ import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import { Icon } from "@iconify/react";
 import PaymentVerificationModal from "@/components/book/_componet/PaymentVerificationModal";
+import { LogoLoader } from "@/components/ui/LogoLoader";
 import type { Booking } from "@/type";
 
 export default function BookingConfirmationPage() {
   const params = useParams();
   const router = useRouter();
   const [booking, setBooking] = useState<Booking | null>(null);
+  const [groupBookings, setGroupBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
@@ -30,6 +32,16 @@ export default function BookingConfirmationPage() {
         throw new Error("Booking not found.");
       }
       setBooking(data);
+      if (data.booking_group_id) {
+        try {
+          const group = await getBookingGroupDetails(data.booking_group_id);
+          if (group && group.length > 0) {
+            setGroupBookings(group);
+          }
+        } catch (gErr) {
+          console.debug("Could not fetch group bookings:", gErr);
+        }
+      }
     } catch (err: any) {
       console.error("Failed to fetch booking:", err);
       setError(err.message || "Could not load booking details.");
@@ -49,9 +61,13 @@ export default function BookingConfirmationPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        <p className="ml-4 text-lg">Loading booking details...</p>
+      <div className="min-h-screen bg-background flex items-center justify-center p-6">
+        <LogoLoader
+          variant="flip"
+          size="lg"
+          text="Loading booking details"
+          subtext="Retrieving your reservation confirmation"
+        />
       </div>
     );
   }
@@ -198,6 +214,91 @@ export default function BookingConfirmationPage() {
               )}
             </div>
 
+            {/* Component Snapshot Breakdown */}
+            {booking.booking_components && booking.booking_components.length > 0 && (
+              <div className="bg-slate-50/70 dark:bg-slate-900/60 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 dark:text-slate-200">
+                    <Icon icon="solar:layers-minimalistic-bold" className="w-4 h-4 text-amber-600" />
+                    <span>Included Steps &amp; Add-ons ({booking.booking_components.length})</span>
+                  </div>
+                  {booking.booking_group_id && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300">
+                      Multi-Service Group
+                    </span>
+                  )}
+                </div>
+
+                <div className="space-y-1.5 pt-1">
+                  {booking.booking_components.map((bc) => {
+                    const comp = bc.component;
+                    const isPhase = comp?.component_type === "phase";
+
+                    return (
+                      <div
+                        key={bc.id}
+                        className="flex items-center justify-between text-xs py-1.5 px-2.5 rounded-xl bg-white dark:bg-slate-800/80 border border-slate-100 dark:border-slate-700/60"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span
+                            className={`w-2 h-2 rounded-full shrink-0 ${
+                              isPhase ? "bg-emerald-500" : "bg-amber-500"
+                            }`}
+                          />
+                          <span className="font-semibold text-slate-900 dark:text-white truncate">
+                            {comp?.name || "Service Item"}
+                          </span>
+                          {comp?.is_overlappable && (
+                            <span className="text-[9px] text-blue-600 bg-blue-50 dark:bg-blue-950/60 px-1 rounded font-medium">
+                              Concurrent
+                            </span>
+                          )}
+                          {bc.provider && (
+                            <span className="text-[10px] text-slate-400">
+                              by {bc.provider.name}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="text-right shrink-0 font-medium text-slate-700 dark:text-slate-300">
+                          {bc.price_at_booking === 0
+                            ? "Included"
+                            : `+${bc.price_at_booking} ETB`}
+                          {bc.duration_mins > 0 && (
+                            <span className="text-[10px] text-slate-400 ml-1.5">
+                              ({bc.duration_mins}m)
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Price Snapshot Summary */}
+            <div className="bg-slate-50/50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-1.5 text-xs">
+              <div className="flex justify-between text-slate-500">
+                <span>Original Price</span>
+                <span className="font-medium text-slate-800 dark:text-slate-200">
+                  {booking.original_price != null ? `${booking.original_price} ETB` : "N/A"}
+                </span>
+              </div>
+              {Boolean(booking.discount_amount && booking.discount_amount > 0) && (
+                <div className="flex justify-between text-emerald-600 font-medium">
+                  <span>Discount Applied</span>
+                  <span>-{booking.discount_amount} ETB</span>
+                </div>
+              )}
+              <div className="flex justify-between text-sm font-bold pt-1 border-t border-slate-200 dark:border-slate-700">
+                <span className="text-slate-900 dark:text-white">Final Total</span>
+                <span className="text-base font-black text-amber-600">
+                  {booking.final_price != null ? `${booking.final_price} ETB` : "N/A"}
+                </span>
+              </div>
+            </div>
+
             {booking.notes && (
               <div className="text-xs p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800">
                 <p className="text-muted-foreground text-[11px]">Notes</p>
@@ -243,6 +344,17 @@ export default function BookingConfirmationPage() {
           open={paymentModalOpen}
           onOpenChange={setPaymentModalOpen}
           booking={booking}
+          bookingGroupId={booking.booking_group_id}
+          totalPrepaymentAmount={
+            groupBookings.length > 0
+              ? groupBookings.reduce((sum, b) => sum + (Number(b.prepayment_amount) || 0), 0) || (booking.service ? Number(booking.service.prepayment_amount) || 0 : 0)
+              : (booking.service ? Number(booking.service.prepayment_amount) || 0 : 0)
+          }
+          serviceNames={
+            groupBookings.length > 0
+              ? (groupBookings.map((b) => b.service?.name).filter(Boolean) as string[])
+              : (booking.service?.name ? [booking.service.name] : [])
+          }
           service={booking.service}
           company={booking.company}
           selectedProvider={

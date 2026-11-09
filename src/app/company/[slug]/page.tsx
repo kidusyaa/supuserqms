@@ -13,6 +13,7 @@ import CompanyHeader from "@/components/company-componets/CompanyHeader"
 import CompanyServicesList from "@/components/company-componets/CompanyServicesList"
 import CompanySidebar from "@/components/company-componets/CompanySidebar"
 import CompanyPhotosGallery from "@/components/company-componets/CompanyPhotosGallery"
+import { LogoLoader } from "@/components/ui/LogoLoader"
 
 export default function CompanyDetailPage() {
   const params = useParams()

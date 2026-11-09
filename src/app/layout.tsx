@@ -1,19 +1,22 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Fraunces, Inter } from "next/font/google";
 
 import "./globals.css";
 import NavSection from "@/components/navsection";
 import MobileBottomNav from "@/components/MobileBottomNav";
 import Footer from "@/components/footer";
+import CartProviderWrapper from "@/components/cart/CartProviderWrapper";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
+  display: "swap",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const fraunces = Fraunces({
+  variable: "--font-fraunces",
   subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -70,18 +73,25 @@ export default function RootLayout({
       <head>
         <link rel="manifest" href="/manifest.json" />
         <link rel="icon" href="/images/logopro.png" />
+        <link rel="preconnect" href="https://gwfwbijqcqvmtsnpikwz.supabase.co" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://gwfwbijqcqvmtsnpikwz.supabase.co" />
+        <link rel="preconnect" href="https://cxifbxhpwkxnsxxpaxwh.supabase.co" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://cxifbxhpwkxnsxxpaxwh.supabase.co" />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased`}
+        className={`${inter.variable} ${fraunces.variable} font-sans antialiased`}
       >
-        <NavSection servicesSectionId={SERVICES_SECTION_ID} />
+        <CartProviderWrapper>
+          <NavSection servicesSectionId={SERVICES_SECTION_ID} />
 
-        {children}
-        {/* Spacer to prevent content from being hidden behind mobile bottom nav */}
-        <div className="h-14 md:hidden" />
-        {/* Mobile Bottom Navigation */}
-        <Footer/>
-        <MobileBottomNav />
+          <main id="main-content">
+            {children}
+          </main>
+
+          {/* Mobile Bottom Navigation */}
+          <Footer/>
+          <MobileBottomNav />
+        </CartProviderWrapper>
         {/* JSON-LD: Organization and WebSite */}
         <script
           type="application/ld+json"

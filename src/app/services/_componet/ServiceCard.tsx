@@ -97,6 +97,20 @@ export default function ServiceCard({
     return "30 min";
   }, [selectedVariant, service.estimated_wait_time_mins]);
 
+  // Active service components (phases & add-ons)
+  const activeComponents = useMemo(() => {
+    const comps = service.components || service.service_components || [];
+    return comps.filter((c) => c.is_active !== false);
+  }, [service.components, service.service_components]);
+
+  const addonCount = useMemo(() => {
+    return activeComponents.filter((c) => c.component_type === "addon").length;
+  }, [activeComponents]);
+
+  const phaseCount = useMemo(() => {
+    return activeComponents.filter((c) => c.component_type === "phase").length;
+  }, [activeComponents]);
+
   const primaryPhoto = service.photo || service.service_photos?.[0]?.url || null;
 
   const ratingSummary = service.company?.rating_summary;
@@ -249,6 +263,24 @@ export default function ServiceCard({
               </div>
             </div>
 
+            {/* Service Components Badge (Phases & Add-ons) */}
+            {activeComponents.length > 0 && (
+              <div className="flex items-center gap-1.5 flex-wrap mb-2">
+                {phaseCount > 0 && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200/50 dark:border-emerald-900/40">
+                    <Icon icon="solar:layers-minimalistic-bold" className="w-3 h-3 text-emerald-600" />
+                    <span>{phaseCount} {phaseCount === 1 ? "Phase" : "Phases"}</span>
+                  </span>
+                )}
+                {addonCount > 0 && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200/50 dark:border-amber-900/40">
+                    <Icon icon="solar:magic-stick-3-bold" className="w-3 h-3 text-amber-600" />
+                    <span>+{addonCount} Add-on{addonCount === 1 ? "" : "s"}</span>
+                  </span>
+                )}
+              </div>
+            )}
+
             {/* ── Included Amenities / Perks Chips (description_points) ── */}
             {service.description_points && service.description_points.length > 0 && (
               <div className="flex flex-wrap gap-1.5 my-2.5">
@@ -380,8 +412,8 @@ export default function ServiceCard({
         </div>
       </Link>
 
-      {/* Enlarged Photo Dialog / Lightbox */}
-      {primaryPhoto && (
+      {/* Enlarged Photo Dialog / Lightbox - Only mount when preview is requested */}
+      {primaryPhoto && isPreviewOpen && (
         <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
           <DialogContent className="max-w-4xl p-2 bg-black/95 border-none">
             <DialogTitle className="sr-only">{service.name} Image</DialogTitle>

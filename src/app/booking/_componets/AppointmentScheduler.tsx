@@ -1,14 +1,14 @@
 "use client";
 
-import { useState } from "react";
-import { Calendar } from "@/components/ui/calendar";
-import { EthiopianCalendar } from "@/components/ui/ethiopian-calendar";
-import { format, getDay, isPast, isSameDay, startOfDay } from "date-fns";
+import { useMemo, useState } from "react";
+import DualCalendarPicker from "@/components/book/DualCalendarPicker";
+import { addDays, format, getDay, isPast, isSameDay, startOfDay } from "date-fns";
 import type { AvailableSlot, Company, DailyWorkingHours } from "@/type";
 import { parseWorkingHours } from "@/lib/booking-utils";
-import { formatEthiopian, formatDualDate } from "@/lib/ethiopian-calendar";
+import { formatEthiopian, getEthiopianDate } from "@/lib/ethiopian-calendar";
 import { Icon } from "@iconify/react";
 import { cn } from "@/lib/utils";
+import { LogoLoader } from "@/components/ui/LogoLoader";
 
 interface AppointmentSchedulerProps {
   company: Company;
@@ -31,7 +31,12 @@ export default function AppointmentScheduler({
   isProviderSelected,
   selectedSlot,
 }: AppointmentSchedulerProps) {
-  const [calendarMode, setCalendarMode] = useState<"ethiopian" | "gregorian">("ethiopian");
+  const [showCalendar, setShowCalendar] = useState(false);
+
+  const quickDates = useMemo(
+    () => Array.from({ length: 5 }, (_, index) => addDays(startOfDay(new Date()), index)),
+    []
+  );
 
   const disabledDays = (date: Date) =>
     isPast(startOfDay(date)) && !isSameDay(date, new Date());
@@ -59,61 +64,67 @@ export default function AppointmentScheduler({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
       {/* ── Left: Calendar (5 Cols) ── */}
-      <div className="lg:col-span-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-5 shadow-none">
+      <div className={cn(
+        "bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3.5 sm:p-5 shadow-none",
+        showCalendar ? "lg:col-span-12" : "lg:col-span-5"
+      )}>
         <div className="flex items-center justify-between mb-3">
           <label className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
             <Icon icon="solar:calendar-bold" className="w-4 h-4 text-amber-500" />
-            <span>1. Select Date</span>
+            <span>Select a date</span>
           </label>
+          <button
+            type="button"
+            onClick={() => setShowCalendar((shown) => !shown)}
+            aria-expanded={showCalendar}
+            className="min-h-10 rounded-lg px-3 text-xs font-bold text-amber-800 hover:bg-amber-50 hover:text-amber-950 dark:text-amber-300 dark:hover:bg-amber-950/40"
+          >
+            {showCalendar ? "Close calendars" : "Choose another date"}
+          </button>
+        </div>
 
-          {/* Calendar Type Switcher (Ethiopian / Gregorian) */}
-          <div className="flex p-0.5 bg-slate-100 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
-            <button
-              type="button"
-              onClick={() => setCalendarMode("ethiopian")}
-              className={cn(
-                "px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1",
-                calendarMode === "ethiopian"
-                  ? "bg-[#0f2937] text-white shadow-xs"
-                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-              )}
-            >
-              <span>🇪🇹 ኢትዮጵያ</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setCalendarMode("gregorian")}
-              className={cn(
-                "px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1",
-                calendarMode === "gregorian"
-                  ? "bg-[#0f2937] text-white shadow-xs"
-                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-              )}
-            >
-              <span>🌐 Gregorian</span>
-            </button>
+        <div className="grid grid-cols-5 gap-1.5 pb-1">
+          {quickDates.map((date, index) => {
+            const isSelected = Boolean(selectedDate && isSameDay(selectedDate, date));
+            const ethiopianDate = getEthiopianDate(date);
+            return (
+              <button
+                key={date.toISOString()}
+                type="button"
+                onClick={() => onDateSelect(date)}
+                aria-pressed={isSelected}
+                aria-label={`${index === 0 ? "Today" : format(date, "EEEE")}, ${format(date, "MMMM d, yyyy")} Gregorian, ${ethiopianDate.monthNameAm} ${ethiopianDate.day} ${ethiopianDate.year} Ethiopian`}
+                className={cn(
+                  "min-w-0 flex flex-col items-center justify-center rounded-xl border px-1 py-2 transition-colors",
+                  isSelected
+                    ? "border-[#ad741f] bg-[#ad741f] text-white shadow-sm"
+                    : "border-amber-100 bg-white text-slate-700 hover:border-amber-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                )}
+              >
+                <span className={cn("text-[10px] font-medium", isSelected ? "text-white/80" : "text-slate-500")}>
+                  {index === 0 ? "Today" : format(date, "EEE")}
+                </span>
+                <span className="mt-0.5 text-lg font-bold leading-none">{format(date, "d")}</span>
+                <span className={cn("mt-1 text-[10px]", isSelected ? "text-white/80" : "text-slate-500")}>
+                  {format(date, "MMM")}
+                </span>
+                <span className={cn("mt-1 max-w-full truncate text-[9px] leading-none", isSelected ? "text-white/90" : "text-amber-800 dark:text-amber-300")}>
+                  {ethiopianDate.monthNameAm} {ethiopianDate.day}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {showCalendar && (
+          <div className="mt-3 rounded-xl border border-slate-200 p-3 dark:border-slate-800">
+            <DualCalendarPicker
+              selectedDate={selectedDate}
+              onSelect={onDateSelect}
+              disabled={disabledDays}
+            />
           </div>
-        </div>
-        
-        <div className="flex justify-center">
-          {calendarMode === "ethiopian" ? (
-            <EthiopianCalendar
-              selected={selectedDate}
-              onSelect={onDateSelect}
-              disabled={disabledDays}
-              className="rounded-2xl border border-slate-100 dark:border-slate-800 p-2"
-            />
-          ) : (
-            <Calendar
-              mode="single"
-              selected={selectedDate}
-              onSelect={onDateSelect}
-              initialFocus
-              disabled={disabledDays}
-              className="rounded-2xl border border-slate-100 dark:border-slate-800 p-2"
-            />
-          )}
-        </div>
+        )}
 
         <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-400 flex items-center gap-1.5">
           <Icon icon="solar:clock-circle-linear" className="w-3.5 h-3.5 text-slate-400 shrink-0" />
@@ -122,28 +133,37 @@ export default function AppointmentScheduler({
       </div>
 
       {/* ── Right: Available Slots (7 Cols) ── */}
-      <div className="lg:col-span-7 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-5 sm:p-6 shadow-none min-h-[360px] flex flex-col">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-4 pb-3 border-b border-slate-100 dark:border-slate-800">
+      <div className={cn(
+        "bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-3.5 sm:p-5 shadow-none min-h-0 flex flex-col",
+        showCalendar ? "lg:col-span-12" : "lg:col-span-7"
+      )}>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4 pb-3 border-b border-slate-100 dark:border-slate-800">
           <label className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
             <Icon icon="solar:clock-circle-bold" className="w-4 h-4 text-amber-500" />
-            <span>2. Select Time Slot</span>
+            <span>Select a time</span>
           </label>
-          <span className="text-xs text-amber-700 dark:text-amber-400 font-semibold bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-md self-start sm:self-auto border border-amber-200/60 dark:border-amber-900/60">
+          <div className="self-start rounded-lg border border-amber-200/60 bg-amber-50 px-3 py-2 text-left dark:border-amber-900/60 dark:bg-amber-950/40 sm:self-auto sm:text-right">
             {selectedDate ? (
-              calendarMode === "ethiopian"
-                ? `${formatEthiopian(selectedDate, { locale: "am", includeWeekday: true })} · (${format(selectedDate, "MMM d, yyyy")})`
-                : `${format(selectedDate, "EEE, MMM d, yyyy")} · (${formatEthiopian(selectedDate, { locale: "am" })})`
+              <>
+                <span className="block text-xs font-bold text-amber-800 dark:text-amber-300">
+                  {formatEthiopian(selectedDate, { locale: "am", includeWeekday: true })}
+                </span>
+                <span className="mt-0.5 block text-[11px] font-medium text-slate-600 dark:text-slate-300">
+                  {format(selectedDate, "EEEE, MMMM d, yyyy")}
+                </span>
+              </>
             ) : (
-              "Choose a date"
+              <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                Choose a date
+              </span>
             )}
-          </span>
+          </div>
         </div>
 
         <div className="flex-1">
           {slotsLoading ? (
-            <div className="h-56 flex flex-col items-center justify-center text-slate-400 space-y-2">
-              <div className="w-8 h-8 border-2 border-slate-300 border-t-amber-500 rounded-full animate-spin"></div>
-              <p className="text-xs font-medium">Checking available slots...</p>
+            <div className="h-56 flex flex-col items-center justify-center text-slate-400">
+              <LogoLoader variant="flip" size="sm" text="Checking available slots..." />
             </div>
           ) : availableSlots.length > 0 ? (
             <div className="space-y-3">
@@ -159,8 +179,9 @@ export default function AppointmentScheduler({
                       type="button"
                       onClick={() => onSlotClick(slot)}
                       disabled={!isProviderSelected}
+                      aria-pressed={isSelected}
                       className={cn(
-                        "py-2.5 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer shadow-none text-center active:scale-98 flex items-center justify-center gap-1",
+                        "min-h-11 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer shadow-none text-center active:scale-98 flex items-center justify-center gap-1",
                         isSelected
                           ? "border-amber-500 bg-amber-500 text-white shadow-xs font-black ring-2 ring-amber-500/30"
                           : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-amber-500 hover:bg-amber-50/50 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200"

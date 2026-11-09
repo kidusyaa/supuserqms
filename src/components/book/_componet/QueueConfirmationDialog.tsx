@@ -96,6 +96,22 @@ export function QueueConfirmationDialog({
                             </p>
                         )}
                         {queueEntry.notes && <p><strong>Notes:</strong> {queueEntry.notes}</p>}
+
+                        {queueEntry.queue_components && queueEntry.queue_components.length > 0 && (
+                            <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
+                                <p className="font-semibold text-xs text-slate-700 dark:text-slate-300 mb-1">
+                                    Selected Add-ons ({queueEntry.queue_components.length}):
+                                </p>
+                                <div className="space-y-1">
+                                    {queueEntry.queue_components.map((qc) => (
+                                        <div key={qc.id} className="flex justify-between text-xs text-slate-600 dark:text-slate-400">
+                                            <span>{qc.component?.name || "Add-on"}</span>
+                                            <span>{qc.price_at_queue > 0 ? `+${qc.price_at_queue} ETB` : "Included"} ({qc.duration_mins}m)</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
                 <DialogFooter>
